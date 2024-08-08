@@ -500,6 +500,7 @@ future_init(FutureObj *fut, PyObject *loop)
     Py_CLEAR(fut->fut_source_tb);
     Py_CLEAR(fut->fut_cancel_msg);
     Py_CLEAR(fut->fut_cancelled_exc);
+    Py_CLEAR(fut->fut_weakreflist);
 
     fut->fut_state = STATE_PENDING;
     fut->fut_log_tb = 0;
@@ -815,6 +816,7 @@ FutureObj_clear(FutureObj *fut)
     Py_CLEAR(fut->fut_cancel_msg);
     Py_CLEAR(fut->fut_cancelled_exc);
     Py_CLEAR(fut->dict);
+    Py_CLEAR(fut->fut_weakreflist);
     return 0;
 }
 
