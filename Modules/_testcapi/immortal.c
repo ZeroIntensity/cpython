@@ -31,9 +31,19 @@ test_immortal_small_ints(PyObject *self, PyObject *Py_UNUSED(ignored))
     Py_RETURN_NONE;
 }
 
+static PyObject *
+immortalize_object(PyObject *Py_UNUSED(self), PyObject *obj)
+{
+    if (Py_Immortalize(obj) < 0)
+        return NULL;
+    assert(verify_immortality(obj));
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef test_methods[] = {
     {"test_immortal_builtins",   test_immortal_builtins,     METH_NOARGS},
     {"test_immortal_small_ints", test_immortal_small_ints,   METH_NOARGS},
+    {"immortalize_object",       immortalize_object,         METH_O},
     {NULL},
 };
 

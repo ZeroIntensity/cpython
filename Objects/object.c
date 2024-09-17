@@ -3116,11 +3116,36 @@ Py_TYPE(PyObject *ob)
     return _Py_TYPE(ob);
 }
 
-
-// Py_REFCNT() implementation for the stable ABI
-#undef Py_REFCNT
-Py_ssize_t
-Py_REFCNT(PyObject *ob)
+int
+Py_Immortalize(PyObject *op)
 {
-    return _Py_REFCNT(ob);
+    assert(op != NULL);
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    PyObject *immortals;
+    if (interp->runtime_immortals == NULL)
+    {
+        // The immortals list hasn't been allocated yet!
+        immortals = PyList_New(1);
+        if (immortals == NULL)
+        {
+            return -1;
+        }
+        _Py_SetImmortal(immortals);
+        interp->runtime_immortals = immortals;
+    } else
+    {
+        assert(interp->runtime_immortals != NULL);
+        immortals = interp->runtime_immortals;
+    }
+
+    assert(immortals != NULL);
+    assert(_Py_IsImmortalLoose(immortals));
+
+    if (PyList_Append(immortals, op) < 0)
+    {
+        return -1;
+    }
+    _Py_SetImmortal(op);
+
+    return 0;
 }

@@ -823,6 +823,26 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
     Py_CLEAR(interp->audit_hooks);
 
+    if (interp->runtime_immortals != NULL)
+    {
+        // Clear the user-defined immortal objects
+        for (Py_ssize_t i = 0; i < PyList_GET_SIZE(interp->runtime_immortals); ++i)
+        {
+            PyObject *op = PyList_GET_ITEM(interp->runtime_immortals, i);
+            if (op == NULL)
+                // It's possible for a NULL entry to exist, if allocation succeeded
+                // but then appending failed.
+                continue;
+
+            assert(_Py_IsImmortalLoose(op));
+            _Py_SetMortal(op, 1);
+        }
+
+        // This will go through and deallocate each immortal object.
+        _Py_SetMortal(interp->runtime_immortals, 1);
+        Py_CLEAR(interp->runtime_immortals);
+    }
+
     // At this time, all the threads should be cleared so we don't need atomic
     // operations for instrumentation_version or eval_breaker.
     interp->ceval.instrumentation_version = 0;
