@@ -3120,6 +3120,10 @@ int
 Py_Immortalize(PyObject *op)
 {
     assert(op != NULL);
+    if (_Py_IsImmortal(op))
+        // We don't want to track objects that are already immortal
+        return 0;
+
     PyInterpreterState *interp = _PyInterpreterState_GET();
     PyObject *immortals;
     if (interp->runtime_immortals == NULL)
