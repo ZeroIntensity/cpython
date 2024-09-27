@@ -2442,9 +2442,40 @@ _Py_NewReferenceNoTotal(PyObject *op)
     new_reference(op);
 }
 
+Py_ssize_t
+_Py_FindUserDefinedImmortal(PyObject *op)
+{
+    if (!_Py_IsImmortal(op))
+        return -1;
+
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    if (interp->runtime_immortals == NULL)
+        return -1;
+
+    for (Py_ssize_t i = 0; i < PyList_GET_SIZE(interp->runtime_immortals); ++i)
+    {
+        if (PyList_GET_ITEM(interp->runtime_immortals, i))
+            return i;
+    }
+
+    return -1;
+}
+
 void
 _Py_SetImmortalUntracked(PyObject *op)
 {
+    Py_ssize_t user_immortal_index = _Py_FindUserDefinedImmortal(op);
+    if (user_immortal_index != -1)
+    {
+        // This object is being tracked by user immortals.
+        // We don't want to do that anymore, and let the interpreter do it instead.
+        PyInterpreterState *interp = _PyInterpreterState_GET();
+        assert(interp->runtime_immortals != NULL);
+        if (PySequence_DelItem(interp->runtime_immortals, index) < 0) {
+            PyErr_WriteUnraisable(op);
+        }
+        _Py_SetMortal(op);
+    }
 #ifdef Py_DEBUG
     // For strings, use _PyUnicode_InternImmortal instead.
     if (PyUnicode_CheckExact(op)) {
