@@ -3329,6 +3329,64 @@ test_critical_sections(PyObject *module, PyObject *Py_UNUSED(args))
     Py_RETURN_NONE;
 }
 
+#include <pthread.h>
+
+static void *
+some_thread(void *arg)
+{
+    PyInterpreterState *interp = (PyInterpreterState *) arg;
+    Py_ENTER_SUBINTERPRETER(interp);
+    printf("interpreter id b: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
+
+    Py_ENTER_MAIN_INTERPRETER();
+    printf("interpreter id c: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
+    Py_EXIT_MAIN_INTERPRETER();
+
+    Py_EXIT_SUBINTERPRETER();
+    return NULL;
+}
+
+static PyInterpreterConfig config = {
+    .gil = PyInterpreterConfig_OWN_GIL,
+    .use_main_obmalloc = 1,
+    .check_multi_interp_extensions = 1
+};
+
+static void *
+first_thread(void *arg)
+{
+
+    PyThreadState *tstate = NULL;
+
+    Py_ENTER_MAIN_INTERPRETER();
+    Py_NewInterpreterFromConfig(&tstate, &config);
+    Py_EXIT_MAIN_INTERPRETER();
+
+    printf("interpreter id a: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
+
+    pthread_t thread;
+    pthread_create(&thread, NULL, some_thread, PyInterpreterState_Get());
+
+    Py_BEGIN_ALLOW_THREADS;
+    pthread_join(thread, NULL);
+    Py_END_ALLOW_THREADS;
+
+    Py_EndInterpreter(tstate);
+
+    return NULL;
+}
+
+static PyObject *
+test_attach_interpreter(PyObject *self, PyObject *args)
+{
+    pthread_t thread;
+    pthread_create(&thread, NULL, first_thread, NULL);
+    Py_BEGIN_ALLOW_THREADS;
+    pthread_join(thread, NULL);
+    Py_END_ALLOW_THREADS;
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef TestMethods[] = {
     {"set_errno",               set_errno,                       METH_VARARGS},
     {"test_config",             test_config,                     METH_NOARGS},
@@ -3469,6 +3527,7 @@ static PyMethodDef TestMethods[] = {
     {"test_weakref_capi", test_weakref_capi, METH_NOARGS},
     {"function_set_warning", function_set_warning, METH_NOARGS},
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
+    {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
 
