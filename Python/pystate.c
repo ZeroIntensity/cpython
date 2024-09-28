@@ -937,6 +937,136 @@ static inline void tstate_deactivate(PyThreadState *tstate);
 static void tstate_set_detached(PyThreadState *tstate, int detached_state);
 static void zapthreads(PyInterpreterState *interp);
 
+/*
+ * We use a stack here to ensure that functions can't accidentially have a side-effect
+ * of setting tstate to NULL after calling PyInterpreterState_Detach.
+ *
+ * For example, if "foo()" enters a subinterpreter, but then calls "bar()", which
+ * enters the main interpreter, then the subinterpreter from foo() would be lost, and
+ * would have to reactivate it's thread state with PyThreadState_Swap() or something
+ * similar.
+ *
+ * The stack approach makes this automatic: thread states detached by PyInterpreterState_Attach are
+ * stored, and then restored once PyInterpreterState_Detach() is called with a thread state that
+ * matches the current interpreter.
+ */
+typedef struct _Py_subinterp_tstate_linkedlist _Py_tstate_linkedlist;
+
+struct _Py_subinterp_tstate_linkedlist {
+    _Py_tstate_linkedlist *next;
+    PyThreadState *current;
+};
+
+static _Py_thread_local _Py_tstate_linkedlist *tstate_stack = NULL;
+
+static int
+stack_push_tstate(PyThreadState *tstate)
+{
+    // XXX Maybe this could use PyMem_Malloc()?
+    _Py_tstate_linkedlist *entry = PyMem_RawMalloc(sizeof(_Py_tstate_linkedlist));
+    if (entry == NULL)
+    {
+        return -1;
+    }
+
+    if (tstate_stack != NULL) {
+        // Copy the current stack top to our new entry
+        entry->current = tstate_stack->current;
+        entry->next = tstate_stack->next;
+
+        // Set the current stack top to tstate, and put the previous stack
+        // top right behind it.
+        tstate_stack->current = tstate;
+        tstate_stack->next = entry;
+    } else
+    {
+        // This is the first item in the stack!
+        entry->current = tstate;
+        entry->next = NULL;
+        tstate_stack = entry;
+    }
+
+    return 0;
+
+}
+
+static PyThreadState *
+stack_pop_tstate(void)
+{
+    PyThreadState *tstate = tstate_stack->current;
+    _Py_tstate_linkedlist *stack_pointer_copy = tstate_stack;
+    tstate_stack = tstate_stack->next;
+    PyMem_RawFree(stack_pointer_copy);
+    return tstate;
+}
+
+static int
+stack_has_entry(void)
+{
+    return tstate_stack != NULL && tstate_stack->current != NULL;
+}
+
+PyStatus
+PyInterpreterState_Attach(PyInterpreterState *interp, PyThreadState **tstate_out)
+{
+    PyThreadState *old_tstate = _PyThreadState_GET();
+    PyThreadState *tstate = _PyThreadState_New(interp, _PyThreadState_WHENCE_INIT);
+    if (tstate == NULL) {
+        return _PyStatus_NO_MEMORY();
+    }
+
+    if (old_tstate != NULL) {
+        if (stack_push_tstate(old_tstate) < 0) {
+            return _PyStatus_NO_MEMORY();
+        }
+
+        _PyThreadState_Detach(old_tstate);
+    }
+
+    _PyThreadState_Bind(tstate);
+    _PyThreadState_Attach(tstate);
+
+    *tstate_out = tstate;
+
+    return _PyStatus_OK();
+}
+
+void
+PyInterpreterState_Detach(PyThreadState *tstate)
+{
+    assert(tstate != NULL);
+    PyThreadState *old_tstate = current_fast_get();
+    _Py_EnsureTstateNotNULL(old_tstate);
+
+    if (old_tstate == tstate && stack_has_entry())
+    {
+        // The original call to PyInterpreterState_Attach() was nested, restore
+        // the previous interpreter.
+        old_tstate = stack_pop_tstate();
+    }
+    else if (old_tstate != tstate)
+    {
+        // Temporarily enter tstate's interpreter
+        _PyThreadState_Detach(old_tstate);
+        _PyThreadState_Attach(tstate);
+    }
+
+    PyThreadState_Clear(tstate);
+    _PyThreadState_Detach(tstate);
+    PyThreadState_Delete(tstate);
+
+    if (old_tstate != tstate)
+    {
+        _PyThreadState_Attach(old_tstate);
+    }
+}
+
+PyStatus
+PyInterpreterState_AttachToMain(PyThreadState **tstate_out)
+{
+    return PyInterpreterState_Attach(&_PyRuntime._main_interpreter, tstate_out);
+}
+
 void
 PyInterpreterState_Delete(PyInterpreterState *interp)
 {
