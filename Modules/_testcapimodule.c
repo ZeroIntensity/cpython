@@ -3330,31 +3330,83 @@ test_critical_sections(PyObject *module, PyObject *Py_UNUSED(args))
     Py_RETURN_NONE;
 }
 
-static int
-interpreter_id(void)
+static void
+expect_id(int64_t expected)
 {
     PyInterpreterState *interp = PyInterpreterState_Get();
     assert(interp != NULL);
-    return PyInterpreterState_GetID(interp);
+    int64_t interp_id = PyInterpreterState_GetID(interp);
+    if (interp_id != expected) {
+        fprintf(stderr, "expected interpreter ID %ld, got %ld\n", expected, interp_id);
+    }
+
+    assert(interp_id == expected);
+}
+
+static PyObject *
+test_attach_interpreter(PyObject *self, PyObject *args)
+{
+    // Nested main interpreter calls
+    Py_ENTER_MAIN_INTERPRETER();
+    expect_id(0);
+
+    Py_ENTER_MAIN_INTERPRETER();
+    expect_id(0);
+    Py_EXIT_MAIN_INTERPRETER();
+
+    expect_id(0);
+    Py_EXIT_MAIN_INTERPRETER();
+
+    // Now, an actual subinterpreter
+    PyThreadState *orig_tstate = PyThreadState_Get();
+    PyThreadState *tstate = Py_NewInterpreter();
+    assert(tstate != NULL);
+
+    PyInterpreterState *interp = PyThreadState_GetInterpreter(tstate);
+    assert(interp != NULL);
+
+    // The subinterpreter ID can vary, depending on what was called beforehand.
+    // All that matters is that it's not the main interpreter, I guess.
+    int64_t expected_id = PyInterpreterState_GetID(interp);
+    assert(expected_id != 0);
+
+    expect_id(expected_id);
+
+    Py_ENTER_MAIN_INTERPRETER();
+    expect_id(0);
+
+    Py_ENTER_SUBINTERPRETER(PyThreadState_GetInterpreter(tstate));
+    expect_id(expected_id);
+    Py_EXIT_SUBINTERPRETER();
+
+    expect_id(0);
+    Py_EXIT_MAIN_INTERPRETER();
+
+    Py_EndInterpreter(tstate);
+    PyThreadState_Swap(orig_tstate);
+    Py_RETURN_NONE;
 }
 
 static int
 second_thread(void *arg)
 {
     PyInterpreterState *interp = (PyInterpreterState *) arg;
+    int64_t expected_id = PyInterpreterState_GetID(interp);
+    assert(expected_id != 0);
+
     Py_ENTER_SUBINTERPRETER(interp);
-    assert(interpreter_id() == 1);
+    expect_id(expected_id);
 
     Py_ENTER_MAIN_INTERPRETER();
-    assert(interpreter_id() == 0);
+    expect_id(0);
     Py_EXIT_MAIN_INTERPRETER();
 
-    assert(interpreter_id() == 1);
+    expect_id(expected_id);
     Py_EXIT_SUBINTERPRETER();
 
     // tstate is NULL again, see if the main interpreter works
     Py_ENTER_MAIN_INTERPRETER();
-    assert(interpreter_id() == 0);
+    expect_id(0);
     Py_EXIT_MAIN_INTERPRETER();
 
     return 0;
@@ -3371,18 +3423,22 @@ first_thread(void *arg)
 {
 
     PyThreadState *tstate = NULL;
+    int64_t expected_id;
 
     Py_ENTER_MAIN_INTERPRETER();
-    assert(interpreter_id() == 0);
+    expect_id(0);
     PyStatus status = Py_NewInterpreterFromConfig(&tstate, &config);
     if (PyStatus_IsError(status)) {
         // Too lazy to set up error handling between threads
         Py_FatalError("failed to create subinterpreter");
     }
-    assert(interpreter_id() == 1);
+
+    expected_id = PyInterpreterState_GetID(PyInterpreterState_Get());
+    assert(expected_id != 0);
+    expect_id(expected_id);
     Py_EXIT_MAIN_INTERPRETER();
 
-    assert(interpreter_id() == 1);
+    expect_id(expected_id);
 
     thrd_t thread;
     if (thrd_create(&thread, second_thread, PyInterpreterState_Get()) != thrd_success)
@@ -3393,8 +3449,15 @@ first_thread(void *arg)
     Py_BEGIN_ALLOW_THREADS;
     thrd_join(thread, NULL);
     Py_END_ALLOW_THREADS;
+    expect_id(expected_id);
 
     Py_EndInterpreter(tstate);
+
+    // Back into main interpreter, just for fun
+    Py_ENTER_MAIN_INTERPRETER();
+    expect_id(0);
+    Py_EXIT_MAIN_INTERPRETER();
+
     return 0;
 }
 
@@ -3552,6 +3615,7 @@ static PyMethodDef TestMethods[] = {
     {"test_weakref_capi", test_weakref_capi, METH_NOARGS},
     {"function_set_warning", function_set_warning, METH_NOARGS},
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
+    {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
     {"test_attach_interpreter_threads", test_attach_interpreter_threads, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
