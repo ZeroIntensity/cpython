@@ -3341,8 +3341,8 @@ some_thread(void *arg)
     Py_ENTER_MAIN_INTERPRETER();
     printf("interpreter id c: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
     Py_EXIT_MAIN_INTERPRETER();
-
     Py_EXIT_SUBINTERPRETER();
+
     return NULL;
 }
 
@@ -3377,13 +3377,14 @@ first_thread(void *arg)
 }
 
 static PyObject *
-test_attach_interpreter(PyObject *self, PyObject *args)
+test_attach_interpreter_threads(PyObject *self, PyObject *args)
 {
     pthread_t thread;
     pthread_create(&thread, NULL, first_thread, NULL);
     Py_BEGIN_ALLOW_THREADS;
     pthread_join(thread, NULL);
     Py_END_ALLOW_THREADS;
+
     Py_RETURN_NONE;
 }
 
@@ -3527,7 +3528,7 @@ static PyMethodDef TestMethods[] = {
     {"test_weakref_capi", test_weakref_capi, METH_NOARGS},
     {"function_set_warning", function_set_warning, METH_NOARGS},
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
-    {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
+    {"test_attach_interpreter_threads", test_attach_interpreter_threads, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
 
