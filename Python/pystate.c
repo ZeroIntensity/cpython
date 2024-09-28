@@ -1028,6 +1028,9 @@ PyInterpreterState_Attach(PyInterpreterState *interp, PyThreadState **tstate_out
 
     *tstate_out = tstate;
 
+    // Sanity check to make sure we actually switched to the requested interpreter
+    assert(_PyInterpreterState_GET()->id == PyInterpreterState_GetID(interp));
+
     return _PyStatus_OK();
 }
 
