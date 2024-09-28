@@ -271,6 +271,29 @@ PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_Next(PyInterpreterState *);
 PyAPI_FUNC(PyThreadState *) PyInterpreterState_ThreadHead(PyInterpreterState *);
 PyAPI_FUNC(PyThreadState *) PyThreadState_Next(PyThreadState *);
 PyAPI_FUNC(void) PyThreadState_DeleteCurrent(void);
+PyAPI_FUNC(PyStatus) PyInterpreterState_Attach(PyInterpreterState *interp, PyThreadState **tstate_out);
+PyAPI_FUNC(void) PyInterpreterState_Detach(PyThreadState *tstate);
+PyAPI_FUNC(PyStatus) PyInterpreterState_AttachToMain(PyThreadState **tstate_out);
+
+#define Py_ENTER_MAIN_INTERPRETER() do { \
+    PyThreadState *_Py_local_main_tstate; \
+    PyStatus _Py_attach_status = PyInterpreterState_AttachToMain(&_Py_local_main_tstate); \
+    if (PyStatus_IsError(_Py_attach_status)) \
+        Py_FatalError("failed to initialize thread state"); \
+
+#define Py_EXIT_MAIN_INTERPRETER() \
+    PyInterpreterState_Detach(_Py_local_main_tstate); \
+    } while (0)
+
+#define Py_ENTER_SUBINTERPRETER(interp) do { \
+    PyThreadState *_Py_local_subinterp_tstate; \
+    PyStatus _Py_attach_status = PyInterpreterState_Attach(interp, &_Py_local_subinterp_tstate); \
+    if (PyStatus_IsError(_Py_attach_status)) \
+        Py_FatalError("failed to initialize thread state"); \
+
+#define Py_EXIT_SUBINTERPRETER() \
+    PyInterpreterState_Detach(_Py_local_subinterp_tstate); \
+    } while (0)
 
 /* Frame evaluation API */
 

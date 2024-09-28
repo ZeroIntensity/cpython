@@ -3310,49 +3310,63 @@ test_critical_sections(PyObject *module, PyObject *Py_UNUSED(args))
     Py_RETURN_NONE;
 }
 
+#include <pthread.h>
 
-// Used by `finalize_thread_hang`.
-#ifdef _POSIX_THREADS
-static void finalize_thread_hang_cleanup_callback(void *Py_UNUSED(arg)) {
-    // Should not reach here.
-    Py_FatalError("pthread thread termination was triggered unexpectedly");
-}
-#endif
-
-// Tests that finalization does not trigger pthread cleanup.
-//
-// Must be called with a single nullary callable function that should block
-// (with GIL released) until finalization is in progress.
-static PyObject *
-finalize_thread_hang(PyObject *self, PyObject *callback)
+static void *
+some_thread(void *arg)
 {
-    // WASI builds some pthread stuff but doesn't have these APIs today?
-#if defined(_POSIX_THREADS) && !defined(__wasi__)
-    pthread_cleanup_push(finalize_thread_hang_cleanup_callback, NULL);
-#endif
-    PyObject_CallNoArgs(callback);
-    // Should not reach here.
-    Py_FatalError("thread unexpectedly did not hang");
-#if defined(_POSIX_THREADS) && !defined(__wasi__)
-    pthread_cleanup_pop(0);
-#endif
+    PyInterpreterState *interp = (PyInterpreterState *) arg;
+    Py_ENTER_SUBINTERPRETER(interp);
+    printf("interpreter id b: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
+
+    Py_ENTER_MAIN_INTERPRETER();
+    printf("interpreter id c: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
+    Py_EXIT_MAIN_INTERPRETER();
+
+    Py_EXIT_SUBINTERPRETER();
+    return NULL;
+}
+
+static PyInterpreterConfig config = {
+    .gil = PyInterpreterConfig_OWN_GIL,
+    .use_main_obmalloc = 1,
+    .check_multi_interp_extensions = 1
+};
+
+static void *
+first_thread(void *arg)
+{
+
+    PyThreadState *tstate = NULL;
+
+    Py_ENTER_MAIN_INTERPRETER();
+    Py_NewInterpreterFromConfig(&tstate, &config);
+    Py_EXIT_MAIN_INTERPRETER();
+
+    printf("interpreter id a: %ld\n", PyInterpreterState_GetID(PyInterpreterState_Get()));
+
+    pthread_t thread;
+    pthread_create(&thread, NULL, some_thread, PyInterpreterState_Get());
+
+    Py_BEGIN_ALLOW_THREADS;
+    pthread_join(thread, NULL);
+    Py_END_ALLOW_THREADS;
+
+    Py_EndInterpreter(tstate);
+
+    return NULL;
+}
+
+static PyObject *
+test_attach_interpreter(PyObject *self, PyObject *args)
+{
+    pthread_t thread;
+    pthread_create(&thread, NULL, first_thread, NULL);
+    Py_BEGIN_ALLOW_THREADS;
+    pthread_join(thread, NULL);
+    Py_END_ALLOW_THREADS;
     Py_RETURN_NONE;
 }
-
-
-static PyObject *
-type_freeze(PyObject *module, PyObject *args)
-{
-    PyTypeObject *type;
-    if (!PyArg_ParseTuple(args, "O!", &PyType_Type, &type)) {
-        return NULL;
-    }
-    if (PyType_Freeze(type) < 0) {
-        return NULL;
-    }
-    Py_RETURN_NONE;
-}
-
 
 static PyMethodDef TestMethods[] = {
     {"set_errno",               set_errno,                       METH_VARARGS},
@@ -3493,8 +3507,7 @@ static PyMethodDef TestMethods[] = {
     {"test_weakref_capi", test_weakref_capi, METH_NOARGS},
     {"function_set_warning", function_set_warning, METH_NOARGS},
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
-    {"finalize_thread_hang", finalize_thread_hang, METH_O, NULL},
-    {"type_freeze", type_freeze, METH_VARARGS},
+    {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
 
