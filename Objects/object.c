@@ -2508,10 +2508,10 @@ _Py_SetImmortalUntracked(PyObject *op)
         // We don't want to do that anymore, and let the interpreter do it instead.
         PyInterpreterState *interp = _PyInterpreterState_GET();
         assert(interp->runtime_immortals != NULL);
-        if (PySequence_DelItem(interp->runtime_immortals, index) < 0) {
+        if (PySequence_DelItem(interp->runtime_immortals, user_immortal_index) < 0) {
             PyErr_WriteUnraisable(op);
         }
-        _Py_SetMortal(op);
+        _Py_SetMortal(op, 1);
     }
 #ifdef Py_DEBUG
     // For strings, use _PyUnicode_InternImmortal instead.
