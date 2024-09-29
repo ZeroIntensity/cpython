@@ -997,6 +997,7 @@ stack_push_tstate(PyThreadState *tstate)
 static PyThreadState *
 stack_pop_tstate(void)
 {
+    assert(tstate_stack != NULL);
     PyThreadState *tstate = tstate_stack->current;
     _Py_tstate_linkedlist *stack_pointer_copy = tstate_stack;
     tstate_stack = tstate_stack->next;
