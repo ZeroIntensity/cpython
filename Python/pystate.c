@@ -3208,6 +3208,24 @@ _PyLeakTrack_InitForObjectNoFail(PyObject *op)
     }
 }
 
+/*
+ * Mark an address as deallocated.
+ *
+ * If the object wasn't tracked by _PyLeakTrack_InitForObject, this is a no-op.
+ */
+void
+_PyLeakTrack_MarkDeallocated(PyObject *op)
+{
+    assert(op != NULL);
+    _leaktrack_state *lt = get_leaktrack_state();
+
+    assert(lt->all_addresses != NULL);
+    _Py_hashtable_entry_t *ent = _Py_hashtable_get_entry(lt->all_addresses, op);
+    if (ent != NULL) {
+        ent->value = (void *) 2;
+    }
+}
+
 void
 _PyLeakTrack_AddRefEntry(_Py_leaktrack_refs *refs, _Py_leaktrack_entry *entry)
 {

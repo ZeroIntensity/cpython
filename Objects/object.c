@@ -2915,6 +2915,8 @@ _Py_Dealloc(PyObject *op)
         tracer->tracer_func(op, PyRefTracer_DESTROY, data);
     }
 
+    _PyLeakTrack_MarkDeallocated(op);
+
 #ifdef Py_TRACE_REFS
     _Py_ForgetReference(op);
 #endif

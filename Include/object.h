@@ -800,6 +800,9 @@ PyAPI_FUNC(PyObject *) PyType_GetModuleByDef(PyTypeObject *, PyModuleDef *);
 PyAPI_FUNC(void)
 _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno);
 
+PyAPI_FUNC(void)
+_PyLeakTrack_MarkDeallocated(PyObject *op);
+
 #if defined(__LINE__) && defined(__FILE__)
 #define _PyObject_TrackNewReference(op)                  \
     _PyLeakTrack_AddReferredObject(                      \
