@@ -213,7 +213,7 @@ PyAPI_FUNC(void) Py_DecRef(PyObject *);
 PyAPI_FUNC(void) _Py_IncRef(PyObject *);
 PyAPI_FUNC(void) _Py_DecRef(PyObject *);
 
-static inline Py_ALWAYS_INLINE void Py_INCREF(PyObject *op, const char *func, const char *file, int lineno)
+static inline Py_ALWAYS_INLINE void _Py_INCREFFUNC(PyObject *op, const char *func, const char *file, int lineno)
 {
     _PyLeakTrack_AddReferredObject(op, func, file, lineno);
 #if defined(Py_LIMITED_API) && (Py_LIMITED_API+0 >= 0x030c0000 || defined(Py_REF_DEBUG))
@@ -276,12 +276,12 @@ static inline Py_ALWAYS_INLINE void Py_INCREF(PyObject *op, const char *func, co
 
 #if defined(__LINE__) && defined(__FILE__)
 #define Py_INCREF(op)                                    \
-    Py_INCREF(                                           \
+    _Py_INCREFFUNC(                                      \
         _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
     )
 #else
 #define Py_INCREF(op)                                  \
-    Py_INCREF(                                         \
+    _Py_INCREFFUNC(                                    \
         _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
     )
 #endif
@@ -471,14 +471,28 @@ static inline Py_ALWAYS_INLINE void Py_DECREF(PyObject *op)
 
 
 /* Function to use in case the object pointer can be NULL: */
-static inline void Py_XINCREF(PyObject *op)
+static inline void Py_XINCREF(PyObject *op, const char *func, const char *file, int lineno)
 {
     if (op != _Py_NULL) {
-        Py_INCREF(op);
+        _Py_INCREFFUNC(op, func, file, lineno);
     }
 }
+/*
 #if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 < 0x030b0000
 #  define Py_XINCREF(op) Py_XINCREF(_PyObject_CAST(op))
+#endif
+*/
+
+#if defined(__LINE__) && defined(__FILE__)
+#define Py_XINCREF(op)                                   \
+    Py_XINCREF(                                          \
+        _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
+    )
+#else
+#define Py_XINCREF(op)                                 \
+    Py_XINCREF(                                        \
+        _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
+    )
 #endif
 
 static inline void Py_XDECREF(PyObject *op)
@@ -498,24 +512,50 @@ PyAPI_FUNC(PyObject*) Py_NewRef(PyObject *obj);
 // Similar to Py_NewRef(), but the object can be NULL.
 PyAPI_FUNC(PyObject*) Py_XNewRef(PyObject *obj);
 
-static inline PyObject* _Py_NewRef(PyObject *obj)
+static inline PyObject* _Py_NewRef(PyObject *obj, const char *func, const char *file, int lineno)
 {
-    Py_INCREF(obj);
+    _Py_INCREFFUNC(obj, func, file, lineno);
     return obj;
 }
 
-static inline PyObject* _Py_XNewRef(PyObject *obj)
+static inline PyObject* _Py_XNewRef(PyObject *obj, const char *func, const char *file, int lineno)
 {
-    Py_XINCREF(obj);
+    if (obj != _Py_NULL) {
+        _Py_INCREFFUNC(obj, func, file, lineno);
+    }
     return obj;
 }
+
+#if defined(__LINE__) && defined(__FILE__)
+#define _Py_XNewRef(op)                                  \
+    _Py_XNewRef(                                         \
+        _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
+    )
+#else
+#define _Py_XNewRef(op)                                \
+    _Py_XNewRef(                                       \
+        _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
+    )
+#endif
+
+#if defined(__LINE__) && defined(__FILE__)
+#define _Py_NewRef(op)                                   \
+    _Py_NewRef(                                          \
+        _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
+    )
+#else
+#define _Py_NewRef(op)                                 \
+    _Py_NewRef(                                        \
+        _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
+    )
+#endif
 
 // Py_NewRef() and Py_XNewRef() are exported as functions for the stable ABI.
 // Names overridden with macros by static inline functions for best
 // performances.
 #if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 < 0x030b0000
-#  define Py_NewRef(obj) _Py_NewRef(_PyObject_CAST(obj))
-#  define Py_XNewRef(obj) _Py_XNewRef(_PyObject_CAST(obj))
+#  define Py_NewRef(op) _Py_NewRef(_PyObject_CAST(op))
+#  define Py_XNewRef(op) _Py_XNewRef(_PyObject_CAST(op))
 #else
 #  define Py_NewRef(obj) _Py_NewRef(obj)
 #  define Py_XNewRef(obj) _Py_XNewRef(obj)
