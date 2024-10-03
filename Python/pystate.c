@@ -3235,8 +3235,9 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
 
     // Uh oh, we're alive with nobody alive that referenced us!
     // Let's show the developer where things could have gone wrong.
-    fputs("--- LEAK TRACKER FOUND LEAKS! ---\nLeaked object data:", stderr);
-    _PyObject_Dump(op);
+    fprintf(stderr,
+            "--- LEAK TRACKER FOUND LEAKS! ---\nLeaked object is of type '%s' at %p (refcnt %ld)\n",
+            Py_TYPE(op)->tp_name, op, Py_REFCNT(op));
 
     fputs("\nPy_INCREF() locations:\n", stderr);
     for (Py_ssize_t i = 0; i < refs->len; ++i)
