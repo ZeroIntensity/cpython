@@ -213,9 +213,9 @@ PyAPI_FUNC(void) Py_DecRef(PyObject *);
 PyAPI_FUNC(void) _Py_IncRef(PyObject *);
 PyAPI_FUNC(void) _Py_DecRef(PyObject *);
 
-static inline Py_ALWAYS_INLINE void Py_INCREF(PyObject *op)
+static inline Py_ALWAYS_INLINE void Py_INCREF(PyObject *op, const char *func, const char *file, int lineno)
 {
-    _PyObject_TrackNewReference(op);
+    _PyLeakTrack_AddReferredObject(op, func, file, lineno);
 #if defined(Py_LIMITED_API) && (Py_LIMITED_API+0 >= 0x030c0000 || defined(Py_REF_DEBUG))
     // Stable ABI implements Py_INCREF() as a function call on limited C API
     // version 3.12 and newer, and on Python built in debug mode. _Py_IncRef()
@@ -268,9 +268,24 @@ static inline Py_ALWAYS_INLINE void Py_INCREF(PyObject *op)
 #endif
 #endif
 }
+/*
 #if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 < 0x030b0000
 #  define Py_INCREF(op) Py_INCREF(_PyObject_CAST(op))
 #endif
+*/
+
+#if defined(__LINE__) && defined(__FILE__)
+#define Py_INCREF(op)                                    \
+    Py_INCREF(                                           \
+        _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
+    )
+#else
+#define Py_INCREF(op)                                  \
+    Py_INCREF(                                         \
+        _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
+    )
+#endif
+
 
 
 #if !defined(Py_LIMITED_API) && defined(Py_GIL_DISABLED)

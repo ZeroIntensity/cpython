@@ -806,18 +806,6 @@ _PyLeakTrack_MarkDeallocated(PyObject *op);
 PyAPI_FUNC(int)
 _PyLeakTrack_CheckForLeak(PyObject *op);
 
-#if defined(__LINE__) && defined(__FILE__)
-#define _PyObject_TrackNewReference(op)                  \
-    _PyLeakTrack_AddReferredObject(                      \
-        _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
-    )
-#else
-#define _PyObject_TrackNewReference(op)                \
-    _PyLeakTrack_AddReferredObject(                    \
-        _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
-    )
-#endif
-
 
 #ifdef __cplusplus
 }
