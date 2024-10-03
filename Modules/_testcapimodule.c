@@ -3338,6 +3338,12 @@ finalize_thread_hang(PyObject *self, PyObject *callback)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+leaky(PyObject *self, PyObject *arg)
+{
+    Py_INCREF(arg); // Leak!
+    Py_RETURN_NONE;
+}
 
 static PyMethodDef TestMethods[] = {
     {"set_errno",               set_errno,                       METH_VARARGS},
@@ -3479,6 +3485,7 @@ static PyMethodDef TestMethods[] = {
     {"function_set_warning", function_set_warning, METH_NOARGS},
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
     {"finalize_thread_hang", finalize_thread_hang, METH_O, NULL},
+    {"leaky", leaky, METH_O, NULL},
     {NULL, NULL} /* sentinel */
 };
 
