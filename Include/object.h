@@ -803,6 +803,9 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
 PyAPI_FUNC(void)
 _PyLeakTrack_MarkDeallocated(PyObject *op);
 
+PyAPI_FUNC(int)
+_PyLeakTrack_CheckForLeak(PyObject *op);
+
 #if defined(__LINE__) && defined(__FILE__)
 #define _PyObject_TrackNewReference(op)                  \
     _PyLeakTrack_AddReferredObject(                      \

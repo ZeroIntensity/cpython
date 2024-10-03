@@ -3208,6 +3208,47 @@ _PyLeakTrack_InitForObjectNoFail(PyObject *op)
     }
 }
 
+void
+_PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
+{
+    fprintf(stderr, "in %s (%s, line %d)", entry->func_name, entry->file, entry->lineno);
+}
+
+int
+_PyLeakTrack_CheckForLeak(PyObject *op)
+{
+    assert(op != NULL);
+    _leaktrack_state *lt = get_leaktrack_state();
+    assert(lt->object_refs != NULL);
+
+    _Py_leaktrack_refs *refs = _Py_hashtable_get(lt->object_refs, op);
+    assert(refs != NULL);
+
+    for (Py_ssize_t i = 0; i < refs->len; ++i)
+    {
+        _Py_leaktrack_entry *ref = refs->entries[i];
+        if (_PyLeakTrack_HasPointer(ref->pointer)) {
+            // There's a live object referencing this one, not a leak!
+            return 0;
+        }
+    }
+
+    // Uh oh, we're alive with nobody alive that referenced us!
+    // Let's show the developer where things could have gone wrong.
+    fputs("--- LEAK TRACKER FOUND LEAKS! ---\nLeaked object data:", stderr);
+    _PyObject_Dump(op);
+
+    fputs("\nPy_INCREF() locations:\n", stderr);
+    for (Py_ssize_t i = 0; i < refs->len; ++i)
+    {
+        _Py_leaktrack_entry *ref = refs->entries[i];
+        assert(_PyLeakTrack_HasPointer(ref->pointer));
+        _PyLeakTrack_PrintEntry(ref);
+    }
+
+    return 1;
+}
+
 /*
  * Mark an address as deallocated.
  *
@@ -3221,9 +3262,11 @@ _PyLeakTrack_MarkDeallocated(PyObject *op)
 
     assert(lt->all_addresses != NULL);
     _Py_hashtable_entry_t *ent = _Py_hashtable_get_entry(lt->all_addresses, op);
-    if (ent != NULL) {
-        ent->value = (void *) 2;
+    if (ent == NULL) {
+        return;
     }
+
+    ent->value = (void *) 2;
 }
 
 void
@@ -3269,6 +3312,12 @@ void
 _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno)
 {
     assert(op != NULL);
+    if (_Py_IsImmortal(op)) {
+        // Immortal objects cannot be leaked, at least in the
+        // traditional sense with reference counting.
+        return;
+    }
+
     _leaktrack_state *lt = get_leaktrack_state();
     PyThreadState *tstate = _PyThreadState_GET();
     _Py_EnsureTstateNotNULL(tstate);
