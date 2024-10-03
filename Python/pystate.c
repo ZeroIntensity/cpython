@@ -3222,7 +3222,11 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     assert(lt->object_refs != NULL);
 
     _Py_leaktrack_refs *refs = _Py_hashtable_get(lt->object_refs, op);
-    assert(refs != NULL);
+    if (refs == NULL || refs->len == 0)
+    {
+        // No references to this object at all, no way for us to track if it's a leak.
+        return 0;
+    }
 
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
