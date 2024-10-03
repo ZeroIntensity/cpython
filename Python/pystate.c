@@ -3252,7 +3252,6 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     }
 
     fputs("--- END LEAK TRACKER OUTPUT ---", stderr);
-
     return 1;
 }
 

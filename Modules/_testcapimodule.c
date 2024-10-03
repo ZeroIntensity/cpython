@@ -3345,6 +3345,12 @@ leaky(PyObject *self, PyObject *arg)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+check_leak(PyObject *self, PyObject *arg)
+{
+    return PyLong_FromLong(_PyLeakTrack_CheckForLeak(arg));
+}
+
 static PyMethodDef TestMethods[] = {
     {"set_errno",               set_errno,                       METH_VARARGS},
     {"test_config",             test_config,                     METH_NOARGS},
@@ -3486,6 +3492,7 @@ static PyMethodDef TestMethods[] = {
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
     {"finalize_thread_hang", finalize_thread_hang, METH_O, NULL},
     {"leaky", leaky, METH_O, NULL},
+    {"check_leak", check_leak, METH_O, NULL},
     {NULL, NULL} /* sentinel */
 };
 
