@@ -85,6 +85,61 @@ typedef struct _rare_events {
     uint8_t func_modification;
 } _rare_events;
 
+/* Leak tracker related things */
+
+#define _PY_LEAKTRACK_INITIAL_SIZE 32
+
+/*
+ * Entry representing a single reference.
+ */
+typedef struct _leaktrack_entry {
+    void *pointer;
+    const char *func_name;
+    const char *file;
+    int lineno;
+} _Py_leaktrack_entry;
+
+/*
+ * Array structure containing all the references to an object.
+ */
+typedef struct _leaktrack_refs {
+    Py_ssize_t capacity;
+    Py_ssize_t len;
+    _Py_leaktrack_entry **entries;
+} _Py_leaktrack_refs;
+
+/*
+ * Per-interpreter leak tracking data.
+ */
+typedef struct _leaktrack {
+    /*
+     * Set of all known object addresses.
+     * This is only a _Py_hashtable_t because we don't have a good C type for
+     * sets, so it's just a hash table with entries set to a pointer to 1.
+     *
+     * Psuedocode for it's type signature:
+     * _Py_hashtable_t[intptr_t, (void *) 1]
+     */
+    _Py_hashtable_t *all_addresses;
+    /*
+     * Map of objects:references. The key here is an object address, and the value
+     * is the references array.
+     *
+     * Psuedocode for it's type signature:
+     * _Py_hashtable_t[intptr_t, _Py_leaktrack_refs[_Py_leaktrack_entry *]]
+     */
+    _Py_hashtable_t *object_refs;
+} _leaktrack_state;
+
+int
+_PyLeakTrack_StorePointer(PyObject *op);
+
+int
+_PyLeakTrack_HasPointer(PyObject *op);
+
+void
+_PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs);
+
 /* interpreter state */
 
 /* PyInterpreterState holds the global state for one of the runtime's
@@ -280,6 +335,9 @@ struct _is {
     /* the initial PyInterpreterState.threads.head */
     _PyThreadStateImpl _initial_thread;
     Py_ssize_t _interactive_src_count;
+
+    /* Reference leak tracking */
+    _leaktrack_state _leaktrack;
 };
 
 

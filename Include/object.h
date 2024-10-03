@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 
+typedef struct _Py_hashtable_t _Py_hashtable_t;
 
 /* Object and type object interface */
 
@@ -795,6 +796,22 @@ static inline int PyType_CheckExact(PyObject *op) {
 #if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 >= 0x030d0000
 PyAPI_FUNC(PyObject *) PyType_GetModuleByDef(PyTypeObject *, PyModuleDef *);
 #endif
+
+PyAPI_FUNC(void)
+_PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno);
+
+#if defined(__LINE__) && defined(__FILE__)
+#define _PyObject_TrackNewReference(op)                  \
+    _PyLeakTrack_AddReferredObject(                      \
+        _PyObject_CAST(op), __func__, __FILE__, __LINE__ \
+    )
+#else
+#define _PyObject_TrackNewReference(op)                \
+    _PyLeakTrack_AddReferredObject(                    \
+        _PyObject_CAST(op), __func__, "<unknown>.c", 0 \
+    )
+#endif
+
 
 #ifdef __cplusplus
 }

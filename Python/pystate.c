@@ -3113,3 +3113,175 @@ _PyThreadState_ClearMimallocHeaps(PyThreadState *tstate)
     }
 #endif
 }
+
+static _leaktrack_state *
+get_leaktrack_state(void)
+{
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    return &interp->_leaktrack;
+}
+
+/*
+ * Check whether an object is in the global list of addresses.
+ * op does not have to be a valid pointer.
+ */
+int
+_PyLeakTrack_HasPointer(PyObject *op)
+{
+    _leaktrack_state *lt = get_leaktrack_state();
+    assert(lt->all_addresses != NULL);
+    void *res = _Py_hashtable_get(lt->all_addresses, (void *) op);
+    return res == ((void *) 1);
+}
+
+/*
+ * Store a pointer in the global list of addresses.
+ */
+int
+_PyLeakTrack_StorePointer(PyObject *op)
+{
+    assert(op != NULL);
+    _leaktrack_state *lt = get_leaktrack_state();
+    assert(lt->all_addresses != NULL);
+
+    if (_Py_hashtable_set(lt->all_addresses, op, (void *) 1) < 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+int
+_PyLeakTrack_InitForObject(PyObject *op)
+{
+    assert(op != NULL);
+    _leaktrack_state *lt = get_leaktrack_state();
+    assert(lt->object_refs != NULL);
+
+    if (_Py_hashtable_get(lt->object_refs, op) != NULL)
+    {
+        // Apparently, some objects call _PyObject_Init more than once.
+        // That seems like a bug to me, but I might as well try and support it.
+        return 0;
+    }
+
+    _Py_leaktrack_refs *refs = PyMem_RawMalloc(sizeof(_Py_leaktrack_refs));
+    if (refs == NULL)
+    {
+        PyErr_NoMemory();
+        return -1;
+    }
+
+    refs->capacity = _PY_LEAKTRACK_INITIAL_SIZE;
+    refs->len = 0;
+    refs->entries = PyMem_RawCalloc(_PY_LEAKTRACK_INITIAL_SIZE, sizeof(_Py_leaktrack_entry));
+
+    if (refs->entries == NULL)
+    {
+        PyMem_RawFree(refs);
+        PyErr_NoMemory();
+        return -1;
+    }
+
+    if (_Py_hashtable_set(lt->object_refs, op, refs) < 0)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
+void
+_PyLeakTrack_InitForObjectNoFail(PyObject *op)
+{
+    int res = _PyLeakTrack_InitForObject(op);
+    if (res < 0)
+    {
+        Py_FatalError("failed to allocate leak tracker information");
+    }
+}
+
+void
+_PyLeakTrack_AddRefEntry(_Py_leaktrack_refs *refs, _Py_leaktrack_entry *entry)
+{
+    assert(refs != NULL);
+    assert(entry != NULL);
+    assert(refs->entries != NULL);
+
+    refs->entries[refs->len++] = entry;
+    if (refs->capacity == refs->len)
+    {
+        // Needs to be resized
+        refs->capacity *= 2;
+        refs->entries = PyMem_RawRealloc(refs->entries, sizeof(_Py_leaktrack_entry *) * refs->capacity);
+        if (refs->entries == NULL)
+        {
+            Py_FatalError("failed to resize leaktrack array");
+        };
+    }
+}
+
+void
+_PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
+{
+    assert(refs != NULL);
+    assert(refs->entries != NULL);
+    for (Py_ssize_t i = 0; i < refs->len; ++i) {
+        PyMem_RawFree(refs->entries[i]);
+    }
+
+    PyMem_RawFree(refs);
+}
+
+void
+_PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno)
+{
+    assert(op != NULL);
+    _leaktrack_state *lt = get_leaktrack_state();
+    PyThreadState *tstate = _PyThreadState_GET();
+    _Py_EnsureTstateNotNULL(tstate);
+    _PyInterpreterFrame *iframe = _PyThreadState_GetFrame(tstate);
+
+    if (iframe == NULL)
+    {
+        // I'm not totally sure what case this happens in, probably
+        // something to do with creating references between thread state
+        // switches.
+        return;
+    }
+
+    PyFrameObject *frame = tstate->current_frame->frame_obj;
+    if (frame == NULL)
+    {
+        // Eval loop has not started... or something like that
+        return;
+    }
+
+    void *ptr = (void *) frame->_f_leaktrack_object;
+    if (ptr == NULL)
+    {
+        // Eval loop has not stored any object. This is a no-op.
+        return;
+    }
+
+    assert(lt->all_addresses != NULL);
+    assert(lt->object_refs != NULL);
+
+    _Py_leaktrack_refs *refs = (_Py_leaktrack_refs *) _Py_hashtable_get(lt->object_refs, op);
+    if (refs == NULL)
+    {
+        // Statically allocated object that did not go through
+        // PyObject_Init(), or something along those lines.
+        return;
+    }
+
+    _Py_leaktrack_entry *entry = PyMem_RawMalloc(sizeof(_Py_leaktrack_entry));
+    entry->file = file;
+    entry->lineno = lineno;
+    entry->func_name = func;
+    entry->pointer = ptr;
+
+    _PyLeakTrack_AddRefEntry(refs, entry);
+}
+

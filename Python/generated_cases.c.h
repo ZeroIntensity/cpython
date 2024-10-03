@@ -877,6 +877,10 @@
             callable = func;
             {
                 PyObject *callable_o = PyStackRef_AsPyObjectBorrow(callable);
+                // TODO: Figure out how to do this properly
+                PyFrameObject *cur_frame = PyEval_GetFrame();
+                assert(cur_frame != NULL);
+                cur_frame->_f_leaktrack_object = callable_o;
                 // oparg counts all of the args, but *not* self:
                 int total_args = oparg;
                 if (!PyStackRef_IsNull(self_or_null[0])) {
@@ -4060,6 +4064,7 @@
             }
             // _MONITOR_CALL
             {
+                puts("monitor_call");
                 int is_meth = !PyStackRef_IsNull(maybe_self[0]);
                 PyObject *function = PyStackRef_AsPyObjectBorrow(func);
                 PyObject *arg0;
@@ -4083,6 +4088,10 @@
             callable = func;
             {
                 PyObject *callable_o = PyStackRef_AsPyObjectBorrow(callable);
+                // TODO: Figure out how to do this properly
+                PyFrameObject *cur_frame = PyEval_GetFrame();
+                assert(cur_frame != NULL);
+                cur_frame->_f_leaktrack_object = callable_o;
                 // oparg counts all of the args, but *not* self:
                 int total_args = oparg;
                 if (!PyStackRef_IsNull(self_or_null[0])) {
@@ -4542,6 +4551,8 @@
                 // GH-99729: We need to unlink the frame *before* clearing it:
                 _PyInterpreterFrame *dying = frame;
                 frame = tstate->current_frame = dying->previous;
+                // XXX Only needed for leaktracking
+                frame->frame_obj = NULL;
                 _PyEval_FrameClearAndPop(tstate, dying);
                 LOAD_SP();
                 LOAD_IP(frame->return_offset);
@@ -4584,6 +4595,8 @@
                 // GH-99729: We need to unlink the frame *before* clearing it:
                 _PyInterpreterFrame *dying = frame;
                 frame = tstate->current_frame = dying->previous;
+                // XXX Only needed for leaktracking
+                frame->frame_obj = NULL;
                 _PyEval_FrameClearAndPop(tstate, dying);
                 LOAD_SP();
                 LOAD_IP(frame->return_offset);
@@ -6481,6 +6494,8 @@
                 // GH-99729: We need to unlink the frame *before* clearing it:
                 _PyInterpreterFrame *dying = frame;
                 frame = tstate->current_frame = dying->previous;
+                // XXX Only needed for leaktracking
+                frame->frame_obj = NULL;
                 _PyEval_FrameClearAndPop(tstate, dying);
                 LOAD_SP();
                 LOAD_IP(frame->return_offset);
@@ -6544,6 +6559,8 @@
             // GH-99729: We need to unlink the frame *before* clearing it:
             _PyInterpreterFrame *dying = frame;
             frame = tstate->current_frame = dying->previous;
+            // XXX Only needed for leaktracking
+            frame->frame_obj = NULL;
             _PyEval_FrameClearAndPop(tstate, dying);
             LOAD_SP();
             LOAD_IP(frame->return_offset);

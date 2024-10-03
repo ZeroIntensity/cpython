@@ -383,6 +383,13 @@ _Py_DECREF_TYPE(PyTypeObject *type)
 }
 #endif
 
+PyAPI_FUNC(int)
+_PyLeakTrack_InitForObject(PyObject *op);
+
+PyAPI_FUNC(void)
+_PyLeakTrack_InitForObjectNoFail(PyObject *op);
+
+
 /* Inline functions trading binary compatibility for speed:
    _PyObject_Init() is the fast version of PyObject_Init(), and
    _PyObject_InitVar() is the fast version of PyObject_InitVar().
@@ -395,6 +402,7 @@ _PyObject_Init(PyObject *op, PyTypeObject *typeobj)
     Py_SET_TYPE(op, typeobj);
     assert(_PyType_HasFeature(typeobj, Py_TPFLAGS_HEAPTYPE) || _Py_IsImmortalLoose(typeobj));
     _Py_INCREF_TYPE(typeobj);
+    _PyLeakTrack_InitForObjectNoFail(op);
     _Py_NewReference(op);
 }
 

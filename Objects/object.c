@@ -27,7 +27,6 @@
 #include "pycore_typevarobject.h" // _PyTypeAlias_Type, _Py_initialize_generic
 #include "pycore_unionobject.h"   // _PyUnion_Type
 
-
 #ifdef Py_LIMITED_API
    // Prevent recursive call _Py_IncRef() <=> Py_INCREF()
 #  error "Py_LIMITED_API macro must not be defined"
@@ -463,6 +462,7 @@ _PyObject_New(PyTypeObject *tp)
     if (op == NULL) {
         return PyErr_NoMemory();
     }
+
     _PyObject_Init(op, tp);
     return op;
 }
@@ -476,6 +476,7 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
     if (op == NULL) {
         return (PyVarObject *)PyErr_NoMemory();
     }
+
     _PyObject_InitVar(op, tp, nitems);
     return op;
 }
@@ -2184,10 +2185,42 @@ PyTypeObject _PyNotImplemented_Type = {
 
 PyObject _Py_NotImplementedStruct = _PyObject_HEAD_INIT(&_PyNotImplemented_Type);
 
+static int
+_PyLeakTrack_InitForInterpreter(PyInterpreterState *interp)
+{
+    assert(interp != NULL);
+    _Py_hashtable_allocator_t alloc = {
+        .malloc = PyMem_RawMalloc,
+        .free = PyMem_RawFree,
+    };
+
+    assert(interp->_leaktrack.all_addresses == NULL);
+    interp->_leaktrack.all_addresses = _Py_hashtable_new_full(
+        _Py_hashtable_hash_ptr, _Py_hashtable_compare_direct,
+        NULL, NULL, &alloc);
+    if (interp->_leaktrack.all_addresses == NULL) {
+        return -1;
+    }
+
+    assert(interp->_leaktrack.object_refs == NULL);
+    interp->_leaktrack.object_refs = _Py_hashtable_new_full(
+        _Py_hashtable_hash_ptr, _Py_hashtable_compare_direct,
+        NULL, (_Py_hashtable_destroy_func) _PyLeakTrack_FreeRefs, &alloc);
+    if (interp->_leaktrack.object_refs == NULL) {
+        return -1;
+    }
+
+    return 0;
+}
 
 PyStatus
 _PyObject_InitState(PyInterpreterState *interp)
 {
+    if (_PyLeakTrack_InitForInterpreter(interp) < 0)
+    {
+        return _PyStatus_NO_MEMORY();
+    }
+
 #ifdef Py_TRACE_REFS
     _Py_hashtable_allocator_t alloc = {
         // Don't use default PyMem_Malloc() and PyMem_Free() which

@@ -976,6 +976,8 @@ dummy_func(
             // GH-99729: We need to unlink the frame *before* clearing it:
             _PyInterpreterFrame *dying = frame;
             frame = tstate->current_frame = dying->previous;
+            // XXX Only needed for leaktracking
+            frame->frame_obj = NULL;
             _PyEval_FrameClearAndPop(tstate, dying);
             LOAD_SP();
             LOAD_IP(frame->return_offset);
@@ -3242,6 +3244,11 @@ dummy_func(
         op(_DO_CALL, (callable, self_or_null[1], args[oparg] -- res)) {
             PyObject *callable_o = PyStackRef_AsPyObjectBorrow(callable);
 
+            // TODO: Figure out how to do this properly
+            PyFrameObject *cur_frame = PyEval_GetFrame();
+            assert(cur_frame != NULL);
+            cur_frame->_f_leaktrack_object = callable_o;
+
             // oparg counts all of the args, but *not* self:
             int total_args = oparg;
             if (!PyStackRef_IsNull(self_or_null[0])) {
@@ -3310,6 +3317,7 @@ dummy_func(
         }
 
         op(_MONITOR_CALL, (func, maybe_self[1], args[oparg] -- func, maybe_self[1], args[oparg])) {
+            puts("monitor_call");
             int is_meth = !PyStackRef_IsNull(maybe_self[0]);
             PyObject *function = PyStackRef_AsPyObjectBorrow(func);
             PyObject *arg0;

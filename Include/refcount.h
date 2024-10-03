@@ -4,7 +4,6 @@
 extern "C" {
 #endif
 
-
 /*
 Immortalization:
 
@@ -76,7 +75,6 @@ check by comparing the reference count field to the immortality reference count.
               (((refcnt) << _Py_REF_SHARED_SHIFT) + (flags))
 #endif  // Py_GIL_DISABLED
 
-
 // Py_REFCNT() implementation for the stable ABI
 PyAPI_FUNC(Py_ssize_t) Py_REFCNT(PyObject *ob);
 
@@ -101,7 +99,6 @@ PyAPI_FUNC(Py_ssize_t) Py_REFCNT(PyObject *ob);
     #  define Py_REFCNT(ob) _Py_REFCNT(_PyObject_CAST(ob))
     #endif
 #endif
-
 
 static inline Py_ALWAYS_INLINE int _Py_IsImmortal(PyObject *op)
 {
@@ -218,6 +215,7 @@ PyAPI_FUNC(void) _Py_DecRef(PyObject *);
 
 static inline Py_ALWAYS_INLINE void Py_INCREF(PyObject *op)
 {
+    _PyObject_TrackNewReference(op);
 #if defined(Py_LIMITED_API) && (Py_LIMITED_API+0 >= 0x030c0000 || defined(Py_REF_DEBUG))
     // Stable ABI implements Py_INCREF() as a function call on limited C API
     // version 3.12 and newer, and on Python built in debug mode. _Py_IncRef()
