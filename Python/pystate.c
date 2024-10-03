@@ -3152,6 +3152,12 @@ _PyLeakTrack_StorePointer(PyObject *op)
     return 0;
 }
 
+/*
+ * Store the memory address of op to know that it's a live object
+ * for reference tracking.
+ *
+ * This is called automatically by _PyObject_Init()
+ */
 int
 _PyLeakTrack_InitForObject(PyObject *op)
 {
@@ -3234,6 +3240,13 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
     PyMem_RawFree(refs);
 }
 
+/*
+ * Add a reference for the given object.
+ *
+ * If the eval loop has not set a parent object, this function is a no-op.
+ * This function can also no-op in a number of edge cases, e.g. during frame
+ * deallocation.
+ */
 void
 _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno)
 {
