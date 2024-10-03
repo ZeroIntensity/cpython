@@ -3247,9 +3247,11 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
-        assert(_PyLeakTrack_HasPointer(ref->pointer));
+        assert(!_PyLeakTrack_HasPointer(ref->pointer));
         _PyLeakTrack_PrintEntry(ref);
     }
+
+    fputs("--- END LEAK TRACKER OUTPUT ---", stderr);
 
     return 1;
 }
