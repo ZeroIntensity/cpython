@@ -106,6 +106,7 @@ typedef struct _leaktrack_refs {
     Py_ssize_t capacity;
     Py_ssize_t len;
     _Py_leaktrack_entry **entries;
+    char *type_name;
 } _Py_leaktrack_refs;
 
 /*

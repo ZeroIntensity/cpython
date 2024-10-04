@@ -3249,9 +3249,17 @@ _PyLeakTrack_InitForObject(PyObject *op)
         return -1;
     }
 
+    char *type_name = _PyMem_RawStrdup(Py_TYPE(op)->tp_name);
+    if (type_name == NULL)
+    {
+        PyErr_NoMemory();
+        return -1;
+    }
+
     _Py_leaktrack_refs *refs = PyMem_RawMalloc(sizeof(_Py_leaktrack_refs));
     if (refs == NULL)
     {
+        PyMem_RawFree(type_name);
         PyErr_NoMemory();
         return -1;
     }
@@ -3260,9 +3268,14 @@ _PyLeakTrack_InitForObject(PyObject *op)
     refs->len = 0;
     refs->entries = PyMem_RawCalloc(_PY_LEAKTRACK_INITIAL_SIZE, sizeof(_Py_leaktrack_entry));
 
+    // We need to cache the type name for debugging, because it's possible that the type
+    // isn't alive while the object is, in rare cases.
+    refs->type_name = type_name;
+
     if (refs->entries == NULL)
     {
         PyMem_RawFree(refs);
+        PyMem_RawFree(type_name);
         PyErr_NoMemory();
         return -1;
     }
@@ -3359,7 +3372,7 @@ _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
     // Let's show the developer where things could have gone wrong.
     fprintf(stderr,
             "--- LEAK TRACKER FOUND LEAKS! ---\nLeaked object is of type '%s' at %p (refcnt %ld)\n",
-            Py_TYPE(op)->tp_name, op, Py_REFCNT(op));
+            refs->type_name, op, Py_REFCNT(op));
 
     fputs("\nPy_INCREF() locations:\n", stderr);
     for (Py_ssize_t i = 0; i < refs->len; ++i)
@@ -3469,6 +3482,7 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
         PyMem_RawFree(refs->entries[i]);
     }
 
+    PyMem_RawFree(refs->type_name);
     PyMem_RawFree(refs);
 }
 
