@@ -3116,6 +3116,10 @@ _PyThreadState_ClearMimallocHeaps(PyThreadState *tstate)
 #endif
 }
 
+/*
+ * Get the leaktrack field from the interpreter state.
+ * If the GIL is not held, this throws a fatal error.
+ */
 static _leaktrack_state *
 get_leaktrack_state(void)
 {
@@ -3177,7 +3181,7 @@ _PyLeakTrack_StorePointer(PyObject *op)
  * Store the memory address of op to know that it's a live object
  * for reference tracking.
  *
- * This is called automatically by _PyObject_Init()
+ * If this fails, -1 is returned, 0 otherwise.
  */
 int
 _PyLeakTrack_InitForObject(PyObject *op)
@@ -3224,7 +3228,12 @@ _PyLeakTrack_InitForObject(PyObject *op)
 
     return 0;
 }
-
+/*
+ * Equivalent to _PyLeakTrack_InitForObject(), but throws
+ * a fatal error upon failure.
+ *
+ * This is called automatically by _PyObject_Init()
+ */
 void
 _PyLeakTrack_InitForObjectNoFail(PyObject *op)
 {
@@ -3235,6 +3244,9 @@ _PyLeakTrack_InitForObjectNoFail(PyObject *op)
     }
 }
 
+/*
+ * Print an entry to stderr for a Py_INCREF()
+ */
 static void
 _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 {
@@ -3248,6 +3260,15 @@ _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
     );
 }
 
+/*
+ * Check for leaks on all live objects.
+ *
+ * This function doesn't require the GIL, it only needs
+ * the interpreter state to be passed.
+ *
+ * This should generally only be called upon interpreter finalization, otherwise
+ * some false positives will come up.
+ */
 static int
 _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
 {
@@ -3299,6 +3320,7 @@ _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
         if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer, lt)) {
+            // Again, we want to ignore this case.
             continue;
         }
         assert(!_PyLeakTrack_IsAlive(ref->pointer, lt));
@@ -3309,6 +3331,11 @@ _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
     return 1;
 }
 
+/*
+ * Check for leaks on all live objects.
+ *
+ * The GIL must be held.
+ */
 int
 _PyLeakTrack_CheckForLeak(PyObject *op)
 {
@@ -3318,6 +3345,7 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
 static int
 check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *data)
 {
+    // Don't call this manually, this is for iteration of the hash table.
     PyInterpreterState *interp = (PyInterpreterState *) data;
     assert(interp != NULL);
 
@@ -3337,9 +3365,12 @@ _PyLeakTrack_CheckAllObjects(PyInterpreterState *interp)
 }
 
 /*
- * Mark an address as deallocated.
+ * Mark an address as deallocated. The GIL must be held.
  *
- * If the object wasn't tracked by _PyLeakTrack_InitForObject, this is a no-op.
+ * For tracked objects (i.e., called with _PyLeakTrack_InitForObject()), this is called
+ * automatically upon deallocation.
+ *
+ * If the object wasn't tracked by _PyLeakTrack_InitForObject(), this is a no-op.
  */
 void
 _PyLeakTrack_MarkDeallocated(PyObject *op)
@@ -3356,6 +3387,9 @@ _PyLeakTrack_MarkDeallocated(PyObject *op)
     ent->value = (void *) 2;
 }
 
+/*
+ * Add a reference entry to a references array.
+ */
 static void
 _PyLeakTrack_AddRefEntry(_Py_leaktrack_refs *refs, _Py_leaktrack_entry *entry)
 {
@@ -3376,6 +3410,10 @@ _PyLeakTrack_AddRefEntry(_Py_leaktrack_refs *refs, _Py_leaktrack_entry *entry)
     }
 }
 
+/*
+ * Deallocator for an object reference list, meant
+ * for use by _Py_hashtable_destroy.
+ */
 void
 _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
 {
