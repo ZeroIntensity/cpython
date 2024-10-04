@@ -141,11 +141,11 @@ _PyLeakTrack_StorePointer(PyObject *op);
 int
 _PyLeakTrack_HasPointer(PyObject *op);
 
-void
+PyAPI_FUNC(void)
 _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs);
 
-void
-_PyLeakTrack_CheckAllObjects(void);
+PyAPI_FUNC(void)
+_PyLeakTrack_CheckAllObjects(PyInterpreterState *interp);
 
 /* interpreter state */
 

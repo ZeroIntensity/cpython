@@ -949,7 +949,7 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
     _PyRuntimeState *runtime = interp->runtime;
     struct pyinterpreters *interpreters = &runtime->interpreters;
 
-    _PyLeakTrack_CheckAllObjects();
+    _PyLeakTrack_CheckAllObjects(interp);
 
     // XXX Clearing the "current" thread state should happen before
     // we start finalizing the interpreter (or the current thread state).
@@ -3251,10 +3251,11 @@ _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 }
 
 int
-_PyLeakTrack_CheckForLeak(PyObject *op)
+_PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
 {
     assert(op != NULL);
-    _leaktrack_state *lt = get_leaktrack_state();
+    assert(interp != NULL);
+    _leaktrack_state *lt = &interp->_leaktrack;
     assert(lt->object_refs != NULL);
 
     _Py_leaktrack_refs *refs = _Py_hashtable_get(lt->object_refs, op);
@@ -3311,8 +3312,17 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
 }
 
 int
+_PyLeakTrack_CheckForLeak(PyObject *op)
+{
+    return _PyLeakTrack_CheckForLeakWithInterp(op, _PyInterpreterState_GET());
+}
+
+int
 check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *data)
 {
+    PyInterpreterState *interp = (PyInterpreterState *) data;
+    assert(interp != NULL);
+
     if (value == ((void *) 1)) {
         _PyLeakTrack_CheckForLeak((PyObject *) key);
     } else {
@@ -3322,10 +3332,10 @@ check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *d
 }
 
 void
-_PyLeakTrack_CheckAllObjects(void)
+_PyLeakTrack_CheckAllObjects(PyInterpreterState *interp)
 {
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    _Py_hashtable_foreach(interp->_leaktrack.all_addresses, check_leak_fini, NULL);
+    assert(interp != NULL);
+    _Py_hashtable_foreach(interp->_leaktrack.all_addresses, check_leak_fini, interp);
 }
 
 /*
