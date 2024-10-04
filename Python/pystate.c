@@ -3272,7 +3272,6 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
         if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer)) {
             // It's possible that we haven't tracked the pointer.
             // If that's the case, we don't know whether or not it's leaked.
-            // We also want to ignore all circular references.
             continue;
         }
 
@@ -3434,6 +3433,7 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     if (refs == NULL)
     {
         _PyLeakTrack_InitForObjectNoFail(op);
+        assert(_PyLeakTrack_HasPointer(op));
         refs = (_Py_leaktrack_refs *) _Py_hashtable_get(lt->object_refs, op);
     }
 
