@@ -1217,8 +1217,6 @@
             // GH-99729: We need to unlink the frame *before* clearing it:
             _PyInterpreterFrame *dying = frame;
             frame = tstate->current_frame = dying->previous;
-            // XXX Only needed for leaktracking
-            frame->frame_obj = NULL;
             _PyEval_FrameClearAndPop(tstate, dying);
             LOAD_SP();
             LOAD_IP(frame->return_offset);

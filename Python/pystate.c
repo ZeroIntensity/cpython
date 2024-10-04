@@ -3398,34 +3398,14 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     }
 
     _leaktrack_state *lt = get_leaktrack_state();
-    PyThreadState *tstate = _PyThreadState_GET();
-    _Py_EnsureTstateNotNULL(tstate);
-    _PyInterpreterFrame *iframe = _PyThreadState_GetFrame(tstate);
-
-    if (iframe == NULL)
-    {
-        // I'm not totally sure what case this happens in, probably
-        // something to do with creating references between thread state
-        // switches.
-        return;
-    }
-
-    PyFrameObject *frame = tstate->current_frame->frame_obj;
-    if (frame == NULL)
-    {
-        // Eval loop has not started, I think?
-        return;
-    }
-
-    PyObject *ptr = frame->_f_leaktrack_object;
+    PyObject *ptr = lt->current_eval_object;
     if (ptr == NULL)
     {
         // Eval loop has not stored any object. This is a no-op.
         return;
     }
 
-    frame->_f_leaktrack_object = NULL;
-
+    lt->current_eval_object = NULL;
     assert(lt->all_addresses != NULL);
     assert(lt->object_refs != NULL);
 

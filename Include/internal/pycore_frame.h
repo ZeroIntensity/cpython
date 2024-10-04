@@ -33,7 +33,6 @@ struct _frame {
     PyObject *f_locals_cache;
     /* The frame data, if this frame object owns the frame */
     PyObject *_f_frame_data[1];
-    PyObject *_f_leaktrack_object; // Leak tracking
 };
 
 extern PyFrameObject* _PyFrame_New_NoTrack(PyCodeObject *code);

@@ -129,6 +129,10 @@ typedef struct _leaktrack {
      * _Py_hashtable_t[intptr_t, _Py_leaktrack_refs[_Py_leaktrack_entry *]]
      */
     _Py_hashtable_t *object_refs;
+    /*
+     * Object currently being executed, set by the eval loop.
+     */
+    PyObject *current_eval_object;
 } _leaktrack_state;
 
 int
