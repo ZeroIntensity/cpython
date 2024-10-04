@@ -3127,7 +3127,7 @@ get_leaktrack_state(void)
  * Check whether an object is in the global list of addresses.
  * op does not have to be a valid pointer.
  */
-int
+static int
 _PyLeakTrack_HasPointer(PyObject *op, _leaktrack_state *lt)
 {
     assert(lt->all_addresses != NULL);
@@ -3139,7 +3139,7 @@ _PyLeakTrack_HasPointer(PyObject *op, _leaktrack_state *lt)
  * Check whether an object is alive.
  * op must be in the global list of addresses;
  */
-int
+static int
 _PyLeakTrack_IsAlive(PyObject *op, _leaktrack_state *lt)
 {
     assert(_PyLeakTrack_HasPointer(op, lt));
@@ -3152,14 +3152,14 @@ _PyLeakTrack_IsAlive(PyObject *op, _leaktrack_state *lt)
 /*
  * Store a pointer in the global list of addresses.
  */
-int
+static int
 _PyLeakTrack_StorePointer(PyObject *op)
 {
     assert(op != NULL);
     _leaktrack_state *lt = get_leaktrack_state();
     assert(lt->all_addresses != NULL);
 
-    if (_PyLeakTrack_HasPointer(op))
+    if (_PyLeakTrack_HasPointer(op, lt))
     {
         // We don't want to reset the state of an existing pointer
         return 0;
@@ -3235,7 +3235,7 @@ _PyLeakTrack_InitForObjectNoFail(PyObject *op)
     }
 }
 
-void
+static void
 _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 {
     fprintf(
@@ -3248,7 +3248,7 @@ _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
     );
 }
 
-int
+static int
 _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
 {
     assert(op != NULL);
@@ -3315,7 +3315,7 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     return _PyLeakTrack_CheckForLeakWithInterp(op, _PyInterpreterState_GET());
 }
 
-int
+static int
 check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *data)
 {
     PyInterpreterState *interp = (PyInterpreterState *) data;
@@ -3356,7 +3356,7 @@ _PyLeakTrack_MarkDeallocated(PyObject *op)
     ent->value = (void *) 2;
 }
 
-void
+static void
 _PyLeakTrack_AddRefEntry(_Py_leaktrack_refs *refs, _Py_leaktrack_entry *entry)
 {
     assert(refs != NULL);
