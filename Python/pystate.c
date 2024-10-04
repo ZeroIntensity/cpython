@@ -3128,9 +3128,8 @@ get_leaktrack_state(void)
  * op does not have to be a valid pointer.
  */
 int
-_PyLeakTrack_HasPointer(PyObject *op)
+_PyLeakTrack_HasPointer(PyObject *op, _leaktrack_state *lt)
 {
-    _leaktrack_state *lt = get_leaktrack_state();
     assert(lt->all_addresses != NULL);
     void *res = _Py_hashtable_get(lt->all_addresses, (void *) op);
     return res != NULL;
@@ -3141,10 +3140,9 @@ _PyLeakTrack_HasPointer(PyObject *op)
  * op must be in the global list of addresses;
  */
 int
-_PyLeakTrack_IsAlive(PyObject *op)
+_PyLeakTrack_IsAlive(PyObject *op, _leaktrack_state *lt)
 {
-    assert(_PyLeakTrack_HasPointer(op));
-    _leaktrack_state *lt = get_leaktrack_state();
+    assert(_PyLeakTrack_HasPointer(op, lt));
     assert(lt->all_addresses != NULL);
     void *res = _Py_hashtable_get(lt->all_addresses, (void *) op);
     assert(res != NULL);
@@ -3270,14 +3268,14 @@ _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
-        if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer)) {
+        if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer, lt)) {
             // It's possible that we haven't tracked the pointer.
             // If that's the case, we don't know whether or not it's leaked.
             continue;
         }
 
         has_stored = true;
-        if (_PyLeakTrack_IsAlive(ref->pointer)) {
+        if (_PyLeakTrack_IsAlive(ref->pointer, lt)) {
             // There's a live object referencing this one, not a leak!
             return 0;
         }
@@ -3300,10 +3298,10 @@ _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
-        if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer)) {
+        if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer, lt)) {
             continue;
         }
-        assert(!_PyLeakTrack_IsAlive(ref->pointer));
+        assert(!_PyLeakTrack_IsAlive(ref->pointer, lt));
         _PyLeakTrack_PrintEntry(ref);
     }
 
@@ -3324,7 +3322,7 @@ check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *d
     assert(interp != NULL);
 
     if (value == ((void *) 1)) {
-        _PyLeakTrack_CheckForLeak((PyObject *) key);
+        _PyLeakTrack_CheckForLeakWithInterp((PyObject *) key, interp);
     } else {
         assert(value == ((void *) 2));
     }
@@ -3423,12 +3421,12 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     if (refs == NULL)
     {
         _PyLeakTrack_InitForObjectNoFail(op);
-        assert(_PyLeakTrack_HasPointer(op));
+        assert(_PyLeakTrack_HasPointer(op, lt));
         refs = (_Py_leaktrack_refs *) _Py_hashtable_get(lt->object_refs, op);
     }
 
     assert(refs != NULL);
-    assert(_PyLeakTrack_HasPointer(op));
+    assert(_PyLeakTrack_HasPointer(op, lt));
     _Py_leaktrack_entry *entry = PyMem_RawMalloc(sizeof(_Py_leaktrack_entry));
     if (entry == NULL)
     {

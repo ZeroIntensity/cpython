@@ -135,12 +135,6 @@ typedef struct _leaktrack {
     PyObject *current_eval_object;
 } _leaktrack_state;
 
-int
-_PyLeakTrack_StorePointer(PyObject *op);
-
-int
-_PyLeakTrack_HasPointer(PyObject *op);
-
 PyAPI_FUNC(void)
 _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs);
 
