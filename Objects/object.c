@@ -2185,42 +2185,9 @@ PyTypeObject _PyNotImplemented_Type = {
 
 PyObject _Py_NotImplementedStruct = _PyObject_HEAD_INIT(&_PyNotImplemented_Type);
 
-static int
-_PyLeakTrack_InitForInterpreter(PyInterpreterState *interp)
-{
-    assert(interp != NULL);
-    _Py_hashtable_allocator_t alloc = {
-        .malloc = PyMem_RawMalloc,
-        .free = PyMem_RawFree,
-    };
-
-    assert(interp->_leaktrack.all_addresses == NULL);
-    interp->_leaktrack.all_addresses = _Py_hashtable_new_full(
-        _Py_hashtable_hash_ptr, _Py_hashtable_compare_direct,
-        NULL, NULL, &alloc);
-    if (interp->_leaktrack.all_addresses == NULL) {
-        return -1;
-    }
-
-    assert(interp->_leaktrack.object_refs == NULL);
-    interp->_leaktrack.object_refs = _Py_hashtable_new_full(
-        _Py_hashtable_hash_ptr, _Py_hashtable_compare_direct,
-        NULL, (_Py_hashtable_destroy_func) _PyLeakTrack_FreeRefs, &alloc);
-    if (interp->_leaktrack.object_refs == NULL) {
-        return -1;
-    }
-
-    return 0;
-}
-
 PyStatus
 _PyObject_InitState(PyInterpreterState *interp)
 {
-    if (_PyLeakTrack_InitForInterpreter(interp) < 0)
-    {
-        return _PyStatus_NO_MEMORY();
-    }
-
 #ifdef Py_TRACE_REFS
     _Py_hashtable_allocator_t alloc = {
         // Don't use default PyMem_Malloc() and PyMem_Free() which
@@ -2241,8 +2208,6 @@ _PyObject_InitState(PyInterpreterState *interp)
 void
 _PyObject_FiniState(PyInterpreterState *interp)
 {
-    _Py_hashtable_destroy(interp->_leaktrack.object_refs);
-    _Py_hashtable_destroy(interp->_leaktrack.all_addresses);
 #ifdef Py_TRACE_REFS
     _Py_hashtable_destroy(REFCHAIN(interp));
     REFCHAIN(interp) = NULL;

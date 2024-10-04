@@ -587,6 +587,10 @@ free_interpreter(PyInterpreterState *interp)
         PyMem_RawFree(interp);
     }
 }
+
+int
+_PyLeakTrack_InitForInterpreter(PyInterpreterState *interp); // Forward reference
+
 #ifndef NDEBUG
 static inline int check_interpreter_whence(long);
 #endif
@@ -632,6 +636,11 @@ init_interpreter(PyInterpreterState *interp,
     assert(runtime->interpreters.head == interp);
     assert(next != NULL || (interp == runtime->interpreters.main));
     interp->next = next;
+
+    if (_PyLeakTrack_InitForInterpreter(interp) < 0)
+    {
+        return _PyStatus_NO_MEMORY();
+    }
 
     PyStatus status = _PyObject_InitState(interp);
     if (_PyStatus_EXCEPTION(status)) {
@@ -3184,6 +3193,37 @@ _PyLeakTrack_StorePointer(PyObject *op)
 }
 
 /*
+ * Initialize leak tracking for the given interpreter.
+ */
+int
+_PyLeakTrack_InitForInterpreter(PyInterpreterState *interp)
+{
+    assert(interp != NULL);
+    _Py_hashtable_allocator_t alloc = {
+        .malloc = PyMem_RawMalloc,
+        .free = PyMem_RawFree,
+    };
+
+    assert(interp->_leaktrack.all_addresses == NULL);
+    interp->_leaktrack.all_addresses = _Py_hashtable_new_full(
+        _Py_hashtable_hash_ptr, _Py_hashtable_compare_direct,
+        NULL, NULL, &alloc);
+    if (interp->_leaktrack.all_addresses == NULL) {
+        return -1;
+    }
+
+    assert(interp->_leaktrack.object_refs == NULL);
+    interp->_leaktrack.object_refs = _Py_hashtable_new_full(
+        _Py_hashtable_hash_ptr, _Py_hashtable_compare_direct,
+        NULL, (_Py_hashtable_destroy_func) _PyLeakTrack_FreeRefs, &alloc);
+    if (interp->_leaktrack.object_refs == NULL) {
+        return -1;
+    }
+
+    return 0;
+}
+
+/*
  * Store the memory address of op to know that it's a live object
  * for reference tracking.
  *
@@ -3483,3 +3523,4 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
 
     _PyLeakTrack_AddRefEntry(refs, entry);
 }
+
