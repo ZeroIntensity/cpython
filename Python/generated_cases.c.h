@@ -4061,7 +4061,6 @@
             }
             // _MONITOR_CALL
             {
-                puts("monitor_call");
                 int is_meth = !PyStackRef_IsNull(maybe_self[0]);
                 PyObject *function = PyStackRef_AsPyObjectBorrow(func);
                 PyObject *arg0;
