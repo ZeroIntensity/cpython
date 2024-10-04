@@ -3311,7 +3311,6 @@ dummy_func(
         }
 
         op(_MONITOR_CALL, (func, maybe_self[1], args[oparg] -- func, maybe_self[1], args[oparg])) {
-            puts("monitor_call");
             int is_meth = !PyStackRef_IsNull(maybe_self[0]);
             PyObject *function = PyStackRef_AsPyObjectBorrow(func);
             PyObject *arg0;
