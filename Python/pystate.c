@@ -3211,7 +3211,15 @@ _PyLeakTrack_InitForObjectNoFail(PyObject *op)
 void
 _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 {
-    fprintf(stderr, " - from object %s in %s (%s, line %d)\n", entry->repr, entry->func_name, entry->file, entry->lineno);
+    fprintf(
+            stderr,
+            " - from (%s at %p) in %s() (%s, line %d)\n",
+            entry->repr,
+            entry->pointer,
+            entry->func_name,
+            entry->file,
+            entry->lineno
+    );
 }
 
 int
