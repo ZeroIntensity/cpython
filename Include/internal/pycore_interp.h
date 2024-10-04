@@ -97,6 +97,7 @@ typedef struct _leaktrack_entry {
     const char *func_name;
     const char *file;
     int lineno;
+    char *repr;
 } _Py_leaktrack_entry;
 
 /*
@@ -118,7 +119,7 @@ typedef struct _leaktrack {
      * sets, so it's just a hash table with entries set to a pointer to 1.
      *
      * Psuedocode for it's type signature:
-     * _Py_hashtable_t[intptr_t, (void *) 1]
+     * _Py_hashtable_t[intptr_t, (void *) 1 | 2]
      */
     _Py_hashtable_t *all_addresses;
     /*

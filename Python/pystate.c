@@ -3211,7 +3211,7 @@ _PyLeakTrack_InitForObjectNoFail(PyObject *op)
 void
 _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 {
-    fprintf(stderr, " - in %s (%s, line %d)\n", entry->func_name, entry->file, entry->lineno);
+    fprintf(stderr, " - from object %s in %s (%s, line %d)\n", entry->repr, entry->func_name, entry->file, entry->lineno);
 }
 
 int
@@ -3301,6 +3301,7 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
     assert(refs != NULL);
     assert(refs->entries != NULL);
     for (Py_ssize_t i = 0; i < refs->len; ++i) {
+        PyMem_RawFree(refs->entries[i]->repr);
         PyMem_RawFree(refs->entries[i]);
     }
 
@@ -3351,6 +3352,8 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
         return;
     }
 
+    frame->_f_leaktrack_object = NULL;
+
     assert(lt->all_addresses != NULL);
     assert(lt->object_refs != NULL);
 
@@ -3362,11 +3365,36 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
         return;
     }
 
+    char *repr;
+    PyObject *str = NULL;//PyObject_Repr((PyObject *)ptr);
+    if (str == NULL)
+    {
+        //PyErr_WriteUnraisable(NULL);
+        repr = _PyMem_RawStrdup("<failed to get object repr>");
+    } else
+    {
+        repr = _PyMem_RawStrdup("<failed to get object repr>");
+        /*
+        // XXX Is there a proper private API for this?
+        repr = _PyMem_RawStrdup(((PyUnicodeObject *)str)->_base.utf8);
+        */
+    }
+
+    if (repr == NULL)
+    {
+        Py_FatalError("failed to allocate string");
+    }
+
     _Py_leaktrack_entry *entry = PyMem_RawMalloc(sizeof(_Py_leaktrack_entry));
+    if (entry == NULL)
+    {
+        Py_FatalError("failed to allocate leaktrack entry");
+    }
     entry->file = file;
     entry->lineno = lineno;
     entry->func_name = func;
     entry->pointer = ptr;
+    entry->repr = repr;
 
     _PyLeakTrack_AddRefEntry(refs, entry);
 }
