@@ -3133,6 +3133,21 @@ _PyLeakTrack_HasPointer(PyObject *op)
     _leaktrack_state *lt = get_leaktrack_state();
     assert(lt->all_addresses != NULL);
     void *res = _Py_hashtable_get(lt->all_addresses, (void *) op);
+    return res != NULL;
+}
+
+/*
+ * Check whether an object is alive.
+ * op must be in the global list of addresses;
+ */
+int
+_PyLeakTrack_IsAlive(PyObject *op)
+{
+    assert(_PyLeakTrack_HasPointer(op));
+    _leaktrack_state *lt = get_leaktrack_state();
+    assert(lt->all_addresses != NULL);
+    void *res = _Py_hashtable_get(lt->all_addresses, (void *) op);
+    assert(res != NULL);
     return res == ((void *) 1);
 }
 
@@ -3145,6 +3160,12 @@ _PyLeakTrack_StorePointer(PyObject *op)
     assert(op != NULL);
     _leaktrack_state *lt = get_leaktrack_state();
     assert(lt->all_addresses != NULL);
+
+    if (_PyLeakTrack_HasPointer(op))
+    {
+        // We don't want to reset the state of an existing pointer
+        return 0;
+    }
 
     if (_Py_hashtable_set(lt->all_addresses, op, (void *) 1) < 0)
     {
@@ -3243,16 +3264,30 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
         return 0;
     }
 
+    bool has_stored = false;
+
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
-        // Ignore circular references
-        if (ref->pointer == op)
+        if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer)) {
+            // It's possible that we haven't tracked the pointer.
+            // If that's the case, we don't know whether or not it's leaked.
+            // We also want to ignore all circular references.
             continue;
-        if (_PyLeakTrack_HasPointer(ref->pointer)) {
+        }
+
+        has_stored = true;
+        if (_PyLeakTrack_IsAlive(ref->pointer)) {
             // There's a live object referencing this one, not a leak!
             return 0;
         }
+    }
+
+    if (!has_stored) {
+        // All the references to the object aren't tracked by us, so
+        // we don't know if its a leak. We shouldn't report it
+        // as such.
+        return 0;
     }
 
     // Uh oh, we're alive with nobody alive that referenced us!
@@ -3265,9 +3300,10 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
-        if (ref->pointer == op)
+        if ((ref->pointer == op) || !_PyLeakTrack_HasPointer(ref->pointer)) {
             continue;
-        assert(!_PyLeakTrack_HasPointer(ref->pointer));
+        }
+        assert(!_PyLeakTrack_IsAlive(ref->pointer));
         _PyLeakTrack_PrintEntry(ref);
     }
 
@@ -3292,7 +3328,6 @@ _PyLeakTrack_CheckAllObjects(void)
     PyInterpreterState *interp = _PyInterpreterState_GET();
     _Py_hashtable_foreach(interp->_leaktrack.all_addresses, check_leak_fini, NULL);
 }
-
 
 /*
  * Mark an address as deallocated.
@@ -3398,11 +3433,12 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     _Py_leaktrack_refs *refs = (_Py_leaktrack_refs *) _Py_hashtable_get(lt->object_refs, op);
     if (refs == NULL)
     {
-        // Statically allocated object that did not go through
-        // PyObject_Init(), or something along those lines.
-        return;
+        _PyLeakTrack_InitForObjectNoFail(op);
+        refs = (_Py_leaktrack_refs *) _Py_hashtable_get(lt->object_refs, op);
     }
 
+    assert(refs != NULL);
+    assert(_PyLeakTrack_HasPointer(op));
     _Py_leaktrack_entry *entry = PyMem_RawMalloc(sizeof(_Py_leaktrack_entry));
     if (entry == NULL)
     {
