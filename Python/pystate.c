@@ -949,6 +949,8 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
     _PyRuntimeState *runtime = interp->runtime;
     struct pyinterpreters *interpreters = &runtime->interpreters;
 
+    _PyLeakTrack_CheckAllObjects();
+
     // XXX Clearing the "current" thread state should happen before
     // we start finalizing the interpreter (or the current thread state).
     PyThreadState *tcur = current_fast_get();
@@ -3172,6 +3174,12 @@ _PyLeakTrack_InitForObject(PyObject *op)
         return 0;
     }
 
+    if (_PyLeakTrack_StorePointer(op) < 0)
+    {
+        PyErr_NoMemory();
+        return -1;
+    }
+
     _Py_leaktrack_refs *refs = PyMem_RawMalloc(sizeof(_Py_leaktrack_refs));
     if (refs == NULL)
     {
@@ -3238,6 +3246,9 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
+        // Ignore circular references
+        if (ref->pointer == op)
+            continue;
         if (_PyLeakTrack_HasPointer(ref->pointer)) {
             // There's a live object referencing this one, not a leak!
             return 0;
@@ -3254,6 +3265,8 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     for (Py_ssize_t i = 0; i < refs->len; ++i)
     {
         _Py_leaktrack_entry *ref = refs->entries[i];
+        if (ref->pointer == op)
+            continue;
         assert(!_PyLeakTrack_HasPointer(ref->pointer));
         _PyLeakTrack_PrintEntry(ref);
     }
@@ -3261,6 +3274,25 @@ _PyLeakTrack_CheckForLeak(PyObject *op)
     fputs("--- END LEAK TRACKER OUTPUT ---\n", stderr);
     return 1;
 }
+
+int
+check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *data)
+{
+    if (value == ((void *) 1)) {
+        _PyLeakTrack_CheckForLeak((PyObject *) key);
+    } else {
+        assert(value == ((void *) 2));
+    }
+    return 0;
+}
+
+void
+_PyLeakTrack_CheckAllObjects(void)
+{
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    _Py_hashtable_foreach(interp->_leaktrack.all_addresses, check_leak_fini, NULL);
+}
+
 
 /*
  * Mark an address as deallocated.

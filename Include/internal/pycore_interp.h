@@ -140,6 +140,9 @@ _PyLeakTrack_HasPointer(PyObject *op);
 void
 _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs);
 
+void
+_PyLeakTrack_CheckAllObjects(void);
+
 /* interpreter state */
 
 /* PyInterpreterState holds the global state for one of the runtime's
