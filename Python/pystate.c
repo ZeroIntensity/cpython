@@ -997,6 +997,12 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
 
     _Py_qsbr_fini(interp);
 
+    // Free leaktrack information.
+    // It's intentional to not Py_CLEAR() the current_eval_object, because
+    // we don't own a reference to it.
+    _Py_hashtable_destroy(interp->_leaktrack.all_addresses);
+    _Py_hashtable_destroy(interp->_leaktrack.object_refs);
+
     _PyObject_FiniState(interp);
 
     free_interpreter(interp);
