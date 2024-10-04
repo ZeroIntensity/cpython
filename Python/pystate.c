@@ -3213,8 +3213,7 @@ _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 {
     fprintf(
             stderr,
-            " - from (%s at %p) in %s() (%s, line %d)\n",
-            entry->repr,
+            " - from object at %p in %s() (%s, line %d)\n",
             entry->pointer,
             entry->func_name,
             entry->file,
@@ -3309,7 +3308,6 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
     assert(refs != NULL);
     assert(refs->entries != NULL);
     for (Py_ssize_t i = 0; i < refs->len; ++i) {
-        PyMem_RawFree(refs->entries[i]->repr);
         PyMem_RawFree(refs->entries[i]);
     }
 
@@ -3349,7 +3347,7 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     PyFrameObject *frame = tstate->current_frame->frame_obj;
     if (frame == NULL)
     {
-        // Eval loop has not started... or something like that
+        // Eval loop has not started, I think?
         return;
     }
 
@@ -3373,31 +3371,6 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
         return;
     }
 
-    char *repr;
-    if (_PyLeakTrack_HasPointer(ptr)) {
-        // The object has been initialized, we know it's safe
-        // to try and repr() it.
-        PyObject *str = PyObject_Repr(ptr);
-        if (str == NULL)
-        {
-            PyErr_WriteUnraisable(NULL);
-            repr = _PyMem_RawStrdup("<exception occurred in repr()>");
-        } else
-        {
-            const char *tmp = PyUnicode_AsUTF8(str);
-            assert(tmp != NULL);
-            repr = _PyMem_RawStrdup(tmp);
-        }
-    } else
-    {
-        repr = _PyMem_RawStrdup("<repr unavailable upon tracking>");
-    }
-
-    if (repr == NULL)
-    {
-        Py_FatalError("failed to allocate string");
-    }
-
     _Py_leaktrack_entry *entry = PyMem_RawMalloc(sizeof(_Py_leaktrack_entry));
     if (entry == NULL)
     {
@@ -3407,8 +3380,6 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     entry->lineno = lineno;
     entry->func_name = func;
     entry->pointer = ptr;
-    entry->repr = repr;
 
     _PyLeakTrack_AddRefEntry(refs, entry);
 }
-

@@ -1827,6 +1827,7 @@ _PyFrame_New_NoTrack(PyCodeObject *code)
     f->f_lineno = 0;
     f->f_extra_locals = NULL;
     f->f_locals_cache = NULL;
+    f->_f_leaktrack_object = NULL;
     return f;
 }
 
