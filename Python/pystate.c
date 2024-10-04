@@ -3345,7 +3345,7 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
         return;
     }
 
-    void *ptr = (void *) frame->_f_leaktrack_object;
+    PyObject *ptr = frame->_f_leaktrack_object;
     if (ptr == NULL)
     {
         // Eval loop has not stored any object. This is a no-op.
@@ -3366,18 +3366,23 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     }
 
     char *repr;
-    PyObject *str = NULL;//PyObject_Repr((PyObject *)ptr);
-    if (str == NULL)
-    {
-        //PyErr_WriteUnraisable(NULL);
-        repr = _PyMem_RawStrdup("<failed to get object repr>");
+    if (_PyLeakTrack_HasPointer(ptr)) {
+        // The object has been initialized, we know it's safe
+        // to try and repr() it.
+        PyObject *str = PyObject_Repr(ptr);
+        if (str == NULL)
+        {
+            PyErr_WriteUnraisable(NULL);
+            repr = _PyMem_RawStrdup("<exception occurred in repr()>");
+        } else
+        {
+            const char *tmp = PyUnicode_AsUTF8(str);
+            assert(tmp != NULL);
+            repr = _PyMem_RawStrdup(tmp);
+        }
     } else
     {
-        repr = _PyMem_RawStrdup("<failed to get object repr>");
-        /*
-        // XXX Is there a proper private API for this?
-        repr = _PyMem_RawStrdup(((PyUnicodeObject *)str)->_base.utf8);
-        */
+        repr = _PyMem_RawStrdup("<repr unavailable upon tracking>");
     }
 
     if (repr == NULL)
