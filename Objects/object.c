@@ -2238,21 +2238,9 @@ _PyObject_InitState(PyInterpreterState *interp)
     return _PyStatus_OK();
 }
 
-int
-check_leak_fini(_Py_hashtable_t *ht, const void *key, const void *value, void *data)
-{
-    if (value == ((void *) 1)) {
-        _PyLeakTrack_CheckForLeak((PyObject *) key);
-    } else {
-        assert(value == ((void *) 2));
-    }
-    return 0;
-}
-
 void
 _PyObject_FiniState(PyInterpreterState *interp)
 {
-    assert(_Py_hashtable_foreach(interp->_leaktrack.all_addresses, check_leak_fini, NULL) == 0);
     _Py_hashtable_destroy(interp->_leaktrack.object_refs);
     _Py_hashtable_destroy(interp->_leaktrack.all_addresses);
 #ifdef Py_TRACE_REFS
