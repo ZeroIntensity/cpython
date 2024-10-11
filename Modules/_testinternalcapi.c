@@ -2049,6 +2049,13 @@ identify_type_slot_wrappers(PyObject *self, PyObject *Py_UNUSED(ignored))
 }
 
 
+static PyObject *
+leaky(PyObject *self, PyObject *arg)
+{
+    Py_INCREF(arg); // Leak!
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef module_functions[] = {
     {"get_configs", get_configs, METH_NOARGS},
     {"get_recursion_depth", get_recursion_depth, METH_NOARGS},
@@ -2145,6 +2152,7 @@ static PyMethodDef module_functions[] = {
     GH_119213_GETARGS_METHODDEF
     {"get_static_builtin_types", get_static_builtin_types, METH_NOARGS},
     {"identify_type_slot_wrappers", identify_type_slot_wrappers, METH_NOARGS},
+    {"leaky", leaky, METH_O, NULL},
     {NULL, NULL} /* sentinel */
 };
 

@@ -958,8 +958,6 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
     _PyRuntimeState *runtime = interp->runtime;
     struct pyinterpreters *interpreters = &runtime->interpreters;
 
-    _PyLeakTrack_CheckAllObjects(interp);
-
     // XXX Clearing the "current" thread state should happen before
     // we start finalizing the interpreter (or the current thread state).
     PyThreadState *tcur = current_fast_get();
@@ -1005,6 +1003,8 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
     }
 
     _Py_qsbr_fini(interp);
+
+    _PyLeakTrack_CheckAllObjects(interp);
 
     // Free leaktrack information.
     // It's intentional to not Py_CLEAR() the current_eval_object, because
