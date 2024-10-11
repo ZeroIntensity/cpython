@@ -132,7 +132,9 @@ _PyObject_VectorcallDictTstate(PyThreadState *tstate, PyObject *callable,
 
     PyObject *res;
     if (kwargs == NULL || PyDict_GET_SIZE(kwargs) == 0) {
+        _PyLeakTrack_CURRENT(callable);
         res = func(callable, args, nargsf, NULL);
+        _PyLeakTrack_DONE();
     }
     else {
         PyObject *kwnames;
@@ -239,8 +241,10 @@ _PyObject_MakeTpCall(PyThreadState *tstate, PyObject *callable,
     PyObject *result = NULL;
     if (_Py_EnterRecursiveCallTstate(tstate, " while calling a Python object") == 0)
     {
+        _PyLeakTrack_CURRENT(callable);
         result = _PyCFunctionWithKeywords_TrampolineCall(
             (PyCFunctionWithKeywords)call, callable, argstuple, kwdict);
+        _PyLeakTrack_DONE();
         _Py_LeaveRecursiveCallTstate(tstate);
     }
 

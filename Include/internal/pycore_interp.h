@@ -109,6 +109,11 @@ typedef struct _leaktrack_refs {
     char *type_name;
 } _Py_leaktrack_refs;
 
+typedef struct _leaktrack_current_eval {
+    PyObject *current;
+    struct _leaktrack_current_eval *next;
+} _Py_leaktrack_current_eval;
+
 /*
  * Per-interpreter leak tracking data.
  */
@@ -131,9 +136,9 @@ typedef struct _leaktrack {
      */
     _Py_hashtable_t *object_refs;
     /*
-     * Object currently being executed, set by the eval loop.
+     * Stack containing the object currently being executed.
      */
-    PyObject *current_eval_object;
+    _Py_leaktrack_current_eval *object_stack;
 } _leaktrack_state;
 
 PyAPI_FUNC(void)
@@ -141,6 +146,20 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs);
 
 PyAPI_FUNC(void)
 _PyLeakTrack_CheckAllObjects(PyInterpreterState *interp);
+
+PyAPI_FUNC(void)
+_PyLeakTrack_PushCurrentObject(PyObject *op);
+
+PyAPI_FUNC(void)
+_PyLeakTrack_PopCurrentObject(void);
+
+#define _PyLeakTrack_CURRENT(op) \
+    do {                         \
+    _PyLeakTrack_PushCurrentObject(op);
+
+#define _PyLeakTrack_DONE()          \
+    _PyLeakTrack_PopCurrentObject(); \
+    } while (0)
 
 /* interpreter state */
 

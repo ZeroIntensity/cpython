@@ -877,7 +877,6 @@
             callable = func;
             {
                 PyObject *callable_o = PyStackRef_AsPyObjectBorrow(callable);
-                tstate->interp->_leaktrack.current_eval_object = callable_o;
                 // oparg counts all of the args, but *not* self:
                 int total_args = oparg;
                 if (!PyStackRef_IsNull(self_or_null[0])) {
@@ -4084,7 +4083,6 @@
             callable = func;
             {
                 PyObject *callable_o = PyStackRef_AsPyObjectBorrow(callable);
-                tstate->interp->_leaktrack.current_eval_object = callable_o;
                 // oparg counts all of the args, but *not* self:
                 int total_args = oparg;
                 if (!PyStackRef_IsNull(self_or_null[0])) {

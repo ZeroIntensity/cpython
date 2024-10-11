@@ -3241,7 +3241,6 @@ dummy_func(
         // When calling Python, inline the call using DISPATCH_INLINED().
         op(_DO_CALL, (callable, self_or_null[1], args[oparg] -- res)) {
             PyObject *callable_o = PyStackRef_AsPyObjectBorrow(callable);
-            tstate->interp->_leaktrack.current_eval_object = callable_o;
 
             // oparg counts all of the args, but *not* self:
             int total_args = oparg;

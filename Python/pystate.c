@@ -3142,6 +3142,59 @@ get_leaktrack_state(void)
     return &interp->_leaktrack;
 }
 
+void
+_PyLeakTrack_PopCurrentObject(void)
+{
+    _leaktrack_state *lt = get_leaktrack_state();
+    _Py_leaktrack_current_eval *to_pop = lt->object_stack;
+    lt->object_stack = lt->object_stack->next;
+    PyMem_RawFree(to_pop);
+}
+
+void
+_PyLeakTrack_PushCurrentObject(PyObject *op)
+{
+    _leaktrack_state *lt = get_leaktrack_state();
+    _Py_leaktrack_current_eval *new_top = PyMem_RawMalloc(sizeof(_Py_leaktrack_current_eval));
+    if (new_top == NULL)
+    {
+        Py_FatalError("failed to allocate leaktrack stack entry");
+    }
+
+    if (lt->object_stack != NULL) {
+        // Copy the current stack top to our new entry
+        new_top->current = lt->object_stack->current;
+        new_top->next = lt->object_stack->next;
+
+        // Set the current stack top to tstate, and put the previous stack
+        // top right behind it.
+        lt->object_stack->current = op;
+        lt->object_stack->next = new_top;
+    } else
+    {
+        // This is the first item in the stack!
+        new_top->current = op;
+        new_top->next = NULL;
+        lt->object_stack = new_top;
+    }
+}
+
+/*
+ * Get the current object being executed.
+ * This may be NULL.
+ */
+static inline PyObject *
+_PyLeakTrack_CurrentObject(void)
+{
+    _leaktrack_state *lt = get_leaktrack_state();
+    if (lt->object_stack == NULL)
+    {
+        // There might be nothing on the top of the stack
+        return NULL;
+    }
+    return lt->object_stack->current;
+}
+
 /*
  * Check whether an object is in the global list of addresses.
  * op does not have to be a valid pointer.
@@ -3488,10 +3541,6 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
 
 /*
  * Add a reference for the given object.
- *
- * If the eval loop has not set a parent object, this function is a no-op.
- * This function can also no-op in a number of edge cases, e.g. during frame
- * deallocation.
  */
 void
 _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno)
@@ -3504,14 +3553,13 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     }
 
     _leaktrack_state *lt = get_leaktrack_state();
-    PyObject *ptr = lt->current_eval_object;
+    PyObject *ptr = _PyLeakTrack_CurrentObject();
     if (ptr == NULL)
     {
-        // Eval loop has not stored any object. This is a no-op.
+        // Nothing has stored any object. This is a no-op.
         return;
     }
 
-    lt->current_eval_object = NULL;
     assert(lt->all_addresses != NULL);
     assert(lt->object_refs != NULL);
 

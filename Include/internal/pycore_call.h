@@ -164,7 +164,9 @@ _PyObject_VectorcallTstate(PyThreadState *tstate, PyObject *callable,
         Py_ssize_t nargs = PyVectorcall_NARGS(nargsf);
         return _PyObject_MakeTpCall(tstate, callable, args, nargs, kwnames);
     }
+    _PyLeakTrack_CURRENT(callable);
     res = func(callable, args, nargsf, kwnames);
+    _PyLeakTrack_DONE();
     return _Py_CheckFunctionResult(tstate, callable, res, NULL);
 }
 
