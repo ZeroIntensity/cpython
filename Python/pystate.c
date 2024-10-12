@@ -3291,8 +3291,7 @@ _PyLeakTrack_InitForObject(PyObject *op)
 
     if (_Py_hashtable_get(lt->object_refs, op) != NULL)
     {
-        // Apparently, some objects call _PyObject_Init more than once.
-        // That seems like a bug to me, but I might as well try and support it.
+        // Apparently, some types can call _PyObject_Init() twice.
         return 0;
     }
 

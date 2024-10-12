@@ -509,7 +509,10 @@ _PyMem_GetAllocatorName(const char *name, PyMemAllocatorName *allocator)
     if (name == NULL || *name == '\0') {
         /* PYTHONMALLOC is empty or is not set or ignored (-E/-I command line
            nameions): use default memory allocators */
-        *allocator = PYMEM_ALLOCATOR_DEFAULT;
+
+        //*allocator = PYMEM_ALLOCATOR_DEFAULT;
+        // Use malloc for leaktrack builds
+        *allocator = PYMEM_ALLOCATOR_MALLOC;
     }
     else if (strcmp(name, "default") == 0) {
         *allocator = PYMEM_ALLOCATOR_DEFAULT;
