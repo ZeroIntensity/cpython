@@ -195,7 +195,14 @@ typedef struct {
 
 /* Use only if you know it's a string */
 static inline unsigned int PyUnicode_CHECK_INTERNED(PyObject *op) {
-    return _PyASCIIObject_CAST(op)->state.interned;
+    unsigned int interned = _PyASCIIObject_CAST(op)->state.interned;
+    if (interned == SSTATE_INTERNED_MORTAL && _Py_IsImmortal(op))
+    {
+        // User made this object immortal
+        return SSTATE_INTERNED_IMMORTAL;
+    }
+
+    return interned;
 }
 #define PyUnicode_CHECK_INTERNED(op) PyUnicode_CHECK_INTERNED(_PyObject_CAST(op))
 
