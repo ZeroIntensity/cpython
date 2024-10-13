@@ -2457,6 +2457,18 @@ _Py_FindUserDefinedImmortal(PyObject *op)
 }
 
 void
+_Py_SetImmortalKnown(PyObject *op)
+{
+#ifdef Py_GIL_DISABLED
+    op->ob_tid = _Py_UNOWNED_TID;
+    op->ob_ref_local = _Py_IMMORTAL_REFCNT_LOCAL;
+    op->ob_ref_shared = 0;
+#else
+    op->ob_refcnt = _Py_IMMORTAL_REFCNT;
+#endif
+}
+
+void
 _Py_SetImmortalUntracked(PyObject *op)
 {
     Py_ssize_t user_immortal_index = _Py_FindUserDefinedImmortal(op);
@@ -2469,13 +2481,7 @@ _Py_SetImmortalUntracked(PyObject *op)
         PyMem_RawFree(entry);
         interp->runtime_immortals.values[user_immortal_index] = NULL;
     }
-#ifdef Py_GIL_DISABLED
-    op->ob_tid = _Py_UNOWNED_TID;
-    op->ob_ref_local = _Py_IMMORTAL_REFCNT_LOCAL;
-    op->ob_ref_shared = 0;
-#else
-    op->ob_refcnt = _Py_IMMORTAL_REFCNT;
-#endif
+    _Py_SetImmortalKnown(op);
 }
 
 void
