@@ -2444,12 +2444,12 @@ _Py_FindUserDefinedImmortal(PyObject *op)
         return -1;
 
     PyInterpreterState *interp = _PyInterpreterState_GET();
-    if (interp->runtime_immortals == NULL)
+    if (interp->runtime_immortals.values == NULL)
         return -1;
 
-    for (Py_ssize_t i = 0; i < PyList_GET_SIZE(interp->runtime_immortals); ++i)
+    for (Py_ssize_t i = 0; i < interp->runtime_immortals.capacity; ++i)
     {
-        if (PyList_GET_ITEM(interp->runtime_immortals, i))
+        if (interp->runtime_immortals.values[i]->object == op)
             return i;
     }
 
@@ -2465,11 +2465,9 @@ _Py_SetImmortalUntracked(PyObject *op)
         // This object is being tracked by user immortals.
         // We don't want to do that anymore, and let the interpreter do it instead.
         PyInterpreterState *interp = _PyInterpreterState_GET();
-        assert(interp->runtime_immortals != NULL);
-        if (PySequence_DelItem(interp->runtime_immortals, user_immortal_index) < 0) {
-            PyErr_WriteUnraisable(op);
-        }
-        _Py_SetMortal(op, 1);
+        _Py_immortal *entry = interp->runtime_immortals.values[user_immortal_index];
+        PyMem_RawFree(entry);
+        interp->runtime_immortals.values[user_immortal_index] = NULL;
     }
 #ifdef Py_GIL_DISABLED
     op->ob_tid = _Py_UNOWNED_TID;
@@ -3075,42 +3073,4 @@ Py_ssize_t
 Py_REFCNT(PyObject *ob)
 {
     return _Py_REFCNT(ob);
-}
-
-int
-Py_Immortalize(PyObject *op)
-{
-    assert(op != NULL);
-    if (_Py_IsImmortal(op))
-        // We don't want to track objects that are already immortal
-        return 0;
-
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    PyObject *immortals;
-    if (interp->runtime_immortals == NULL)
-    {
-        // The immortals list hasn't been allocated yet!
-        immortals = PyList_New(1);
-        if (immortals == NULL)
-        {
-            return -1;
-        }
-        _Py_SetImmortal(immortals);
-        interp->runtime_immortals = immortals;
-    } else
-    {
-        assert(interp->runtime_immortals != NULL);
-        immortals = interp->runtime_immortals;
-    }
-
-    assert(immortals != NULL);
-    assert(_Py_IsImmortalLoose(immortals));
-
-    if (PyList_Append(immortals, op) < 0)
-    {
-        return -1;
-    }
-    _Py_SetImmortal(op);
-
-    return 0;
 }

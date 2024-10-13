@@ -85,6 +85,12 @@ typedef struct _rare_events {
     uint8_t func_modification;
 } _rare_events;
 
+/* User-defined immortal objects */
+typedef struct _Py_immortal {
+    PyObject *object;
+    int gc_tracked;
+} _Py_immortal;
+
 /* interpreter state */
 
 /* PyInterpreterState holds the global state for one of the runtime's
@@ -281,7 +287,11 @@ struct _is {
     Py_ssize_t _interactive_src_count;
 
     /* User-defined immortal objects list. */
-    PyObject *runtime_immortals;
+    struct _Py_runtime_immortals {
+        _Py_immortal **values;
+        Py_ssize_t capacity;
+        Py_ssize_t length;
+    } runtime_immortals;
 };
 
 
