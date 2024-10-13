@@ -1,8 +1,9 @@
 import unittest
 from test.support import import_helper
 import sys
-_testcapi = import_helper.import_module('_testcapi')
 import itertools
+_testcapi = import_helper.import_module('_testcapi')
+
 
 class TestCAPI(unittest.TestCase):
     def test_immortal_builtins(self):
@@ -16,6 +17,15 @@ _IMMORTAL_REFCNT = 4294967295
 
 
 class SomeType:
+    pass
+
+
+class A:
+    pass
+
+
+# Type with mortal parent class
+class B(A):
     pass
 
 
@@ -71,9 +81,12 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.sequence(lambda seq: {a: b for a, b in itertools.pairwise(seq)})
 
     def test_types(self):
-        self.immortalize(SomeType)
-        self.immortalize(range, already=True)
-        self.immortalize(str, already=True)
+        for static_type in (type, range, str, list, int, dict):
+            self.immortalize(static_type, already=True)
+
+        import io
+        for heap_type in (SomeType, unittest.TestCase, io.StringIO, B):
+            self.immortalize(heap_type)
 
 
 if __name__ == "__main__":
