@@ -26,7 +26,7 @@ class TestUserImmortalObjects(unittest.TestCase):
     def immortalize(self, obj, *, already=False, loose=None):
         refcnt = sys.getrefcount(obj)
 
-        if loose is not None:
+        if loose is None:
             if already is True:
                 self.assertEqual(refcnt, _IMMORTAL_REFCNT)
             else:
@@ -218,6 +218,13 @@ class TestUserImmortalObjects(unittest.TestCase):
         # Immortal iterator, immortal contents
         for _ in self.immortalize(iter([9999, -9999])):
             pass
+
+    def test_modules(self):
+        import io
+        import _io
+        self.immortalize(_io)  # Multi-phase init
+        self.immortalize(_testcapi)  # Single-phase init
+        self.immortalize(io)  # Python module
 
 
 if __name__ == "__main__":
