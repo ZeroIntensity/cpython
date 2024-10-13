@@ -44,10 +44,10 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize("not interned bytes".encode('utf-8'))
 
     def sequence(self, constructor):
-        self.immortalize(constructor((1, 2, 3)))
+        self.immortalize(constructor((1, 2, 3, False)))
         self.immortalize(constructor(("hello", sys.intern("world"))))
-        self.immortalize(constructor(("hello", sys.intern("hello"))))
-        self.immortalize(constructor((SomeType(), "hello", 1, 2, 3)))
+        self.immortalize(constructor(("hello", sys.intern("hello"), None)))
+        self.immortalize(constructor((SomeType(), "hello", 1, 2, 3, b"a", "")))
 
     def test_lists(self):
         self.immortalize([])
