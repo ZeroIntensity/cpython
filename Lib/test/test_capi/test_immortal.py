@@ -2,6 +2,7 @@ import unittest
 from test.support import import_helper
 import sys
 import itertools
+import os
 _testcapi = import_helper.import_module('_testcapi')
 
 
@@ -125,6 +126,12 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize(A().dummy)
         self.immortalize(A().dummy_static)
         self.immortalize(A().dummy_class)
+
+    def test_files(self):
+        for mode in ("w", "a", "r", "r+", "w+"):
+            with self.subTest(mode=mode):
+                with open(os.devnull, mode) as file:
+                    self.immortalize(file)
 
 
 if __name__ == "__main__":
