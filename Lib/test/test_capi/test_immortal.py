@@ -45,15 +45,16 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize("not interned bytes".encode('utf-8'))
 
     def sequence(self, constructor):
-        self.immortalize(constructor((1, 2, 3, False)))
-        self.immortalize(constructor(("hello", sys.intern("world"))))
-        self.immortalize(constructor(
-            ("hello", sys.intern("hello"), None, True)
-        ))
-        self.immortalize(constructor(("hello", SomeType(), 1, 2, 3, b"a", "")))
+        with self.subTest(constructor=constructor):
+            self.immortalize(constructor((1, 2, 3, False)))
+            self.immortalize(constructor(("hello", sys.intern("world"))))
+            self.immortalize(constructor(
+                ("hello", sys.intern("hello"), None, True)
+            ))
+            self.immortalize(constructor(("hello", SomeType(), 1, 2, 3, b"a", "")))
 
-        # Some exotic types
-        self.immortalize(constructor((SomeType, range)))
+            # Some exotic types
+            self.immortalize(constructor((SomeType, range)))
 
     def test_lists(self):
         self.immortalize([])
@@ -65,7 +66,9 @@ class TestUserImmortalObjects(unittest.TestCase):
 
     def test_sets(self):
         self.immortalize(set())
+        self.immortalize(frozenset())
         self.sequence(set)
+        self.sequence(frozenset)
 
     def test_dicts(self):
         self.immortalize({})
