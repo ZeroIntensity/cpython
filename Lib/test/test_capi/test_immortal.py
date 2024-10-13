@@ -36,6 +36,10 @@ class TestUserImmortalObjects(unittest.TestCase):
         # Test that double-immortalization is a no-op
         _testcapi.immortalize_object(obj)
 
+    def assert_mortal(self, obj):
+        self.assertNotEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
+        return obj
+
     def test_strings(self):
         # Mortal interned string
         self.immortalize(sys.intern("interned string"))
@@ -73,12 +77,7 @@ class TestUserImmortalObjects(unittest.TestCase):
     def circular(self, constructor):
         with self.subTest(constructor=constructor):
             test = constructor()
-            something_mortal = 999
-            self.assertNotEqual(
-                sys.getrefcount(something_mortal),
-                _IMMORTAL_REFCNT
-            )
-            self.immortalize(constructor((test, something_mortal)))
+            self.immortalize(constructor((test, self.assert_mortal(999))))
 
     def test_lists(self):
         self.immortalize([])
@@ -162,6 +161,17 @@ class TestUserImmortalObjects(unittest.TestCase):
                 self.immortalize("gotcha")
 
         self.immortalize(ImmortalizeWhileFinalizing())
+
+    def test_zip(self):
+        zip_iter = zip(
+            ["aaa", "bbb", "ccc"],
+            ["ddd", "eee", "fff"]
+        )
+        self.immortalize(zip_iter)
+        for a, b in zip_iter:
+            with self.subTest(a=a, b=b):
+                self.assert_mortal(a)
+                self.assert_mortal(b)
 
 
 if __name__ == "__main__":
