@@ -44,6 +44,17 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize("whatever")
         self.immortalize("not interned bytes".encode('utf-8'))
 
+    def test_numbers(self):
+        for i in range(1, 256):
+            with self.subTest(i=i):
+                self.immortalize(i, already=True)
+
+        self.immortalize(1000)
+        self.immortalize(10 ** 1000)  # Really big number
+        self.immortalize(100j)
+        self.immortalize(0.0)
+        self.immortalize(42.42)
+
     def sequence(self, constructor):
         with self.subTest(constructor=constructor):
             self.immortalize(constructor((1, 2, 3, False)))
@@ -51,7 +62,9 @@ class TestUserImmortalObjects(unittest.TestCase):
             self.immortalize(constructor(
                 ("hello", sys.intern("hello"), None, True)
             ))
-            self.immortalize(constructor(("hello", SomeType(), 1, 2, 3, b"a", "")))
+            self.immortalize(constructor(
+                ("hello", SomeType(), 1, 2, 3, b"a", "")
+            ))
 
             # Some exotic types
             self.immortalize(constructor((SomeType, range)))
