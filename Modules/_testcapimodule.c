@@ -3456,6 +3456,12 @@ test_attach_interpreter_threads(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+test_share_objects_between_interpreters(PyObject *self, PyObject *args)
+{
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef TestMethods[] = {
     {"set_errno",               set_errno,                       METH_VARARGS},
     {"test_config",             test_config,                     METH_NOARGS},
@@ -3597,6 +3603,7 @@ static PyMethodDef TestMethods[] = {
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
     {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
     {"test_attach_interpreter_threads", test_attach_interpreter_threads, METH_NOARGS},
+    {"test_share_objects_between_interpreters", test_share_objects_between_interpreters, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
 
