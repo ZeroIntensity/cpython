@@ -3422,9 +3422,10 @@ _PyLeakTrack_CheckForLeakWithInterp(PyObject *op, PyInterpreterState *interp)
 
     // Uh oh, we're alive with nobody alive that referenced us!
     // Let's show the developer where things could have gone wrong.
+    // TODO: Show the refcnt here.
     fprintf(stderr,
-            "--- LEAK TRACKER FOUND LEAKS! ---\nLeaked object is of type '%s' at %p (refcnt %ld)\n",
-            refs->type_name, op, Py_REFCNT(op));
+            "--- LEAK TRACKER FOUND LEAKS! ---\nLeaked object is of type '%s' at %p\n",
+            refs->type_name, op);
 
     fputs("\nPy_INCREF() locations:\n", stderr);
     for (Py_ssize_t i = 0; i < refs->len; ++i)
