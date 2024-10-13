@@ -141,6 +141,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         def something():
             return 42
 
+        self.immortalize(something.__qualname__)
         self.immortalize(self)
         self.immortalize(something)
         self.assertEqual(something(), 42)
