@@ -226,6 +226,14 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize(_testcapi)  # Single-phase init
         self.immortalize(io)  # Python module
 
+    def test_exceptions(self):
+        try:
+            _ = 0 / 0
+        except ZeroDivisionError as e:
+            self.immortalize(e)
+
+        self.immortalize(Exception())
+
 
 if __name__ == "__main__":
     unittest.main()
