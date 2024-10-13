@@ -40,7 +40,7 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         self.immortalize(b"byte string")
         self.immortalize(b"a", already=True)  # Latin 1-byte string
-        self.immortalize("whatever")  # Interned string
+        self.immortalize("whatever")
         self.immortalize("not interned bytes".encode('utf-8'))
 
     def sequence(self, constructor):
@@ -56,6 +56,10 @@ class TestUserImmortalObjects(unittest.TestCase):
     def test_tuples(self):
         self.immortalize((), already=True)  # Interpreter constant
         self.sequence(tuple)
+
+    def test_sets(self):
+        self.immortalize(set())
+        self.sequence(set)
 
 
 if __name__ == "__main__":
