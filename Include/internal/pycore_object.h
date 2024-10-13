@@ -158,6 +158,7 @@ _PyObject_IsUniquelyReferenced(PyObject *ob)
 
 PyAPI_FUNC(void) _Py_SetImmortal(PyObject *op);
 PyAPI_FUNC(void) _Py_SetImmortalUntracked(PyObject *op);
+PyAPI_FUNC(void) _Py_SetImmortalKnown(PyObject *op);
 
 // Makes an immortal object mortal again with the specified refcnt. Should only
 // be used during runtime finalization.
@@ -489,9 +490,12 @@ static inline void _PyObject_GC_UNTRACK(
 #endif
     PyObject *op)
 {
-    _PyObject_ASSERT_FROM(op, _PyObject_GC_IS_TRACKED(op),
-                          "object not tracked by the garbage collector",
-                          filename, lineno, __func__);
+    if (!_PyObject_GC_IS_TRACKED(op))
+    {
+        _PyObject_ASSERT_FROM(op, _PyObject_GC_IS_TRACKED(op),
+                              "object not tracked by the garbage collector",
+                              filename, lineno, __func__);
+    }
 
 #ifdef Py_GIL_DISABLED
     _PyObject_CLEAR_GC_BITS(op, _PyGC_BITS_TRACKED);
