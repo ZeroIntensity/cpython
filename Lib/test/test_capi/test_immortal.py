@@ -3,6 +3,7 @@ from test.support import import_helper
 import sys
 import itertools
 import os
+import weakref
 _testcapi = import_helper.import_module('_testcapi')
 
 
@@ -167,21 +168,22 @@ class TestUserImmortalObjects(unittest.TestCase):
                     self.immortalize(file)
 
     def test_finalizers(self):
-        class Foo:
-            def __del__(self):
-                Bar()
-
         class Bar:
             pass
 
-        self.immortalize(Foo())
+        # Immortalize while finalizing
+        something = SomeType()
+        weakref.finalize(something, lambda: self.immortalize(Bar()))
+        self.immortalize(something)
 
-        class ImmortalizeWhileFinalizing:
-            @staticmethod
-            def __del__():
-                self.immortalize("gotcha")
+        def finalize():
+            self.assertIsInstance(something, SomeType)
 
-        self.immortalize(ImmortalizeWhileFinalizing())
+        class Whatever:
+            pass
+
+        some_immortal = self.immortalize(Whatever())
+        weakref.finalize(some_immortal, finalize)
 
     def test_zip(self):
         zip_iter = zip(
