@@ -70,19 +70,32 @@ class TestUserImmortalObjects(unittest.TestCase):
             # Some exotic types
             self.immortalize(constructor((SomeType, range)))
 
+    def circular(self, constructor):
+        with self.subTest(constructor=constructor):
+            test = constructor()
+            something_mortal = 999
+            self.assertNotEqual(
+                sys.getrefcount(something_mortal),
+                _IMMORTAL_REFCNT
+            )
+            self.immortalize(constructor((test, something_mortal)))
+
     def test_lists(self):
         self.immortalize([])
         self.sequence(list)
+        self.circular(list)
 
     def test_tuples(self):
         self.immortalize((), already=True)  # Interpreter constant
         self.sequence(tuple)
+        self.circular(tuple)
 
     def test_sets(self):
         self.immortalize(set())
         self.immortalize(frozenset())
         self.sequence(set)
         self.sequence(frozenset)
+        self.circular(frozenset)
 
     def test_dicts(self):
         self.immortalize({})
@@ -132,6 +145,23 @@ class TestUserImmortalObjects(unittest.TestCase):
             with self.subTest(mode=mode):
                 with open(os.devnull, mode) as file:
                     self.immortalize(file)
+
+    def test_finalizers(self):
+        class Foo:
+            def __del__(self):
+                Bar()
+
+        class Bar:
+            pass
+
+        self.immortalize(Foo())
+
+        class ImmortalizeWhileFinalizing:
+            @staticmethod
+            def __del__():
+                self.immortalize("gotcha")
+
+        self.immortalize(ImmortalizeWhileFinalizing())
 
 
 if __name__ == "__main__":
