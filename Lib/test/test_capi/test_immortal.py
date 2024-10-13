@@ -2,7 +2,7 @@ import unittest
 from test.support import import_helper
 import sys
 _testcapi = import_helper.import_module('_testcapi')
-
+import itertools
 
 class TestCAPI(unittest.TestCase):
     def test_immortal_builtins(self):
@@ -46,8 +46,13 @@ class TestUserImmortalObjects(unittest.TestCase):
     def sequence(self, constructor):
         self.immortalize(constructor((1, 2, 3, False)))
         self.immortalize(constructor(("hello", sys.intern("world"))))
-        self.immortalize(constructor(("hello", sys.intern("hello"), None)))
-        self.immortalize(constructor((SomeType(), "hello", 1, 2, 3, b"a", "")))
+        self.immortalize(constructor(
+            ("hello", sys.intern("hello"), None, True)
+        ))
+        self.immortalize(constructor(("hello", SomeType(), 1, 2, 3, b"a", "")))
+
+        # Some exotic types
+        self.immortalize(constructor((SomeType, range)))
 
     def test_lists(self):
         self.immortalize([])
@@ -60,6 +65,15 @@ class TestUserImmortalObjects(unittest.TestCase):
     def test_sets(self):
         self.immortalize(set())
         self.sequence(set)
+
+    def test_dicts(self):
+        self.immortalize({})
+        self.sequence(lambda seq: {a: b for a, b in itertools.pairwise(seq)})
+
+    def test_types(self):
+        self.immortalize(SomeType)
+        self.immortalize(range, already=True)
+        self.immortalize(str, already=True)
 
 
 if __name__ == "__main__":
