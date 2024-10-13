@@ -772,6 +772,30 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
 
+    /*
+     * ** User-defined immortal object deallocation **
+     *
+     *  Runtime immortals can be any arbitrary object--heap types, interned
+     *  strings, you name it! This means we have to be careful about
+     *  deallocation, because two immortals might try to reference each other
+     *  in their finalizers. If that's the case, simply deallocating the
+     *  boring way (as in, mortalizing to a refcnt of 1 and then deallocating)
+     *  would result in a use-after-free violation.
+     *
+     *  Instead, we go through each object, clear them (if they were tracked),
+     *  and then run *only* their finalizer, not their deallocator. That way,
+     *  if they reference one another, things might be a little buggy, but at
+     *  least there isn't a segfault.
+     *
+     *  Finally, after we've run the finalizer for every immortal object, we
+     *  can run just the deallocators, which won't result in arbitrary code
+     *  execution. In pretty much every case, clearing the object should get rid
+     *  of all objects that could possibly reference an immortal.
+     *
+     *  Technically, someone *could* cause problems if they decided
+     *  it was a good idea to call Python code in tp_dealloc rather than
+     *  in tp_finalize, but that's their fault.
+     */
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
         _Py_immortal *immortal = imm_state->values[i];
