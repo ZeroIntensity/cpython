@@ -92,7 +92,7 @@ class TestUserImmortalObjects(unittest.TestCase):
                 ("hello", SomeType(), 1, 2, 3, b"a", "")
             ))
 
-            # Some exotic types
+            # Some random types
             self.immortalize(constructor((SomeType, range)))
 
     def circular(self, constructor):
