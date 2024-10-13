@@ -829,10 +829,11 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
         for (Py_ssize_t i = 0; i < PyList_GET_SIZE(interp->runtime_immortals); ++i)
         {
             PyObject *op = PyList_GET_ITEM(interp->runtime_immortals, i);
-            if (op == NULL)
+            if (op == NULL) {
                 // It's possible for a NULL entry to exist, if allocation succeeded
                 // but then appending failed.
                 continue;
+            }
 
             assert(_Py_IsImmortalLoose(op));
             _Py_SetMortal(op, 1);
