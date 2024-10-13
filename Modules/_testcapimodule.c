@@ -3330,12 +3330,18 @@ test_critical_sections(PyObject *module, PyObject *Py_UNUSED(args))
     Py_RETURN_NONE;
 }
 
-static void
-expect_id(int64_t expected)
+static int64_t
+get_interp_id()
 {
     PyInterpreterState *interp = PyInterpreterState_Get();
     assert(interp != NULL);
-    int64_t interp_id = PyInterpreterState_GetID(interp);
+    return PyInterpreterState_GetID(interp);
+}
+
+static void
+expect_id(int64_t expected)
+{
+    int64_t interp_id = get_interp_id();
     if (interp_id != expected) {
         fprintf(stderr, "expected interpreter ID %ld, got %ld\n", expected, interp_id);
     }
@@ -3433,7 +3439,7 @@ first_thread(void *arg)
         Py_FatalError("failed to create subinterpreter");
     }
 
-    expected_id = PyInterpreterState_GetID(PyInterpreterState_Get());
+    expected_id = get_interp_id();
     assert(expected_id != 0);
     expect_id(expected_id);
     Py_EXIT_MAIN_INTERPRETER();
@@ -3476,8 +3482,50 @@ test_attach_interpreter_threads(PyObject *self, PyObject *args)
 }
 
 static PyObject *
+test_create_destroy_interpreter(PyObject *self, PyObject *args)
+{
+    expect_id(0);
+    Py_CREATE_SUBINTERPRETER();
+    int64_t expected_id = get_interp_id();
+    assert(expected_id != 0);
+
+    Py_ENTER_MAIN_INTERPRETER();
+    expect_id(0);
+    Py_EXIT_MAIN_INTERPRETER();
+
+    expect_id(expected_id);
+    Py_DESTROY_SUBINTERPRETER();
+    Py_RETURN_NONE;
+}
+
+static PyObject *
 test_share_objects_between_interpreters(PyObject *self, PyObject *args)
 {
+    PyObject *ob = PyList_New(0);
+    if (ob == NULL)
+    {
+        return NULL;
+    }
+
+    if (Py_Immortalize(ob) < 0)
+    {
+        Py_DECREF(ob);
+        return NULL;
+    }
+
+    // ob can now be shared between interpreters
+
+    Py_CREATE_SUBINTERPRETER();
+    Py_DECREF(Py_NewRef(ob));
+    // 10 is immortal, so we're safe
+    if (PyList_Append(ob, PyLong_FromLong(10)) < 0)
+    {
+        Py_DESTROY_SUBINTERPRETER_EARLY();
+        return NULL;
+    }
+    Py_DESTROY_SUBINTERPRETER();
+    expect_id(0);
+
     Py_RETURN_NONE;
 }
 
@@ -3623,6 +3671,7 @@ static PyMethodDef TestMethods[] = {
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
     {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
     {"test_attach_interpreter_threads", test_attach_interpreter_threads, METH_NOARGS},
+    {"test_create_destroy_interpreter", test_create_destroy_interpreter, METH_NOARGS},
     {"test_share_objects_between_interpreters", test_share_objects_between_interpreters, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
