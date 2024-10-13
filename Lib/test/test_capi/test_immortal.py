@@ -122,7 +122,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.sequence(lambda seq: {a: b for a, b in itertools.pairwise(seq)})
 
     def test_types(self):
-        for static_type in (type, range, str, list, int, dict):
+        for static_type in (type, range, str, list, int, dict, super):
             self.immortalize(static_type, already=True)
 
         class A:
@@ -193,6 +193,27 @@ class TestUserImmortalObjects(unittest.TestCase):
             with self.subTest(a=a, b=b):
                 self.assert_mortal(a)
                 self.assert_mortal(b)
+
+    def test_iter(self):
+        # Immortal iterator, mortal contents
+        for i in self.immortalize(
+            iter(["nobody immortalizes", "the spanish inquisition"])
+        ):
+            with self.subTest(i=i):
+                self.assert_mortal(i)
+
+        # Mortal iterator, immortal contents
+        mortal_iterator = self.assert_mortal(
+            iter([self.immortalize(9999), self.immortalize(-9999)])
+        )
+        for _ in mortal_iterator:
+            self.assert_mortal(mortal_iterator)
+
+        self.assert_mortal(mortal_iterator)
+
+        # Immortal iterator, immortal contents
+        for _ in self.immortalize(iter([9999, -9999])):
+            pass
 
 
 if __name__ == "__main__":
