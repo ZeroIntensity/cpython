@@ -36,6 +36,8 @@ class TestUserImmortalObjects(unittest.TestCase):
         # Test that double-immortalization is a no-op
         _testcapi.immortalize_object(obj)
 
+        return obj
+
     def assert_mortal(self, obj):
         self.assertNotEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
         return obj
@@ -44,10 +46,29 @@ class TestUserImmortalObjects(unittest.TestCase):
         # Mortal interned string
         self.immortalize(sys.intern("interned string"))
 
-        self.immortalize(b"byte string")
-        self.immortalize(b"a", already=True)  # Latin 1-byte string
-        self.immortalize("whatever")
+        self.immortalize("a", already=True)  # 1-byte string
+        self.immortalize("nobody expects the spanish inquisition")
         self.immortalize("not interned bytes".encode('utf-8'))
+
+    def test_bytes(self):
+        self.immortalize(b"byte string")
+        self.immortalize(b"a", already=True)  # 1-byte string
+        self.immortalize(bytes.fromhex("FFD9"))
+
+    def test_bytearray(self):
+        self.immortalize(bytearray([1, 2, 3, 4]))
+        self.immortalize(bytearray(
+            self.assert_mortal("my silly string"), 'utf-8')
+        )
+        self.immortalize(bytearray(self.assert_mortal(999)))
+
+    def test_memoryview(self):
+        self.immortalize(
+            memoryview(self.assert_mortal(bytearray("XYZ", 'utf-8')))
+        )
+        ba = self.immortalize(bytearray("XYZ", 'utf-8'))
+        memoryview(ba)
+        self.immortalize(memoryview(ba))
 
     def test_numbers(self):
         for i in range(1, 256):
