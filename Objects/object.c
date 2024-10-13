@@ -2491,8 +2491,15 @@ _Py_FindUserDefinedImmortal(PyObject *op)
 
     for (Py_ssize_t i = 0; i < interp->runtime_immortals.capacity; ++i)
     {
-        if (interp->runtime_immortals.values[i]->object == op)
+        _Py_immortal *entry = interp->runtime_immortals.values[i];
+        if (entry == NULL)
+        {
+            return -1;
+        }
+
+        if (Py_Is(entry->object, op)) {
             return i;
+        }
     }
 
     return -1;
