@@ -766,6 +766,24 @@ PyInterpreterState_New(void)
     return interp;
 }
 
+static void
+noop(void *x)
+{}
+
+/*
+ * The immortal object trashcan.
+ * Upon deallocating the immortals, there's a possibility
+ * that one of their finalizers references one another.
+ *
+ * To prevent use-after-free, we do two iterations: one
+ * to run the finalizer, with the actual deallocator
+ * disabled, and then a second pass the runs only the
+ * free function.
+ */
+typedef struct _immortal_trashcan {
+    freefunc deallocator;
+    PyObject *object;
+} _immortal_trashcan;
 
 static void
 interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
@@ -823,25 +841,49 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
     Py_CLEAR(interp->audit_hooks);
 
-    if (interp->runtime_immortals != NULL)
+    struct _Py_runtime_immortals imm_state = interp->runtime_immortals;
+    if (imm_state.values != NULL)
     {
         // Clear the user-defined immortal objects
-        for (Py_ssize_t i = 0; i < PyList_GET_SIZE(interp->runtime_immortals); ++i)
+        _immortal_trashcan trashcan[imm_state.capacity];
+        for (Py_ssize_t i = 0; i < imm_state.capacity; ++i)
         {
-            PyObject *op = PyList_GET_ITEM(interp->runtime_immortals, i);
-            if (op == NULL) {
-                // It's possible for a NULL entry to exist, if allocation succeeded
-                // but then appending failed.
+            _Py_immortal *immortal = imm_state.values[i];
+            if (immortal == NULL) {
                 continue;
             }
 
+            PyObject *op = immortal->object;
             assert(_Py_IsImmortalLoose(op));
-            _Py_SetMortal(op, 1);
+            if (immortal->gc_tracked)
+            {
+                // Temporarily re-track the object for the finalizer
+                PyObject_GC_Track(op);
+            }
+
+            freefunc save_dealloc = Py_TYPE(op)->tp_free;
+            Py_TYPE(op)->tp_free = noop;
+            Py_TYPE(op)->tp_dealloc(op);
+            // TODO: Implement trashcan for all allocator domains, not just
+            // the objects tp_free()
+            trashcan[i].deallocator = save_dealloc;
+            PyMem_RawFree(immortal);
         }
 
-        // This will go through and deallocate each immortal object.
-        _Py_SetMortal(interp->runtime_immortals, 1);
-        Py_CLEAR(interp->runtime_immortals);
+        // At this point, all the finalizers for the immortal
+        // objects have run. Now we can safely deallocate them!
+
+        for (Py_ssize_t i = 0; i < imm_state.capacity; ++i)
+        {
+            _immortal_trashcan trash = trashcan[i];
+            if (trash.deallocator != NULL)
+            {
+                trash.deallocator(trash.object);
+            }
+        }
+
+        PyMem_RawFree(imm_state.values);
+        imm_state.values = NULL;
     }
 
     // At this time, all the threads should be cleared so we don't need atomic
@@ -931,6 +973,67 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     // XXX Once we have one allocator per interpreter (i.e.
     // per-interpreter GC) we must ensure that all of the interpreter's
     // objects have been cleaned up at the point.
+}
+
+
+int
+Py_Immortalize(PyObject *op)
+{
+    assert(op != NULL);
+    if (_Py_IsImmortal(op)) {
+        // We don't want to track objects that are already immortal
+        return 0;
+    }
+
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    struct _Py_runtime_immortals imm_state = interp->runtime_immortals;
+    _Py_immortal **immortals;
+    if (imm_state.values == NULL)
+    {
+        // The immortals list hasn't been allocated yet!
+        immortals = PyMem_RawCalloc(16, sizeof(_Py_immortal));
+        if (immortals == NULL)
+        {
+            PyErr_NoMemory();
+            return -1;
+        }
+        imm_state.capacity = 16;
+        imm_state.length = 0;
+    } else
+    {
+        immortals = imm_state.values;
+    }
+    assert(immortals != NULL);
+
+    _Py_immortal *entry = PyMem_RawMalloc(sizeof(_Py_immortal));
+    if (entry == NULL)
+    {
+        PyErr_NoMemory();
+        return -1;
+    }
+    immortals[imm_state.length++] = entry;
+
+    if (imm_state.length == imm_state.capacity)
+    {
+        // Needs to get resized
+        imm_state.capacity *= 2;
+        imm_state.values = PyMem_RawRealloc(
+            imm_state.values,
+            sizeof(_Py_immortal) * imm_state.capacity
+        );
+        if (imm_state.values == NULL)
+        {
+            PyMem_RawFree(entry);
+            PyErr_NoMemory();
+            return -1;
+        }
+    }
+
+    entry->object = op;
+    entry->gc_tracked = PyObject_GC_IsTracked(op);
+    _Py_SetImmortal(op);
+
+    return 0;
 }
 
 
