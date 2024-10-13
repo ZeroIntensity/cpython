@@ -20,15 +20,6 @@ class SomeType:
     pass
 
 
-class A:
-    pass
-
-
-# Type with mortal parent class
-class B(A):
-    pass
-
-
 class TestUserImmortalObjects(unittest.TestCase):
     def immortalize(self, obj, *, already=False):
         refcnt = sys.getrefcount(obj)
@@ -84,9 +75,40 @@ class TestUserImmortalObjects(unittest.TestCase):
         for static_type in (type, range, str, list, int, dict):
             self.immortalize(static_type, already=True)
 
+        class A:
+            pass
+
+        # Type with mortal parent class
+        class B(A):
+            pass
+
         import io
         for heap_type in (SomeType, unittest.TestCase, io.StringIO, B):
             self.immortalize(heap_type)
+
+    def test_functions(self):
+        def something():
+            return 42
+
+        self.immortalize(self)
+        self.immortalize(something)
+        self.assertEqual(something(), 42)
+
+        class A:
+            def dummy(self):
+                pass
+
+            @staticmethod
+            def dummy_static():
+                pass
+
+            @classmethod
+            def dummy_class(cls):
+                pass
+
+        self.immortalize(A().dummy)
+        self.immortalize(A().dummy_static)
+        self.immortalize(A().dummy_class)
 
 
 if __name__ == "__main__":
