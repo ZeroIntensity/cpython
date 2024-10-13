@@ -28,12 +28,12 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.assertEqual(sys.getrefcount(obj), 4294967295)
 
     def test_strings(self):
+        # Mortal interned string
         self.immortalize(sys.intern("interned string"))
+
         self.immortalize(b"byte string")
         self.immortalize(b"a", already=True)  # Latin 1-byte string
-
-        # Testing for strings that are not interned
-        self.immortalize(str(b"whatever"))
+        self.immortalize("whatever")  # Interned string
         self.immortalize("not interned bytes".encode('utf-8'))
 
 
