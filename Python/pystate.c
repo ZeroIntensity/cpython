@@ -795,6 +795,11 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
      *  Technically, someone *could* cause problems if they decided
      *  it was a good idea to call Python code in tp_dealloc rather than
      *  in tp_finalize, but that's their fault.
+     *
+     *  In the future, if that's truly a problem, then the solution is to
+     *  hijack all the allocators, and defer free operations until the end of
+     *  this function--but that's a lot of work to implement, and not something
+     *  that's a big issue right now.
      */
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
