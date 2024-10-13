@@ -188,8 +188,8 @@ class TestUserImmortalObjects(unittest.TestCase):
 
     def test_zip(self):
         zip_iter = zip(
-            ["aaa", "bbb", "ccc"],
-            ["ddd", "eee", "fff"]
+            [2000, 3000, 4000],
+            [5000, 6000, 7000]
         )
         self.immortalize(zip_iter)
         for a, b in zip_iter:
