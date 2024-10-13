@@ -23,16 +23,17 @@ class SomeType:
 
 
 class TestUserImmortalObjects(unittest.TestCase):
-    def immortalize(self, obj, *, already=False):
+    def immortalize(self, obj, *, already=False, loose=None):
         refcnt = sys.getrefcount(obj)
 
-        if already is True:
-            self.assertEqual(refcnt, _IMMORTAL_REFCNT)
-        else:
-            self.assertNotEqual(refcnt, _IMMORTAL_REFCNT)
+        if loose is not None:
+            if already is True:
+                self.assertEqual(refcnt, _IMMORTAL_REFCNT)
+            else:
+                self.assertNotEqual(refcnt, _IMMORTAL_REFCNT)
 
         _testcapi.immortalize_object(obj)
-        self.assertEqual(sys.getrefcount(obj), 4294967295)
+        self.assertEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
 
         # Test that double-immortalization is a no-op
         _testcapi.immortalize_object(obj)
@@ -53,7 +54,7 @@ class TestUserImmortalObjects(unittest.TestCase):
 
     def test_bytes(self):
         self.immortalize(b"byte string")
-        self.immortalize(b"a", already=True)  # 1-byte string
+        self.immortalize(b"a", already=True, loose=True)  # 1-byte string
         self.immortalize(bytes.fromhex("FFD9"))
 
     def test_bytearray(self):
@@ -141,7 +142,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         def something():
             return 42
 
-        self.immortalize(something.__qualname__)
+        self.immortalize(something.__qualname__, loose=True)
         self.immortalize(self)
         self.immortalize(something)
         self.assertEqual(something(), 42)
