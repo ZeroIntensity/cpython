@@ -771,45 +771,15 @@ PyInterpreterState_New(void)
 }
 
 static void
-noop(void *x)
-{}
-
-/*
- * The immortal object trashcan.
- * Upon deallocating the immortals, there's a possibility
- * that one of their finalizers references one another.
- *
- * To prevent use-after-free, we do two iterations: one
- * to run the finalizer, with the actual deallocator
- * disabled, and then a second pass the runs only the
- * free function.
- */
-typedef struct _immortal_trashcan {
-    freefunc deallocator;
-    PyObject *object;
-} _immortal_trashcan;
-
-static void
-deferred_free(void *ctx, void *ptr)
-{
-    //PyInterpreterState *interp = _PyInterpreterState_GET();
-}
-
-static void
 _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
 {
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
 
-    _immortal_trashcan trashcan[imm_state->capacity];
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
         _Py_immortal *immortal = imm_state->values[i];
         if (immortal == NULL) {
-            // There's nothing at this trashcan entry, but
-            // we don't want to leave it uninitialized.
-            trashcan[i].deallocator = NULL;
-            trashcan[i].object = NULL;
             continue;
         }
 
@@ -823,11 +793,15 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
 
         if (Py_TYPE(op)->tp_clear != NULL)
         {
+            // We need to clear up reference cycles, otherwise
+            // there might be a negative reference count if the
+            // immortal object has a reference to itself in it's
+            // deallocator.
             Py_TYPE(op)->tp_clear(op);
         }
 
-        _Py_SetMortal(op, 0);
         // Finalizers expect to be called with refcnt = 0
+        _Py_SetMortal(op, 0);
         if (PyObject_CallFinalizerFromDealloc(op) < 0)
         {
             // Object got resurrected!
@@ -843,21 +817,24 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
         // to deal with negative reference count shenanigans. We'll
         // just resurrect the reference.
         _Py_SetImmortalKnown(op);
-
-        trashcan[i].object = op;
-        PyMem_RawFree(immortal);
     }
 
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
-        _immortal_trashcan *trash = &trashcan[i];
-        PyObject *op = trash->object;
-        if (trash->object != NULL)
-        {
-            assert(_Py_IsImmortalLoose(op));
-            _Py_SetMortal(op, 0);
-            Py_TYPE(trash->object)->tp_dealloc(op);
+        _Py_immortal *immortal = imm_state->values[i];
+        if (immortal == NULL) {
+            continue;
         }
+
+        PyObject *op = immortal->object;
+        assert(_Py_IsImmortalLoose(op));
+
+        // Finally, time to deallocate the immortal!
+        _Py_SetMortal(op, 1);
+        Py_DECREF(op);
+
+        // Get rid of the metadata structure
+        PyMem_RawFree(immortal);
     }
 
     PyMem_RawFree(imm_state->values);
