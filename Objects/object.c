@@ -2437,9 +2437,40 @@ _Py_NewReferenceNoTotal(PyObject *op)
     new_reference(op);
 }
 
+Py_ssize_t
+_Py_FindUserDefinedImmortal(PyObject *op)
+{
+    if (!_Py_IsImmortal(op))
+        return -1;
+
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    if (interp->runtime_immortals == NULL)
+        return -1;
+
+    for (Py_ssize_t i = 0; i < PyList_GET_SIZE(interp->runtime_immortals); ++i)
+    {
+        if (PyList_GET_ITEM(interp->runtime_immortals, i))
+            return i;
+    }
+
+    return -1;
+}
+
 void
 _Py_SetImmortalUntracked(PyObject *op)
 {
+    Py_ssize_t user_immortal_index = _Py_FindUserDefinedImmortal(op);
+    if (user_immortal_index != -1)
+    {
+        // This object is being tracked by user immortals.
+        // We don't want to do that anymore, and let the interpreter do it instead.
+        PyInterpreterState *interp = _PyInterpreterState_GET();
+        assert(interp->runtime_immortals != NULL);
+        if (PySequence_DelItem(interp->runtime_immortals, user_immortal_index) < 0) {
+            PyErr_WriteUnraisable(op);
+        }
+        _Py_SetMortal(op, 1);
+    }
 #ifdef Py_DEBUG
     // For strings, use _PyUnicode_InternImmortal instead.
     if (PyUnicode_CheckExact(op)) {
@@ -3045,11 +3076,48 @@ Py_TYPE(PyObject *ob)
     return _Py_TYPE(ob);
 }
 
-
 // Py_REFCNT() implementation for the stable ABI
 #undef Py_REFCNT
 Py_ssize_t
 Py_REFCNT(PyObject *ob)
 {
     return _Py_REFCNT(ob);
+}
+
+int
+Py_Immortalize(PyObject *op)
+{
+    assert(op != NULL);
+    if (_Py_IsImmortal(op))
+        // We don't want to track objects that are already immortal
+        return 0;
+
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    PyObject *immortals;
+    if (interp->runtime_immortals == NULL)
+    {
+        // The immortals list hasn't been allocated yet!
+        immortals = PyList_New(1);
+        if (immortals == NULL)
+        {
+            return -1;
+        }
+        _Py_SetImmortal(immortals);
+        interp->runtime_immortals = immortals;
+    } else
+    {
+        assert(interp->runtime_immortals != NULL);
+        immortals = interp->runtime_immortals;
+    }
+
+    assert(immortals != NULL);
+    assert(_Py_IsImmortalLoose(immortals));
+
+    if (PyList_Append(immortals, op) < 0)
+    {
+        return -1;
+    }
+    _Py_SetImmortal(op);
+
+    return 0;
 }
