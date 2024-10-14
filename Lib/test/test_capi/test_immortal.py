@@ -122,6 +122,15 @@ class TestUserImmortalObjects(unittest.TestCase):
     def test_dicts(self):
         self.immortalize({})
         self.sequence(lambda seq: {a: b for a, b in itertools.pairwise(seq)})
+        x = {}
+        x['y'] = x
+        _testcapi.immortalize_object(x)
+
+        y = {}
+        y['x'] = y
+        y['y'] = x
+        x['y'] = y
+        _testcapi.immortalize_object(y)
 
     def test_types(self):
         for static_type in (type, range, str, list, int, dict, super):
