@@ -767,6 +767,15 @@ PyInterpreterState_New(void)
     return interp;
 }
 
+/*
+ * Deferred memory deletion.
+ *
+ * See the comment in _PyInterpreterState_ClearImmortals about what this
+ * is for.
+ *
+ * Essentially, this temporarily makes free operations a no-op, and frees
+ * the memory at a later time.
+ */
 
 static void
 deferred_free_common(_Py_immortal_trashcan *deferred_trash, void *ptr)
@@ -887,6 +896,11 @@ delete_deferred_memory(PyInterpreterState *interp)
     delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory, PyMem_Free);
 }
 
+/*
+ * Run the finalizer for an immortal object, but *not*
+ * the deallocator. This assumes that deferred memory
+ * deallocation is enabled.
+ */
 static void
 run_immortal_finalizer(_Py_immortal *immortal)
 {
@@ -918,6 +932,11 @@ run_immortal_finalizer(_Py_immortal *immortal)
     _Py_SetImmortalKnown(op);
 }
 
+/*
+ * Run the deallocator for an immortal object, without actually
+ * freeing it. This assumes that deferred memory deallocation is
+ * enabled.
+ */
 static void
 run_immortal_deallocator(PyObject *op, int phase)
 {
@@ -958,6 +977,9 @@ run_immortal_deallocator(PyObject *op, int phase)
     _Py_SetImmortalKnown(op);
 }
 
+/*
+ * Run the first phase of immortal object deallocation.
+ */
 static void
 _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
 {
@@ -974,7 +996,27 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
      *  boring way (as in, mortalizing to a refcnt of 1 and then deallocating)
      *  would result in a use-after-free violation.
      *
-     *  So, we have to do something a little more exotic.
+     *  So, we have to do something a little more exotic. We divide the deallocation
+     *  process into three phases. Here, in the loop below, we run *only* the
+     *  finalizer, not the deallocator. If there's Python code that needs to get
+     *  run, and that Python code references an immortal object, running it this
+     *  way prevents problems.
+     *
+     *  Next, something I call "deferred memory deletion" is enabled--basically, all
+     *  free operations on the object and memory domains are no-ops until the end
+     *  of the loop. The memory "freed" during that time is then stored in a memory
+     *  bank, and finally deallocated once all other Python objects have been deleted.
+     *
+     *  For each iteration, the current immortal is mortalized to a reference count
+     *  of 1, and then immediately DECREF'd to run the deallocator. The object doesn't
+     *  actually get freed though, because we deferred the memory. Since it's not freed, and
+     *  none of it's fields are freed, we're somewhat safe to keep using it. The object is
+     *  re-immortalized before the iteration ends and this process repeats until all
+     *  the objects have been placed in the memory bank. Note that this actually happens
+     *  twice--one for all objects, and then one for modules later on, after the final garbage
+     *  collection has already happened. Modules are special here and need to get moved to
+     *  a later on deallocation because the interpreter itself relies on them, such as with
+     *  tracebacks.
      */
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
@@ -1007,6 +1049,11 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
     reset_memory(interp);
 }
 
+/*
+ * Run the second phase of immortal object deallocation.
+ *
+ * This function deletes all the accumulated deferred memory.
+ */
 static void
 _PyInterpreterState_FinalizeImmortals(PyInterpreterState *interp)
 {
