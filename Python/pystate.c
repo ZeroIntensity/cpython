@@ -894,7 +894,7 @@ run_immortal_finalizer(_Py_immortal *immortal)
     assert(op != NULL);
     assert(_Py_IsImmortalLoose(op));
 
-    if (immortal->gc_tracked && !PyModule_Check(op)) {
+    if (immortal->gc_tracked && !PyModule_Check(op) && !_PyObject_GC_IS_TRACKED(op)) {
         // Temporarily re-track the object for the finalizer
         PyObject_GC_Track(op);
     }
