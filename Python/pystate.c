@@ -10,6 +10,7 @@
 #include "pycore_emscripten_trampoline.h"  // _Py_EmscriptenTrampoline_Init()
 #include "pycore_frame.h"
 #include "pycore_freelist.h"      // _PyObject_ClearFreeLists()
+#include "pycore_freelist_state.h"
 #include "pycore_initconfig.h"    // _PyStatus_OK()
 #include "pycore_object.h"        // _PyType_InitCache()
 #include "pycore_parking_lot.h"   // _PyParkingLot_AfterFork()
@@ -770,6 +771,197 @@ PyInterpreterState_New(void)
     return interp;
 }
 
+
+static void
+deferred_free_common(_Py_immortal_trashcan *deferred_trash, void *ptr)
+{
+    deferred_trash->garbage[deferred_trash->length++] = ptr;
+    if (deferred_trash->length == deferred_trash->capacity)
+    {
+        deferred_trash->capacity *= 2;
+        deferred_trash->garbage = PyMem_RawRealloc(
+            deferred_trash->garbage,
+            deferred_trash->capacity * sizeof(void *)
+        );
+        if (deferred_trash->garbage == NULL)
+        {
+            Py_FatalError("not enough memory to safely free immortals");
+        }
+    }
+}
+
+static void
+deferred_free_obj(void *ctx, void *ptr)
+{
+    deferred_free_common(&_PyInterpreterState_GET()->runtime_immortals.objects, ptr);
+}
+
+static void
+deferred_free_mem(void *ctx, void *ptr)
+{
+    deferred_free_common(&_PyInterpreterState_GET()->runtime_immortals.memory, ptr);
+}
+
+static void
+defer_memory_for_allocator(PyMemAllocatorDomain domain,
+                           _Py_immortal_trashcan *deferred_trash,
+                           void (*func)(void *, void *))
+{
+    PyMemAllocatorEx alloc;
+
+    deferred_trash->garbage = PyMem_RawCalloc(16, sizeof(void *));
+    if (deferred_trash->garbage == NULL)
+    {
+        Py_FatalError("not enough memory to safely free immortals");
+    }
+    deferred_trash->capacity = 16;
+    deferred_trash->length = 0;
+
+    PyMem_GetAllocator(domain, &alloc);
+    deferred_trash->save_free = alloc.free;
+    alloc.free = func;
+    PyMem_SetAllocator(domain, &alloc);
+}
+
+static void
+reset_memory_common(PyMemAllocatorDomain domain,
+                    _Py_immortal_trashcan *deferred_trash)
+{
+    PyMemAllocatorEx alloc;
+    PyMem_GetAllocator(domain, &alloc);
+    alloc.free = deferred_trash->save_free;
+    PyMem_SetAllocator(domain, &alloc);
+}
+
+static void
+delete_deferred_memory_common(PyMemAllocatorDomain domain,
+                            _Py_immortal_trashcan *deferred_trash,
+                            void (*domain_free)(void *))
+{
+    for (Py_ssize_t i = 0; i < deferred_trash->length; ++i)
+    {
+        void *trash = deferred_trash->garbage[i];
+        if (trash == NULL)
+        {
+            continue;
+        }
+        domain_free(trash);
+    }
+    // Clear the state
+    PyMem_RawFree(deferred_trash->garbage);
+    deferred_trash->garbage = NULL;
+    deferred_trash->capacity = 0;
+    deferred_trash->length = 0;
+}
+
+static void
+defer_memory(PyInterpreterState *interp)
+{
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    defer_memory_for_allocator(PYMEM_DOMAIN_OBJ, &imm_state->objects, deferred_free_obj);
+    defer_memory_for_allocator(PYMEM_DOMAIN_MEM, &imm_state->memory, deferred_free_mem);
+    // Cache the size for when we re-enable freelists later.
+    for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
+    {
+        struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
+        imm_state->freelist_sizes[i] = freelists[i].size;
+        freelists[i].size = -1; // This indicates that the freelist is disabled
+    }
+}
+
+static void
+reset_memory(PyInterpreterState *interp)
+{
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    reset_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->objects);
+    reset_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory);
+    // Re-enable freelists
+    for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
+    {
+        struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
+        freelists[i].size = imm_state->freelist_sizes[i];
+    }
+}
+
+static void
+delete_deferred_memory(PyInterpreterState *interp)
+{
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    delete_deferred_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->objects, PyObject_Free);
+    delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory, PyMem_Free);
+}
+
+static void
+run_immortal_finalizer(_Py_immortal *immortal)
+{
+    PyObject *op = immortal->object;
+    assert(op != NULL);
+    assert(_Py_IsImmortalLoose(op));
+
+    if (immortal->gc_tracked && !PyModule_Check(op)) {
+        // Temporarily re-track the object for the finalizer
+        PyObject_GC_Track(op);
+    }
+
+    // Finalizers expect to be called with refcnt = 0
+    _Py_SetMortal(op, 0);
+    if (PyObject_CallFinalizerFromDealloc(op) < 0)
+    {
+        // Object got resurrected!
+        PyErr_Format(
+            PyExc_RuntimeError,
+            "interpreter is finalizing, cannot use %R\n",
+            op
+        );
+        PyErr_WriteUnraisable(op);
+    }
+
+    // If another object references it, we don't want
+    // to deal with negative reference count shenanigans.
+    // Resurrect the reference.
+    _Py_SetImmortalKnown(op);
+}
+
+static void
+run_immortal_deallocator(PyObject *op, int phase)
+{
+    assert(op != NULL);
+    assert(_Py_IsImmortalLoose(op));
+
+    // Modules are special. Only use them
+    // on the second phase.
+    if (PyModule_Check(op))
+    {
+        if (phase == 0)
+            return;
+        else
+            assert(phase == 1);
+    } else {
+        if (phase == 1)
+            return;
+        else
+            assert(phase == 0);
+    }
+
+    // Need to clear up reference cycles
+    // before running the deallocator.
+    if (Py_TYPE(op)->tp_clear != NULL)
+    {
+        Py_TYPE(op)->tp_clear(op);
+    }
+
+    _Py_SetMortal(op, 1);
+    // Run the deallocator for the immortal object.
+    // All of it's mortal references should get cleared, and
+    // we'll store it in the deferred memory bank.
+    Py_DECREF(op);
+
+    // The object should still be alive, despite our
+    // ruthless attempts to destroy it.
+    assert(!_PyObject_IsFreed(op));
+    _Py_SetImmortalKnown(op);
+}
+
 static void
 _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
 {
@@ -786,24 +978,7 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
      *  boring way (as in, mortalizing to a refcnt of 1 and then deallocating)
      *  would result in a use-after-free violation.
      *
-     *  Instead, we go through each object, clear them (if they were tracked),
-     *  and then run *only* their finalizer, not their deallocator. That way,
-     *  if they reference one another, things might be a little buggy, but at
-     *  least there isn't a segfault.
-     *
-     *  Finally, after we've run the finalizer for every immortal object, we
-     *  can run just the deallocators, which won't result in arbitrary code
-     *  execution. In pretty much every case, clearing the object should get rid
-     *  of all objects that could possibly reference an immortal.
-     *
-     *  Technically, someone *could* cause problems if they decided
-     *  it was a good idea to call Python code in tp_dealloc rather than
-     *  in tp_finalize, but that's their fault.
-     *
-     *  In the future, if that's truly a problem, then the solution is to
-     *  hijack all the allocators, and defer free operations until the end of
-     *  this function--but that's a lot of work to implement, and not something
-     *  that's a big issue right now.
+     *  So, we have to do something a little more exotic.
      */
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
@@ -812,42 +987,14 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
             continue;
         }
 
-        PyObject *op = immortal->object;
-        assert(_Py_IsImmortalLoose(op));
-        if (immortal->gc_tracked)
-        {
-            // Temporarily re-track the object for the finalizer
-            PyObject_GC_Track(op);
-        }
-
-        if (Py_TYPE(op)->tp_clear != NULL)
-        {
-            // We need to clear up reference cycles, otherwise
-            // there might be a negative reference count if the
-            // immortal object has a reference to itself in it's
-            // deallocator.
-            Py_TYPE(op)->tp_clear(op);
-        }
-
-        // Finalizers expect to be called with refcnt = 0
-        _Py_SetMortal(op, 0);
-        if (PyObject_CallFinalizerFromDealloc(op) < 0)
-        {
-            // Object got resurrected!
-            PyErr_Format(
-                PyExc_RuntimeError,
-                "interpreter is finalizing, cannot use %d\n",
-                op
-            );
-            PyErr_WriteUnraisable(op);
-        }
-
-        // If another object references it, we don't want
-        // to deal with negative reference count shenanigans. We'll
-        // just resurrect the reference.
-        _Py_SetImmortalKnown(op);
+        run_immortal_finalizer(immortal);
     }
 
+    // At this point, the finalizer has run for each immortal.
+    // Now, we want to run each deallocator to clear references, but
+    // not deallocate the underlying immortal object.
+
+    defer_memory(interp);
     for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
     {
         _Py_immortal *immortal = imm_state->values[i];
@@ -855,19 +1002,39 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
             continue;
         }
 
-        PyObject *op = immortal->object;
-        assert(_Py_IsImmortalLoose(op));
-
-        // Finally, time to deallocate the immortal!
-        _Py_SetMortal(op, 1);
-        Py_DECREF(op);
-
-        // Get rid of the metadata structure
-        PyMem_RawFree(immortal);
+        run_immortal_deallocator(immortal->object, 0);
+        if (!PyModule_Check(immortal->object)) {
+            imm_state->values[i] = NULL;
+            PyMem_RawFree(immortal); // This gets deferred
+        }
     }
+    reset_memory(interp);
+}
+
+static void
+_PyInterpreterState_FinalizeImmortals(PyInterpreterState *interp)
+{
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+
+    defer_memory(interp);
+    for (Py_ssize_t i = 0; i < imm_state->capacity; ++i)
+    {
+        _Py_immortal *immortal = imm_state->values[i];
+        if (immortal == NULL) {
+            continue;
+        }
+
+        // Phase two--deallocate the modules.
+        run_immortal_deallocator(immortal->object, 1);
+    }
+    reset_memory(interp);
 
     PyMem_RawFree(imm_state->values);
     imm_state->values = NULL;
+
+    // Yay! We can safely delete all the immortal objects.
+    delete_deferred_memory(interp);
 }
 
 static void
@@ -909,6 +1076,12 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
            (e.g. no longer need the GIL). */
         // XXX Eliminate the need to do this.
         tstate->_status.cleared = 0;
+    }
+
+    if (interp->runtime_immortals.values != NULL)
+    {
+        // Clear the user-defined immortal objects.
+        _PyInterpreterState_ClearImmortals(interp);
     }
 
 #ifdef _Py_TIER2
@@ -972,15 +1145,6 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
     /* Last garbage collection on this interpreter */
     _PyGC_CollectNoFail(tstate);
-
-    if (interp->runtime_immortals.values != NULL)
-    {
-        // Clear the user-defined immortal objects.
-        // This needs to happen after the final garbage collection, in
-        // case any stragglers visit an immortal object.
-        _PyInterpreterState_ClearImmortals(interp);
-    }
-
     _PyGC_Fini(interp);
 
     /* We don't clear sysdict and builtins until the end of this function.
@@ -990,6 +1154,11 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     PyDict_Clear(interp->builtins);
     Py_CLEAR(interp->sysdict);
     Py_CLEAR(interp->builtins);
+
+    if (interp->runtime_immortals.values != NULL)
+    {
+        _PyInterpreterState_FinalizeImmortals(interp);
+    }
 
     if (tstate->interp == interp) {
         /* We are now safe to fix tstate->_status.cleared. */

@@ -46,6 +46,8 @@ struct _Py_freelists {
     struct _Py_freelist object_stack_chunks;
 };
 
+#define _PyFreeLists_LENGTH ((Py_ssize_t) (sizeof(struct _Py_freelists) / sizeof(struct _Py_freelist)))
+
 #ifdef __cplusplus
 }
 #endif
