@@ -814,13 +814,16 @@ defer_memory_for_allocator(PyMemAllocatorDomain domain,
 {
     PyMemAllocatorEx alloc;
 
-    deferred_trash->garbage = PyMem_RawCalloc(16, sizeof(void *));
     if (deferred_trash->garbage == NULL)
     {
-        Py_FatalError("not enough memory to safely free immortals");
+        deferred_trash->garbage = PyMem_RawCalloc(16, sizeof(void *));
+        if (deferred_trash->garbage == NULL)
+        {
+            Py_FatalError("not enough memory to safely free immortals");
+        }
+        deferred_trash->capacity = 16;
+        deferred_trash->length = 0;
     }
-    deferred_trash->capacity = 16;
-    deferred_trash->length = 0;
 
     PyMem_GetAllocator(domain, &alloc);
     deferred_trash->save_free = alloc.free;
