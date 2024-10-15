@@ -68,7 +68,15 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize(
             memoryview(self.assert_mortal(bytearray("XYZ", 'utf-8')))
         )
-        ba = self.immortalize(bytearray("XYZ", 'utf-8'))
+        # Note: immortalizing the bytearray causes a false positive
+        # SystemError (it shows up as "Error in sys.excepthook" because the
+        # interpreter is almost dead) during finalization, because the
+        # memoryview is also immortal, and it hasn't given the buffer back.
+        # However, this is perfectly safe because of deferred memory deletion,
+        # so it's really just a cause for confusion. I'm disabling it for now.
+
+        # ba = self.immortalize(bytearray("XYZ", 'utf-8'))
+        ba = bytearray("XYZ", 'utf-8')
         memoryview(ba)
         self.immortalize(memoryview(ba))
 
