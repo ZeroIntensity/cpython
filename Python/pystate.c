@@ -878,10 +878,9 @@ defer_memory(PyInterpreterState *interp)
     for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
-        imm_state->freelist_sizes[i] = freelists[i].size;
-        imm_state->freelist_pointers[i] = freelists[i].freelist;
         freelists[i].freelist = NULL;
         freelists[i].size = -1;
+        imm_state->freelist_caches[i] = freelists[i];
     }
 }
 
@@ -895,8 +894,7 @@ reset_memory(PyInterpreterState *interp)
     for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
-        freelists[i].size = imm_state->freelist_sizes[i];
-        freelists[i].freelist = imm_state->freelist_pointers[i];
+        freelists[i] = imm_state->freelist_caches[i];
     }
 }
 
