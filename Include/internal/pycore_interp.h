@@ -303,8 +303,7 @@ struct _is {
         Py_ssize_t length;
         _Py_immortal_trashcan objects;
         _Py_immortal_trashcan memory;
-        Py_ssize_t freelist_sizes[_PyFreeLists_LENGTH];
-        void *freelist_pointers[_PyFreeLists_LENGTH];
+        struct _Py_freelist freelist_caches[_PyFreeLists_LENGTH];
     } runtime_immortals;
 };
 
