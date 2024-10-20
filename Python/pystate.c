@@ -1331,9 +1331,18 @@ Py_Immortalize(PyObject *op)
     entry->object = op;
     entry->gc_tracked = PyObject_GC_IsTracked(op);
 
-    if (PyObject_IS_GC(op) && _PyObject_GC_IS_TRACKED(op)) {
+    if (entry->gc_tracked) {
         _PyObject_GC_UNTRACK(op);
     }
+
+#ifdef Py_DEBUG
+    // Removal the old references, so the reftotal
+    // isn't affected.
+    for (Py_ssize_t i = 0; i < Py_REFCNT(op) - 1; ++i)
+    {
+        _Py_DECREF_DecRefTotal();
+    }
+#endif
     _Py_SetImmortalKnown(op);
 
     return 0;
