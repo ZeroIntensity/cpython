@@ -870,12 +870,14 @@ defer_memory(PyInterpreterState *interp)
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     defer_memory_for_allocator(PYMEM_DOMAIN_OBJ, &imm_state->objects, deferred_free_obj);
     defer_memory_for_allocator(PYMEM_DOMAIN_MEM, &imm_state->memory, deferred_free_mem);
-    // Cache the size for when we re-enable freelists later.
+    // Cache the size and pointer for when we re-enable freelists later.
     for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
         imm_state->freelist_sizes[i] = freelists[i].size;
-        freelists[i].size = -1; // This indicates that the freelist is disabled
+        imm_state->freelist_pointers[i] = freelists[i].freelist;
+        freelists[i].freelist = NULL;
+        freelists[i].size = -1;
     }
 }
 
@@ -890,6 +892,7 @@ reset_memory(PyInterpreterState *interp)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
         freelists[i].size = imm_state->freelist_sizes[i];
+        freelists[i].freelist = imm_state->freelist_pointers[i];
     }
 }
 
@@ -1087,11 +1090,11 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate, PyInterpreterState 
         _PyObject_ASSERT(op, _Py_IsImmortal(op));
         _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
     }
-    reset_memory(interp);
 
     // Incidentially, this is the last garbage collection for the
     // interpreter.
     _PyGC_CollectNoFail(tstate);
+    reset_memory(interp);
     PyMem_RawFree(imm_state->values);
     imm_state->values = NULL;
 
