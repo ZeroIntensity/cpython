@@ -23,6 +23,8 @@
 #include "pycore_obmalloc.h"      // _PyMem_obmalloc_state_on_heap()
 #include "pycore_typeid.h"        // _PyType_FinalizeThreadLocalRefcounts()
 
+#include "object.h" // _PyObject_ASSERT
+
 /* --------------------------------------------------------------------------
 CAUTION
 
@@ -915,7 +917,7 @@ run_immortal_finalizer(_Py_immortal *immortal)
     assert(op != NULL);
     assert(_Py_IsImmortalLoose(op));
 
-    if (immortal->gc_tracked && !PyModule_Check(op) && !_PyObject_GC_IS_TRACKED(op)) {
+    if (immortal->gc_tracked && !_PyObject_GC_IS_TRACKED(op)) {
         // Temporarily re-track the object for the finalizer
         PyObject_GC_Track(op);
     }
@@ -948,7 +950,7 @@ static void
 run_immortal_deallocator(PyObject *op, int phase)
 {
     assert(op != NULL);
-    assert(_Py_IsImmortalLoose(op));
+    _PyObject_ASSERT(op, _Py_IsImmortal(op));
 
     // Modules are special. Only use them
     // on the second phase.
@@ -982,6 +984,10 @@ run_immortal_deallocator(PyObject *op, int phase)
     // ruthless attempts to destroy it.
     assert(!_PyObject_IsFreed(op));
     _Py_SetImmortalKnown(op);
+
+    // However, it definitely should not be tracked by
+    // the garbage collector anymore.
+    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
 }
 
 /*
@@ -1047,8 +1053,11 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
             continue;
         }
 
-        run_immortal_deallocator(immortal->object, 0);
-        if (!PyModule_Check(immortal->object)) {
+        PyObject *op = immortal->object;
+        run_immortal_deallocator(op, 0);
+        if (!PyModule_Check(op)) {
+            _PyObject_ASSERT(op, _Py_IsImmortal(op));
+            _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
             imm_state->values[i] = NULL;
             PyMem_RawFree(immortal); // This gets deferred
         }
@@ -1062,7 +1071,7 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
  * This function deletes all the accumulated deferred memory.
  */
 static void
-_PyInterpreterState_FinalizeImmortals(PyInterpreterState *interp)
+_PyInterpreterState_FinalizeImmortals(PyThreadState *tstate, PyInterpreterState *interp)
 {
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
@@ -1075,11 +1084,18 @@ _PyInterpreterState_FinalizeImmortals(PyInterpreterState *interp)
             continue;
         }
 
-        // Phase two--deallocate the modules.
-        run_immortal_deallocator(immortal->object, 1);
+        PyObject *op = immortal->object;
+
+        // Phase two: deallocate the modules.
+        run_immortal_deallocator(op, 1);
+        _PyObject_ASSERT(op, _Py_IsImmortal(op));
+        _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
     }
     reset_memory(interp);
 
+    // Incidentially, this is the last garbage collection for the
+    // interpreter.
+    _PyGC_CollectNoFail(tstate);
     PyMem_RawFree(imm_state->values);
     imm_state->values = NULL;
 
@@ -1193,9 +1209,12 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     // types create a reference cycle to themselves in their in their
     // PyTypeObject.tp_mro member (the tuple contains the type).
 
-    /* Last garbage collection on this interpreter */
+    /*
+     * This is possibly the last garbage collection on this interpreter.
+     * However, _PyInterpreterState_FinalizeImmortals() can run one more
+     * cycle.
+     */
     _PyGC_CollectNoFail(tstate);
-    _PyGC_Fini(interp);
 
     /* We don't clear sysdict and builtins until the end of this function.
        Because clearing other attributes can execute arbitrary Python code
@@ -1207,8 +1226,11 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
     if (interp->runtime_immortals.values != NULL)
     {
-        _PyInterpreterState_FinalizeImmortals(interp);
+        // This runs the GC, one last time.
+        _PyInterpreterState_FinalizeImmortals(tstate, interp);
     }
+
+    _PyGC_Fini(interp);
 
     if (tstate->interp == interp) {
         /* We are now safe to fix tstate->_status.cleared. */
