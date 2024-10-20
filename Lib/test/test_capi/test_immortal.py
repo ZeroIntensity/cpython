@@ -15,7 +15,7 @@ class TestCAPI(unittest.TestCase):
         _testcapi.test_immortal_small_ints()
 
 
-_IMMORTAL_REFCNT = 4294967295
+_IMMORTAL_REFCNT = sys.getrefcount(None)
 
 
 class SomeType:
@@ -236,12 +236,24 @@ class TestUserImmortalObjects(unittest.TestCase):
         for _ in self.immortalize(iter([9999, -9999])):
             pass
 
+    def test_freelist(self):
+        # I remember _asyncio.FutureIter was doing
+        # some exotic things with freelists (GH-122695)
+        import asyncio
+        loop = asyncio.new_event_loop()
+        try:
+            self.immortalize(iter(loop.create_task(asyncio.sleep(0))))
+        finally:
+            loop.close()
+
     def test_modules(self):
         import io
         import _io
+        import traceback
         self.immortalize(_io)  # Multi-phase init
         self.immortalize(_testcapi)  # Single-phase init
         self.immortalize(io)  # Python module
+        self.immortalize(traceback)  # Used by the interpreter
 
     def test_exceptions(self):
         try:
