@@ -1091,6 +1091,7 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate, PyInterpreterState 
         run_immortal_deallocator(op, 1);
         _PyObject_ASSERT(op, _Py_IsImmortal(op));
         _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+        PyMem_RawFree(immortal); // This also gets deferred
     }
 
     // Incidentially, this is the last garbage collection for the
