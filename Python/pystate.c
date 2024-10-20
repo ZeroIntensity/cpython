@@ -878,9 +878,9 @@ defer_memory(PyInterpreterState *interp)
     for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
+        imm_state->freelist_caches[i] = freelists[i];
         freelists[i].freelist = NULL;
         freelists[i].size = -1;
-        imm_state->freelist_caches[i] = freelists[i];
     }
 }
 
@@ -1093,11 +1093,11 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate, PyInterpreterState 
         _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
         PyMem_RawFree(immortal); // This also gets deferred
     }
+    reset_memory(interp);
 
     // Incidentially, this is the last garbage collection for the
     // interpreter.
     _PyGC_CollectNoFail(tstate);
-    reset_memory(interp);
     PyMem_RawFree(imm_state->values);
     imm_state->values = NULL;
 
