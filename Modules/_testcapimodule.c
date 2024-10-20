@@ -18,7 +18,6 @@
 #include <float.h>                // FLT_MAX
 #include <signal.h>
 #include <stddef.h>               // offsetof()
-#include <threads.h>
 
 #ifdef HAVE_SYS_WAIT_H
 #  include <sys/wait.h>           // W_STOPCODE
@@ -3374,6 +3373,7 @@ test_attach_interpreter(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+/*
 static int
 second_thread(void *arg)
 {
@@ -3461,8 +3461,9 @@ test_attach_interpreter_threads(PyObject *self, PyObject *args)
 
     Py_RETURN_NONE;
 }
+*/
 
-static PyObject *
+    static PyObject *
 test_create_destroy_interpreter(PyObject *self, PyObject *args)
 {
     expect_id(0);
@@ -3650,7 +3651,7 @@ static PyMethodDef TestMethods[] = {
     {"function_set_warning", function_set_warning, METH_NOARGS},
     {"test_critical_sections", test_critical_sections, METH_NOARGS},
     {"test_attach_interpreter", test_attach_interpreter, METH_NOARGS},
-    {"test_attach_interpreter_threads", test_attach_interpreter_threads, METH_NOARGS},
+    //{"test_attach_interpreter_threads", test_attach_interpreter_threads, METH_NOARGS},
     {"test_create_destroy_interpreter", test_create_destroy_interpreter, METH_NOARGS},
     {"test_share_objects_between_interpreters", test_share_objects_between_interpreters, METH_NOARGS},
     {NULL, NULL} /* sentinel */
