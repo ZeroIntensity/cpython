@@ -32,15 +32,19 @@ class TestUserImmortalObjects(unittest.TestCase):
         if loose is None:
             if already is True:
                 self.assertEqual(refcnt, _IMMORTAL_REFCNT)
+                self.assertTrue(_testcapi.is_immortal(obj))
             else:
                 self.assertNotEqual(refcnt, _IMMORTAL_REFCNT)
+                self.assertFalse(_testcapi.is_immortal(obj))
 
         _testcapi.immortalize_object(obj)
         self.assertEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
+        self.assertTrue(_testcapi.is_immortal(obj))
 
         # Test that double-immortalization is a no-op
         _testcapi.immortalize_object(obj)
         self.assertEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
+        self.assertTrue(_testcapi.is_immortal(obj))
 
         return obj
 
