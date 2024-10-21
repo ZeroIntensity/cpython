@@ -1374,9 +1374,10 @@ has_own_state(PyInterpreterState *interp)
 static inline OMState *
 get_state(void)
 {
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    assert(interp->obmalloc != NULL); // otherwise not initialized or freed
-    return interp->obmalloc;
+    PyThreadState *tstate = _PyThreadState_GET();
+    assert(tstate != NULL);
+    assert(tstate->obmalloc != NULL); // otherwise not initialized or freed
+    return tstate->obmalloc;
 }
 
 // These macros all rely on a local "state" variable.
