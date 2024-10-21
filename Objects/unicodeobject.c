@@ -727,9 +727,6 @@ _PyUnicode_CheckConsistency(PyObject *op, int check_content)
                 // - the 256 one-latin1-character strings
                 //   are static but use SSTATE_NOT_INTERNED
             }
-            else {
-                CHECK(!_Py_IsImmortal(op));
-            }
             break;
         case SSTATE_INTERNED_MORTAL:
             CHECK(!ascii->state.statically_allocated);
