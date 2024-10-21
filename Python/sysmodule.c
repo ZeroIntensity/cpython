@@ -2623,6 +2623,7 @@ static PyMethodDef sys_methods[] = {
 #endif
     SYS__GET_CPU_COUNT_CONFIG_METHODDEF
     SYS__IS_GIL_ENABLED_METHODDEF
+    SYS_IMMORTALIZE_METHODDEF
     {NULL, NULL}  // sentinel
 };
 

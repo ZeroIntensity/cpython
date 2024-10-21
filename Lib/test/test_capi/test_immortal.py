@@ -263,6 +263,12 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         self.immortalize(Exception())
 
+    def test_sys_immortalize(self):
+        # sys.immortalize() does pretty much the same thing
+        # as Py_Immortalize(), but we might as well test it.
+        mortal = self.assert_mortal([1, 2, 3])
+        sys.immortalize(mortal)
+        self.assertEqual(sys.getrefcount(mortal), _IMMORTAL_REFCNT)
 
 if __name__ == "__main__":
     unittest.main()
