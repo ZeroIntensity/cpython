@@ -1,11 +1,13 @@
 import unittest
+
 from test.support import import_helper
 import sys
 import itertools
 import os
 import textwrap
 import weakref
-_testcapi = import_helper.import_module('_testcapi')
+
+_testcapi = import_helper.import_module("_testcapi")
 
 
 class TestCAPI(unittest.TestCase):
@@ -38,6 +40,7 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         # Test that double-immortalization is a no-op
         _testcapi.immortalize_object(obj)
+        self.assertEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
 
         return obj
 
@@ -51,7 +54,7 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         self.immortalize("a", already=True)  # 1-byte string
         self.immortalize("nobody expects the spanish inquisition")
-        self.immortalize("not interned bytes".encode('utf-8'))
+        self.immortalize("not interned bytes".encode("utf-8"))
 
         sys.intern(self.immortalize("i'm immortal"))
 
@@ -62,14 +65,14 @@ class TestUserImmortalObjects(unittest.TestCase):
 
     def test_bytearray(self):
         self.immortalize(bytearray([1, 2, 3, 4]))
-        self.immortalize(bytearray(
-            self.assert_mortal("my silly string"), 'utf-8')
+        self.immortalize(
+            bytearray(self.assert_mortal("my silly string"), "utf-8")
         )
         self.immortalize(bytearray(self.assert_mortal(999)))
 
     def test_memoryview(self):
         self.immortalize(
-            memoryview(self.assert_mortal(bytearray("XYZ", 'utf-8')))
+            memoryview(self.assert_mortal(bytearray("XYZ", "utf-8")))
         )
         # Note: immortalizing the bytearray causes a false positive
         # SystemError (it shows up as "Error in sys.excepthook" because the
@@ -79,7 +82,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         # so it's really just a cause for confusion. I'm disabling it for now.
 
         # ba = self.immortalize(bytearray("XYZ", 'utf-8'))
-        ba = bytearray("XYZ", 'utf-8')
+        ba = bytearray("XYZ", "utf-8")
         memoryview(ba)
         self.immortalize(memoryview(ba))
 
@@ -89,7 +92,7 @@ class TestUserImmortalObjects(unittest.TestCase):
                 self.immortalize(i, already=True)
 
         self.immortalize(1000)
-        self.immortalize(10 ** 1000)  # Really big number
+        self.immortalize(10**1000)  # Really big number
         self.immortalize(100j)
         self.immortalize(0.0)
         self.immortalize(42.42)
@@ -98,12 +101,12 @@ class TestUserImmortalObjects(unittest.TestCase):
         with self.subTest(constructor=constructor):
             self.immortalize(constructor((1, 2, 3, False)))
             self.immortalize(constructor(("hello", sys.intern("world"))))
-            self.immortalize(constructor(
-                ("hello", sys.intern("hello"), None, True)
-            ))
-            self.immortalize(constructor(
-                ("hello", SomeType(), 1, 2, 3, b"a", "")
-            ))
+            self.immortalize(
+                constructor(("hello", sys.intern("hello"), None, True))
+            )
+            self.immortalize(
+                constructor(("hello", SomeType(), 1, 2, 3, b"a", ""))
+            )
 
             # Some random types
             self.immortalize(constructor((SomeType, range)))
@@ -134,13 +137,13 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize({})
         self.sequence(lambda seq: {a: b for a, b in itertools.pairwise(seq)})
         x = {}
-        x['y'] = x
+        x["y"] = x
         _testcapi.immortalize_object(x)
 
         y = {}
-        y['x'] = y
-        y['y'] = x
-        x['y'] = y
+        y["x"] = y
+        y["y"] = x
+        x["y"] = y
         _testcapi.immortalize_object(y)
 
     def test_types(self):
@@ -155,6 +158,7 @@ class TestUserImmortalObjects(unittest.TestCase):
             pass
 
         import io
+
         for heap_type in (SomeType, unittest.TestCase, io.StringIO, B):
             self.immortalize(heap_type)
 
@@ -208,10 +212,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         weakref.finalize(some_immortal, finalize)
 
     def test_zip(self):
-        zip_iter = zip(
-            [2000, 3000, 4000],
-            [5000, 6000, 7000]
-        )
+        zip_iter = zip([2000, 3000, 4000], [5000, 6000, 7000])
         self.immortalize(zip_iter)
         for a, b in zip_iter:
             with self.subTest(a=a, b=b):
@@ -243,6 +244,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         # I remember _asyncio.FutureIter was doing
         # some exotic things with freelists (GH-122695)
         import asyncio
+
         loop = asyncio.new_event_loop()
         try:
             self.immortalize(iter(loop.create_task(asyncio.sleep(0))))
@@ -253,6 +255,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         import io
         import _io
         import traceback
+
         self.immortalize(_io)  # Multi-phase init
         self.immortalize(_testcapi)  # Single-phase init
         self.immortalize(io)  # Python module
@@ -275,8 +278,11 @@ class TestUserImmortalObjects(unittest.TestCase):
 
     def test_the_party_pack(self):
         import _interpreters
-        source = textwrap.dedent("""
+
+        source = textwrap.dedent(
+            """
         import sys
+        import contextlib
 
 
         def immortalize_everything(mod):
@@ -287,15 +293,15 @@ class TestUserImmortalObjects(unittest.TestCase):
                 sys.immortalize(attr)
 
                 for x in dir(attr):
-                    sys.immortalize(getattr(attr, x))
+                    with contextlib.suppress(Exception):
+                        sys.immortalize(getattr(attr, x))
 
 
         for i in sys.stdlib_module_names:
-            try:
+            with contextlib.suppress(ImportError):
                 immortalize_everything(__import__(i))
-            except ImportError:
-                pass
-        """)
+        """
+        )
         interp = _interpreters.create()
         _interpreters.run_string(interp, source)
 

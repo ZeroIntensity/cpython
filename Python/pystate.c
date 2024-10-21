@@ -1059,7 +1059,7 @@ _PyInterpreterState_ClearImmortals(PyInterpreterState *interp)
             _PyObject_ASSERT(op, _Py_IsImmortal(op));
             _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
             imm_state->values[i] = NULL;
-            PyMem_RawFree(immortal); // This gets deferred
+            PyMem_RawFree(immortal);
         }
     }
     reset_memory(interp);
@@ -1090,7 +1090,7 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate, PyInterpreterState 
         run_immortal_deallocator(op, 1);
         _PyObject_ASSERT(op, _Py_IsImmortal(op));
         _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
-        PyMem_RawFree(immortal); // This also gets deferred
+        PyMem_RawFree(immortal);
     }
     reset_memory(interp);
 
@@ -1343,6 +1343,12 @@ Py_Immortalize(PyObject *op)
     return 0;
 }
 
+int
+Py_IsImmortal(PyObject *op)
+{
+    assert(op != NULL);
+    return _Py_IsImmortal(op);
+}
 
 void
 PyInterpreterState_Clear(PyInterpreterState *interp)
