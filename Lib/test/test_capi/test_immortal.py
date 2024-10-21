@@ -3,6 +3,7 @@ from test.support import import_helper
 import sys
 import itertools
 import os
+import textwrap
 import weakref
 _testcapi = import_helper.import_module('_testcapi')
 
@@ -269,6 +270,29 @@ class TestUserImmortalObjects(unittest.TestCase):
         mortal = self.assert_mortal([1, 2, 3])
         sys.immortalize(mortal)
         self.assertEqual(sys.getrefcount(mortal), _IMMORTAL_REFCNT)
+
+    def test_the_party_pack(self):
+        import _interpreters
+        source = textwrap.dedent("""
+        import sys
+
+
+        def immortalize_everything(mod):
+            sys.immortalize(mod)
+
+            for i in dir(mod):
+                sys.immortalize(getattr(mod, i))
+
+
+        for i in sys.stdlib_module_names:
+            try:
+                immortalize_everything(__import__(i))
+            except ImportError:
+                pass
+        """)
+        interp = _interpreters.create()
+        _interpreters.run_string(interp, source)
+
 
 if __name__ == "__main__":
     unittest.main()
