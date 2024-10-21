@@ -53,6 +53,8 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize("nobody expects the spanish inquisition")
         self.immortalize("not interned bytes".encode('utf-8'))
 
+        sys.intern(self.immortalize("i'm immortal"))
+
     def test_bytes(self):
         self.immortalize(b"byte string")
         self.immortalize(b"a", already=True, loose=True)  # 1-byte string
