@@ -283,7 +283,11 @@ class TestUserImmortalObjects(unittest.TestCase):
             sys.immortalize(mod)
 
             for i in dir(mod):
-                sys.immortalize(getattr(mod, i))
+                attr = getattr(mod, i)
+                sys.immortalize(attr)
+
+                for x in dir(attr):
+                    sys.immortalize(getattr(attr, x))
 
 
         for i in sys.stdlib_module_names:
