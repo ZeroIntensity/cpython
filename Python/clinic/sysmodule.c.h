@@ -1625,6 +1625,15 @@ exit:
     return return_value;
 }
 
+PyDoc_STRVAR(sys_immortalize__doc__,
+"immortalize($module, object, /)\n"
+"--\n"
+"\n"
+"Make the object immortal. This means that it\'s reference count will never be modified while the interpreter is running.");
+
+#define SYS_IMMORTALIZE_METHODDEF    \
+    {"immortalize", (PyCFunction)sys_immortalize, METH_O, sys_immortalize__doc__},
+
 #ifndef SYS_GETWINDOWSVERSION_METHODDEF
     #define SYS_GETWINDOWSVERSION_METHODDEF
 #endif /* !defined(SYS_GETWINDOWSVERSION_METHODDEF) */
@@ -1668,4 +1677,4 @@ exit:
 #ifndef SYS_GETANDROIDAPILEVEL_METHODDEF
     #define SYS_GETANDROIDAPILEVEL_METHODDEF
 #endif /* !defined(SYS_GETANDROIDAPILEVEL_METHODDEF) */
-/*[clinic end generated code: output=6d4f6cd20419b675 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=2cfce824a6b99f96 input=a9049054013a1b77]*/

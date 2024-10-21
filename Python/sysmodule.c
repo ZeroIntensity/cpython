@@ -2532,6 +2532,26 @@ close_and_release:
     return 0;
 }
 
+/*[clinic input]
+sys.immortalize
+
+    object:  object
+    /
+
+Make the object immortal. This means that it's reference count will never be modified while the interpreter is running.
+[clinic start generated code]*/
+
+static PyObject *
+sys_immortalize(PyObject *module, PyObject *object)
+/*[clinic end generated code: output=d5a3fdec54342de1 input=8c8520b96815994b]*/
+{
+    if (Py_Immortalize(object) < 0)
+    {
+        return NULL;
+    }
+    assert(_Py_IsImmortal(object));
+    Py_RETURN_NONE;
+}
 
 static PyMethodDef sys_methods[] = {
     /* Might as well keep this in alphabetic order */
