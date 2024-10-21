@@ -1676,6 +1676,8 @@ unicode_dealloc(PyObject *unicode)
     switch (_PyUnicode_STATE(unicode).interned) {
         case SSTATE_NOT_INTERNED:
             break;
+        // If a mortal string was interned, and then immortalized later, then this can be the case.
+        case SSTATE_INTERNED_IMMORTAL:
         case SSTATE_INTERNED_MORTAL:
             /* Remove the object from the intern dict.
              * Before doing so, we set the refcount to 2: the key and value
@@ -15444,6 +15446,12 @@ _PyUnicode_InternStatic(PyInterpreterState *interp, PyObject **p)
 static void
 immortalize_interned(PyObject *s)
 {
+    if (_Py_IsImmortal(s))
+    {
+        // User-defined immortal object. Don't do anything extra.
+        _PyUnicode_STATE(s).interned = SSTATE_INTERNED_IMMORTAL;
+        return;
+    }
     assert(PyUnicode_CHECK_INTERNED(s) == SSTATE_INTERNED_MORTAL);
     assert(!_Py_IsImmortal(s));
 #ifdef Py_REF_DEBUG
