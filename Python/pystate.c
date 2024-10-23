@@ -1917,7 +1917,6 @@ init_threadstate(_PyThreadStateImpl *_tstate,
 
     assert(interp != NULL);
     tstate->interp = interp;
-    tstate->obmalloc = interp->obmalloc; // Copy the obmalloc pointer
     tstate->eval_breaker =
         _Py_atomic_load_uintptr_relaxed(&interp->ceval.instrumentation_version);
 

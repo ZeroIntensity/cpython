@@ -200,13 +200,6 @@ struct _ts {
        The PyThreadObject must hold the only reference to this value.
     */
     PyObject *threading_local_sentinel;
-    /*
-     * This is the "live" pointer to the obmalloc state.
-     * In most cases, this will be a copy of what is on the interpreter state.
-     * Consider this borrowed--the interpreter state is responsible for cleaning
-     * the obmalloc state up, not the thread state.
-     */
-    struct _obmalloc_state *obmalloc;
 };
 
 #ifdef Py_DEBUG
