@@ -112,6 +112,7 @@ typedef struct _leaktrack_refs {
 typedef struct _leaktrack_current_eval {
     PyObject *current;
     struct _leaktrack_current_eval *next;
+    int suspended;
 } _Py_leaktrack_current_eval;
 
 /*
@@ -153,9 +154,15 @@ _PyLeakTrack_PushCurrentObject(PyObject *op);
 PyAPI_FUNC(void)
 _PyLeakTrack_PopCurrentObject(void);
 
+PyAPI_FUNC(void)
+_PyLeakTrack_Suspend(void);
+
+PyAPI_FUNC(void)
+_PyLeakTrack_Unsuspend(void);
+
 #define _PyLeakTrack_CURRENT(op) \
     do {                         \
-    _PyLeakTrack_PushCurrentObject(op);
+    _PyLeakTrack_PushCurrentObject(_PyObject_CAST(op));
 
 #define _PyLeakTrack_DONE()          \
     _PyLeakTrack_PopCurrentObject(); \

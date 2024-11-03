@@ -3160,22 +3160,43 @@ _PyLeakTrack_PushCurrentObject(PyObject *op)
     {
         Py_FatalError("failed to allocate leaktrack stack entry");
     }
+    new_top->suspended = 0;
 
     if (lt->object_stack != NULL) {
         // Copy the current stack top to our new entry
-        new_top->current = lt->object_stack->current;
-        new_top->next = lt->object_stack->next;
+        new_top->next = lt->object_stack;
+        new_top->current = op;
 
-        // Set the current stack top to tstate, and put the previous stack
-        // top right behind it.
-        lt->object_stack->current = op;
-        lt->object_stack->next = new_top;
+        // Set the current stack top to the new entry
+        lt->object_stack = new_top;
     } else
     {
         // This is the first item in the stack!
         new_top->current = op;
         new_top->next = NULL;
         lt->object_stack = new_top;
+    }
+}
+
+void
+_PyLeakTrack_Suspend(void)
+{
+    _leaktrack_state *lt = get_leaktrack_state();
+    if (lt->object_stack != NULL)
+    {
+        assert(lt->object_stack->suspended >= 0);
+        ++lt->object_stack->suspended;
+    }
+}
+
+void
+_PyLeakTrack_Unsuspend(void)
+{
+    _leaktrack_state *lt = get_leaktrack_state();
+    if (lt->object_stack != NULL)
+    {
+        --lt->object_stack->suspended;
+        assert(lt->object_stack->suspended >= 0);
     }
 }
 
@@ -3190,6 +3211,12 @@ _PyLeakTrack_CurrentObject(void)
     if (lt->object_stack == NULL)
     {
         // There might be nothing on the top of the stack
+        return NULL;
+    }
+    assert(lt->object_stack->suspended >= 0);
+    if (lt->object_stack->suspended > 0)
+    {
+        // This entry has been disabled by the eval loop
         return NULL;
     }
     return lt->object_stack->current;
@@ -3539,6 +3566,31 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
     PyMem_RawFree(refs);
 }
 
+static int
+should_ignore(PyObject *op)
+{
+    if (op == NULL)
+    {
+        return 1;
+    }
+
+    if (_Py_IsImmortal(op))
+    {
+        // Immortal objects cannot be leaked, at least in the
+        // traditional sense with reference counting.
+        return 1;
+    }
+
+    if (Py_IS_TYPE(op, &PyFrame_Type) || Py_IS_TYPE(op, &PyCode_Type))
+    {
+        // Frames and code objects do weird things with their reference counts.
+        // We'll figure this out later, but we can ignore them for now.
+        return 1;
+    }
+
+    return 0;
+}
+
 /*
  * Add a reference for the given object.
  */
@@ -3546,17 +3598,15 @@ void
 _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file, int lineno)
 {
     assert(op != NULL);
-    if (_Py_IsImmortal(op)) {
-        // Immortal objects cannot be leaked, at least in the
-        // traditional sense with reference counting.
+    if (should_ignore(op)) {
         return;
     }
 
     _leaktrack_state *lt = get_leaktrack_state();
     PyObject *ptr = _PyLeakTrack_CurrentObject();
-    if (ptr == NULL)
-    {
-        // Nothing has stored any object. This is a no-op.
+
+    if (should_ignore(ptr)) {
+        // Don't track references made by ignored objects.
         return;
     }
 

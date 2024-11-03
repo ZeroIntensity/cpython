@@ -114,11 +114,18 @@ extern _PyPerf_Callbacks _Py_perfmap_jit_callbacks;
 static inline PyObject*
 _PyEval_EvalFrame(PyThreadState *tstate, struct _PyInterpreterFrame *frame, int throwflag)
 {
+    _PyLeakTrack_Suspend();
     EVAL_CALL_STAT_INC(EVAL_CALL_TOTAL);
+    PyObject *res;
     if (tstate->interp->eval_frame == NULL) {
-        return _PyEval_EvalFrameDefault(tstate, frame, throwflag);
+        res = _PyEval_EvalFrameDefault(tstate, frame, throwflag);
     }
-    return tstate->interp->eval_frame(tstate, frame, throwflag);
+    else {
+        res = tstate->interp->eval_frame(tstate, frame, throwflag);
+    }
+    _PyLeakTrack_Unsuspend();
+
+    return res;
 }
 
 extern PyObject*
