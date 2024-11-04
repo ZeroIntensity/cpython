@@ -1,5 +1,6 @@
 import unittest
 
+from test import support
 from test.support import import_helper
 import sys
 import itertools
@@ -62,10 +63,16 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         sys.intern(self.immortalize("i'm immortal"))
 
+        # Now, test using those strings again.
+        self.immortalize(b"i'm immortal".decode("utf-8") + "abc")
+
     def test_bytes(self):
         self.immortalize(b"byte string")
         self.immortalize(b"a", already=True, loose=True)  # 1-byte string
         self.immortalize(bytes.fromhex("FFD9"))
+
+        # Make sure that using it doesn't accidentially make it immortal
+        self.assert_mortal(b"byte string" + b"abc")
 
     def test_bytearray(self):
         self.immortalize(bytearray([1, 2, 3, 4]))
@@ -89,6 +96,14 @@ class TestUserImmortalObjects(unittest.TestCase):
         ba = bytearray("XYZ", "utf-8")
         memoryview(ba)
         self.immortalize(memoryview(ba))
+
+        # Mortal view, immortal buffer
+        self.assert_mortal(memoryview(self.immortalize(b"a duck"))).release()
+
+        # Immortal view, mortal buffer
+        self.immortalize(memoryview(
+            self.assert_mortal(b"i'm mortal")
+        )).release()
 
     def test_numbers(self):
         for i in range(1, 256):
@@ -265,13 +280,60 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.immortalize(io)  # Python module
         self.immortalize(traceback)  # Used by the interpreter
 
-    def test_exceptions(self):
-        try:
-            _ = 0 / 0
-        except ZeroDivisionError as e:
-            self.immortalize(e)
-
+    def test_exceptions_and_tracebacks(self):
+        # Immortal exception, mortal traceback
         self.immortalize(Exception())
+
+        def get_exc():
+            try:
+                _ = 0 / 0
+            except ZeroDivisionError as e:
+                return self.assert_mortal(e)
+
+        exc = get_exc()
+
+        with self.subTest(exc=exc):
+            # Both immortal
+            self.immortalize(exc)
+            self.immortalize(exc.__traceback__)
+
+        exc = get_exc()
+        with self.subTest(exc=exc):
+            # Mortal exception, immortal traceback
+            self.immortalize(exc.__traceback__)
+
+    def test_frames(self):
+        import inspect
+        import weakref
+        import contextlib
+
+        # Wrap it in a function for another frame to get pushed
+        def inner():
+            class Foo:
+                pass
+
+            hello = self.assert_mortal("silly")
+            some_other_var = self.assert_mortal(6000)
+
+            def exotic_finalizer():
+                with contextlib.suppress(NameError):
+                    hello.something()
+                    # We shouldn't get here
+                    os.abort()
+
+            weakref.finalize(self.immortalize(Foo()), exotic_finalizer)
+            frame = inspect.currentframe()
+            self.assertIsNotNone(frame)
+            self.immortalize(frame)
+            self.immortalize(frame.f_locals)
+            self.assert_mortal(hello)
+            self.assert_mortal(some_other_var)
+
+            # hello will get destroyed early, and the other one
+            # will live until finalization.
+            del hello
+
+        inner()
 
     def test_sys_immortalize(self):
         # sys.immortalize() does pretty much the same thing
@@ -280,14 +342,16 @@ class TestUserImmortalObjects(unittest.TestCase):
         sys.immortalize(mortal)
         self.assertEqual(sys.getrefcount(mortal), _IMMORTAL_REFCNT)
 
+    @support.requires_resource("cpu")
     def test_the_party_pack(self):
         import _interpreters
 
-        source = textwrap.dedent(
-            """
+        source = textwrap.dedent("""
         import sys
         import contextlib
 
+        # These have weird side effects
+        blacklisted = {"antigravity", "this"}
 
         def immortalize_everything(mod):
             sys.immortalize(mod)
@@ -302,12 +366,16 @@ class TestUserImmortalObjects(unittest.TestCase):
 
 
         for i in sys.stdlib_module_names:
+            if i in blacklisted:
+                continue
+
             with contextlib.suppress(ImportError):
                 immortalize_everything(__import__(i))
         """
         )
         interp = _interpreters.create()
-        _interpreters.run_string(interp, source)
+        res = _interpreters.run_string(interp, source)
+        self.assertEqual(res, None)
 
 
 if __name__ == "__main__":
