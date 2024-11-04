@@ -3390,7 +3390,8 @@ _PyLeakTrack_PrintEntry(_Py_leaktrack_entry *entry)
 {
     fprintf(
             stderr,
-            " - from object at %p in %s() (%s, line %d)\n",
+            " - from ('%s' object at %p) in %s() (%s, line %d)\n",
+            entry->type_name,
             entry->pointer,
             entry->func_name,
             entry->file,
@@ -3559,6 +3560,7 @@ _PyLeakTrack_FreeRefs(_Py_leaktrack_refs *refs)
     assert(refs != NULL);
     assert(refs->entries != NULL);
     for (Py_ssize_t i = 0; i < refs->len; ++i) {
+        PyMem_RawFree(refs->entries[i]->type_name);
         PyMem_RawFree(refs->entries[i]);
     }
 
@@ -3632,6 +3634,12 @@ _PyLeakTrack_AddReferredObject(PyObject *op, const char *func, const char *file,
     entry->lineno = lineno;
     entry->func_name = func;
     entry->pointer = ptr;
+    entry->type_name = _PyMem_RawStrdup(Py_TYPE(ptr)->tp_name);
+
+    if (entry->type_name == NULL)
+    {
+        Py_FatalError("failed to copy type name");
+    }
 
     _PyLeakTrack_AddRefEntry(refs, entry);
 }

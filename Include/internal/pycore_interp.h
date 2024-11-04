@@ -97,6 +97,7 @@ typedef struct _leaktrack_entry {
     const char *func_name;
     const char *file;
     int lineno;
+    char *type_name;
 } _Py_leaktrack_entry;
 
 /*
