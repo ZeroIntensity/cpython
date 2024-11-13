@@ -10,36 +10,36 @@ extern "C" {
 
 #include <stdbool.h>               // bool
 
-#include "pycore_ast_state.h"      // struct ast_state
-#include "pycore_atexit.h"         // struct atexit_state
-#include "pycore_ceval_state.h"    // struct _ceval_state
-#include "pycore_code.h"           // struct callable_cache
-#include "pycore_codecs.h"         // struct codecs_state
-#include "pycore_context.h"        // struct _Py_context_state
-#include "pycore_crossinterp.h"    // struct _xidregistry
-#include "pycore_dict_state.h"     // struct _Py_dict_state
-#include "pycore_dtoa.h"           // struct _dtoa_state
-#include "pycore_exceptions.h"     // struct _Py_exc_state
-#include "pycore_floatobject.h"    // struct _Py_float_state
-#include "pycore_function.h"       // FUNC_MAX_WATCHERS
-#include "pycore_freelist_state.h" // _PyFreeLists_LENGTH
-#include "pycore_gc.h"             // struct _gc_runtime_state
-#include "pycore_genobject.h"      // _PyGen_FetchStopIterationValue
-#include "pycore_global_objects.h" // struct _Py_interp_cached_objects
-#include "pycore_import.h"         // struct _import_state
-#include "pycore_instruments.h"    // _PY_MONITORING_EVENTS
-#include "pycore_list.h"           // struct _Py_list_state
-#include "pycore_mimalloc.h"       // struct _mimalloc_interp_state
-#include "pycore_object_state.h"   // struct _py_object_state
-#include "pycore_optimizer.h"      // _PyOptimizerObject
-#include "pycore_obmalloc.h"       // struct _obmalloc_state
-#include "pycore_qsbr.h"           // struct _qsbr_state
-#include "pycore_tstate.h"         // _PyThreadStateImpl
-#include "pycore_tuple.h"          // struct _Py_tuple_state
-#include "pycore_typeid.h"         // struct _Py_type_id_pool
-#include "pycore_typeobject.h"     // struct types_state
-#include "pycore_unicodeobject.h"  // struct _Py_unicode_state
-#include "pycore_warnings.h"       // struct _warnings_runtime_state
+#include "pycore_ast_state.h"     // struct ast_state
+#include "pycore_atexit.h"        // struct atexit_state
+#include "pycore_ceval_state.h"   // struct _ceval_state
+#include "pycore_code.h"          // struct callable_cache
+#include "pycore_codecs.h"        // struct codecs_state
+#include "pycore_context.h"       // struct _Py_context_state
+#include "pycore_crossinterp.h"   // _PyXI_state_t
+#include "pycore_dict_state.h"    // struct _Py_dict_state
+#include "pycore_dtoa.h"          // struct _dtoa_state
+#include "pycore_exceptions.h"    // struct _Py_exc_state
+#include "pycore_floatobject.h"   // struct _Py_float_state
+#include "pycore_function.h"      // FUNC_MAX_WATCHERS
+#include "pycore_gc.h"            // struct _gc_runtime_state
+#include "pycore_genobject.h"     // _PyGen_FetchStopIterationValue
+#include "pycore_global_objects.h"// struct _Py_interp_cached_objects
+#include "pycore_import.h"        // struct _import_state
+#include "pycore_index_pool.h"     // _PyIndexPool
+#include "pycore_instruments.h"   // _PY_MONITORING_EVENTS
+#include "pycore_list.h"          // struct _Py_list_state
+#include "pycore_mimalloc.h"      // struct _mimalloc_interp_state
+#include "pycore_object_state.h"  // struct _py_object_state
+#include "pycore_optimizer.h"     // _PyOptimizerObject
+#include "pycore_obmalloc.h"      // struct _obmalloc_state
+#include "pycore_qsbr.h"          // struct _qsbr_state
+#include "pycore_tstate.h"        // _PyThreadStateImpl
+#include "pycore_tuple.h"         // struct _Py_tuple_state
+#include "pycore_uniqueid.h"      // struct _Py_unique_id_pool
+#include "pycore_typeobject.h"    // struct types_state
+#include "pycore_unicodeobject.h" // struct _Py_unicode_state
+#include "pycore_warnings.h"      // struct _warnings_runtime_state
 
 
 struct _Py_long_state {
