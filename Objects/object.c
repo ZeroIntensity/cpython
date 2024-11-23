@@ -523,6 +523,42 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
     return op;
 }
 
+Py_ssize_t _Py_FindUserDefinedImmortal(PyObject *op);
+
+int
+_PyObject_IsFinalized(PyObject *op, _Py_immortal **immortal_ptr)
+{
+    // TODO: Make this thread safe
+    if (_PyType_IS_GC(Py_TYPE(op)))
+    {
+        return _PyGC_FINALIZED(op);
+    }
+    else {
+        Py_ssize_t index = _Py_FindUserDefinedImmortal(op);
+        if (index == -1)
+        {
+            return 0;
+        }
+        PyInterpreterState *interp = _PyInterpreterState_GET();
+        _Py_immortal *immortal = interp->runtime_immortals.values[index];
+        *immortal_ptr = immortal;
+        return immortal->finalized;
+    }
+}
+
+void
+_PyObject_SetFinalized(PyObject *op, _Py_immortal *immortal)
+{
+    if (immortal == NULL)
+    {
+        assert(_PyType_IS_GC(Py_TYPE(op)));
+        _PyGC_SET_FINALIZED(op);
+    }
+    else {
+        immortal->finalized = 1;
+    }
+}
+
 void
 PyObject_CallFinalizer(PyObject *self)
 {
@@ -530,14 +566,14 @@ PyObject_CallFinalizer(PyObject *self)
 
     if (tp->tp_finalize == NULL)
         return;
+
+    _Py_immortal *immortal = NULL;
     /* tp_finalize should only be called once. */
-    if (_PyType_IS_GC(tp) && _PyGC_FINALIZED(self))
+    if (_PyObject_IsFinalized(self, &immortal))
         return;
 
     tp->tp_finalize(self);
-    if (_PyType_IS_GC(tp)) {
-        _PyGC_SET_FINALIZED(self);
-    }
+    _PyObject_SetFinalized(self, immortal);
 }
 
 int
@@ -2482,12 +2518,14 @@ _Py_NewReferenceNoTotal(PyObject *op)
 Py_ssize_t
 _Py_FindUserDefinedImmortal(PyObject *op)
 {
-    if (!_Py_IsImmortal(op))
+    if (!_Py_IsImmortal(op)) {
         return -1;
+    }
 
     PyInterpreterState *interp = _PyInterpreterState_GET();
-    if (interp->runtime_immortals.values == NULL)
+    if (interp->runtime_immortals.values == NULL) {
         return -1;
+    }
 
     for (Py_ssize_t i = 0; i < interp->runtime_immortals.capacity; ++i)
     {

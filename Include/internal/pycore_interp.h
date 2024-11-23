@@ -90,6 +90,7 @@ typedef struct _rare_events {
 typedef struct _Py_immortal {
     PyObject *object;
     int gc_tracked;
+    int finalized;
 } _Py_immortal;
 
 
