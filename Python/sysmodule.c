@@ -2538,7 +2538,7 @@ sys.immortalize
     object:  object
     /
 
-Make the object immortal. This means that it's reference count will never be modified while the interpreter is running.
+Make the object immortal.
 [clinic start generated code]*/
 
 static PyObject *
