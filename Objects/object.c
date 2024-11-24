@@ -523,8 +523,6 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
     return op;
 }
 
-Py_ssize_t _Py_FindUserDefinedImmortal(PyObject *op);
-
 int
 _PyObject_IsFinalized(PyObject *op, _Py_immortal **immortal_ptr)
 {
@@ -2513,34 +2511,6 @@ void
 _Py_NewReferenceNoTotal(PyObject *op)
 {
     new_reference(op);
-}
-
-Py_ssize_t
-_Py_FindUserDefinedImmortal(PyObject *op)
-{
-    if (!_Py_IsImmortal(op)) {
-        return -1;
-    }
-
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    if (interp->runtime_immortals.values == NULL) {
-        return -1;
-    }
-
-    for (Py_ssize_t i = 0; i < interp->runtime_immortals.capacity; ++i)
-    {
-        _Py_immortal *entry = interp->runtime_immortals.values[i];
-        if (entry == NULL)
-        {
-            return -1;
-        }
-
-        if (Py_Is(entry->object, op)) {
-            return i;
-        }
-    }
-
-    return -1;
 }
 
 void

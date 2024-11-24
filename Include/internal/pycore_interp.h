@@ -94,6 +94,10 @@ typedef struct _Py_immortal {
 } _Py_immortal;
 
 
+Py_ssize_t
+_Py_FindUserDefinedImmortal(PyObject *op);
+
+
 typedef struct {
     void **garbage;
     Py_ssize_t length;
