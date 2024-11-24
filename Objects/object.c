@@ -523,8 +523,8 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
     return op;
 }
 
-int
-_PyObject_IsFinalized(PyObject *op, _Py_immortal **immortal_ptr)
+static int
+is_finalized(PyObject *op, _Py_immortal **immortal_ptr)
 {
     // TODO: Make this thread safe
     if (_PyType_IS_GC(Py_TYPE(op)))
@@ -539,9 +539,18 @@ _PyObject_IsFinalized(PyObject *op, _Py_immortal **immortal_ptr)
         }
         PyInterpreterState *interp = _PyInterpreterState_GET();
         _Py_immortal *immortal = interp->runtime_immortals.values[index];
-        *immortal_ptr = immortal;
+        if (immortal_ptr != NULL)
+        {
+            *immortal_ptr = immortal;
+        }
         return immortal->finalized;
     }
+}
+
+int
+_PyObject_IsFinalized(PyObject *op)
+{
+    return is_finalized(op, NULL);
 }
 
 void
@@ -567,7 +576,7 @@ PyObject_CallFinalizer(PyObject *self)
 
     _Py_immortal *immortal = NULL;
     /* tp_finalize should only be called once. */
-    if (_PyObject_IsFinalized(self, &immortal))
+    if (is_finalized(self, &immortal))
         return;
 
     tp->tp_finalize(self);
