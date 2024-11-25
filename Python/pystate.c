@@ -1050,50 +1050,26 @@ run_immortal_destructor(_Py_immortal *immortal)
 
 #define _Py_END_ITER_IMMORTALS() entry = _Py_hashtable_ENTRY_NEXT(entry); }}
 
-typedef struct _traversal_list _Py_immortal_traversal;
-
-struct _traversal_list {
-    PyObject **objects;
-    Py_ssize_t index;
-    Py_ssize_t size;
-};
-
 static int
-is_object_being_traversed(PyObject *needle, _Py_immortal_traversal *stack)
+is_object_being_traversed(PyObject *needle, _Py_hashtable_t *haystack)
 {
-    assert(stack->objects != NULL);
-    for (Py_ssize_t i = 0; i < stack->size; ++i)
-    {
-        if (Py_Is(stack->objects[i], needle))
-        {
-            return 1;
-        }
-    }
-
-    return 0;
+    return _Py_hashtable_get_entry(haystack, needle) != NULL;
 }
 
 static int
 visit_finalize(PyObject *op, void *parent)
 {
-    _Py_immortal_traversal *list = (_Py_immortal_traversal *) parent;
+    _Py_hashtable_t *traversing = (_Py_hashtable_t *)parent;
 
-    if (is_object_being_traversed(op, list))
+    if (is_object_being_traversed(op, traversing))
     {
         // Prevent the circular lookup
         return 0;
     }
 
-    list->objects[list->index++] = op;
-    if (list->index == list->size)
+    if (_Py_hashtable_set(traversing, op, NULL) < 0)
     {
-        list->size *= 2;
-        list->objects = PyMem_RawRealloc(list->objects, list->size * sizeof(PyObject *));
-        if (list->objects == NULL)
-        {
-            PyErr_NoMemory();
-            return -1;
-        }
+        return -1;
     }
 
     PyObject_CallFinalizer(op);
@@ -1106,15 +1082,13 @@ visit_finalize(PyObject *op, void *parent)
             PyErr_WriteUnraisable(op);
             return -1;
         }
-        int result = Py_TYPE(op)->tp_traverse(op, visit_finalize, list);
+        int result = Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing);
         Py_LeaveRecursiveCall();
         return result;
     }
 
     return 0;
 }
-
-#define TRAVERSAL_ARRAY_INITIAL_SIZE 32
 
 /*
  * Run the first phase of immortal object deallocation.
@@ -1130,34 +1104,33 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
         run_immortal_finalizer(immortal);
     _Py_END_ITER_IMMORTALS()
 
-    PyObject **allocation = PyMem_RawCalloc(TRAVERSAL_ARRAY_INITIAL_SIZE, sizeof(PyObject *));
-    if (allocation == NULL)
+    /* This won't actually hold anything in the values
+       It just acts as a set for O(1) lookups. */
+    _Py_hashtable_t *traversing = _Py_hashtable_new(_Py_hashtable_hash_ptr,
+                                                    _Py_hashtable_compare_direct);
+    if (traversing == NULL)
     {
         return -1;
     }
-    _Py_immortal_traversal list = {allocation, 0, TRAVERSAL_ARRAY_INITIAL_SIZE};
 
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
         if (Py_TYPE(op)->tp_traverse != NULL && immortal->gc_tracked)
         {
             PyObject_GC_Track(op);
-            if (Py_TYPE(op)->tp_traverse(op, visit_finalize, &list) < 0)
+            if (Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing) < 0)
             {
                 return -1;
             }
             PyObject_GC_UnTrack(op);
 
-            // Optimization: reuse the allocation for each traversal.
-            memset(list.objects, 0, sizeof(PyObject *) * list.size);
-            list.index = 0;
+            // Optimization: reuse the hash table for each traversal.
+            _Py_hashtable_clear(traversing);
         }
     _Py_END_ITER_IMMORTALS();
-    PyMem_RawFree(list.objects);
+    _Py_hashtable_destroy(traversing);
 
     return 0;
 }
-
-#undef TRAVERSAL_ARRAY_INITIAL_SIZE
 
 /*
  * Run the second phase of immortal object deallocation.
