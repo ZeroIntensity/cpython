@@ -848,6 +848,8 @@ delete_deferred_memory_common(PyMemAllocatorDomain domain,
                             _Py_immortal_trashcan *deferred_trash,
                             void (*domain_free)(void *))
 {
+    assert(deferred_trash != NULL);
+    assert(deferred_trash->garbage != NULL);
     for (Py_ssize_t i = 0; i < deferred_trash->length; ++i)
     {
         void *trash = deferred_trash->garbage[i];
@@ -898,11 +900,10 @@ static void
 delete_deferred_memory(PyInterpreterState *interp)
 {
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    if (imm_state->values != NULL)
-    {
-        delete_deferred_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->objects, PyObject_Free);
-        delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory, PyMem_Free);
-    }
+    // There shouldn't be any actual immortals left to do things with
+    assert(imm_state->values == NULL);
+    delete_deferred_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->objects, PyObject_Free);
+    delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory, PyMem_Free);
 }
 
 static int
@@ -923,14 +924,7 @@ _Py_IsRuntimeImmortal(PyObject *op)
     return 1;
 }
 
-#define TRAVERSE(op, callback) do {                             \
-    traverseproc traverse_function = Py_TYPE(op)->tp_traverse;  \
-    if (traverse_function != NULL && PyObject_GC_IsTracked(op)) \
-    {                                                           \
-        traverse_function(op, callback, op);                    \
-    }                                                           \
-} while (0)
-
+#ifndef NDEBUG
 static int
 is_finalized(PyObject *op)
 {
@@ -949,41 +943,7 @@ is_finalized(PyObject *op)
 
     return 0;
 }
-
-static int
-visit_finalize(PyObject *op, void *parent)
-{
-    if (_Py_IsImmortal(op) || is_finalized(op))
-    {
-        return 0;
-    }
-
-    if (!_PyObject_IS_GC(op))
-    {
-        // This cannot mark itself as finalized, because it's neither
-        // GC nor immortal.
-        // Luckily, that makes it very easy to immortalize, so lets just do that.
-        _PyObject_ASSERT(op, !_Py_IsImmortal(op));
-
-        if (Py_Immortalize((op)) < 0)
-        {
-            // Well, something went wrong. Not sure what to do about it.
-            // XXX Fatal error?
-            PyErr_WriteUnraisable(op);
-            return 0;
-        }
-    }
-
-    PyObject_CallFinalizer(op);
-
-    Py_ssize_t refcnt = Py_REFCNT(op);
-    _Py_SetImmortalKnown(op);
-    TRAVERSE(op, visit_finalize);
-    _Py_SetMortal(op, refcnt);
-    _PyObject_ASSERT(op, is_finalized(op));
-
-    return 0;
-}
+#endif
 
 /*
  * Run the finalizer for an immortal object, but *not*
@@ -1003,25 +963,18 @@ run_immortal_finalizer(_Py_immortal *immortal)
         PyObject_GC_Track(op);
     }
 
-    // Finalizers expect to be called with refcnt = 0
-    _Py_SetMortal(op, 0);
-    if (PyObject_CallFinalizerFromDealloc(op) < 0)
-    {
-        // Object got resurrected!
-        PyErr_Format(
-            PyExc_RuntimeError,
-            "interpreter is finalizing, cannot use %R\n",
-            op
-        );
-        PyErr_WriteUnraisable(op);
-    }
+    // Finalizers expect to be called with refcnt = 1
+    _Py_SetMortal(op, 1);
 
-    TRAVERSE(op, visit_finalize);
+    // XXX What happens if the finalizer destroys itself?
+    PyObject_CallFinalizer(op);
+    _PyObject_ASSERT(op, is_finalized(op));
 
     // If another object references it, we don't want
     // to deal with negative reference count shenanigans.
     // Resurrect the reference.
     _Py_SetImmortalKnown(op);
+
     if (PyObject_GC_IsTracked(op))
     {
         _PyObject_GC_UNTRACK(op);
@@ -1098,6 +1051,149 @@ run_immortal_destructor(_Py_immortal *immortal)
 
 #define _Py_END_ITER_IMMORTALS() }
 
+typedef struct _traversal_list _Py_immortal_traversal;
+
+struct _traversal_list {
+    PyObject **objects;
+    Py_ssize_t index;
+    Py_ssize_t size;
+};
+
+static int
+is_object_being_traversed(PyObject *needle, _Py_immortal_traversal *stack)
+{
+    assert(stack->objects != NULL);
+    for (Py_ssize_t i = 0; i < stack->size; ++i)
+    {
+        if (Py_Is(stack->objects[i], needle))
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int
+visit_finalize(PyObject *op, void *parent)
+{
+    _Py_immortal_traversal *list = (_Py_immortal_traversal *) parent;
+
+    if (is_object_being_traversed(op, list))
+    {
+        // Prevent the circular lookup
+        return 0;
+    }
+
+    list->objects[list->index++] = op;
+    if (list->index == list->size)
+    {
+        list->size *= 2;
+        list->objects = PyMem_RawRealloc(list->objects, list->size * sizeof(PyObject *));
+        if (list->objects == NULL)
+        {
+            PyErr_NoMemory();
+            return -1;
+        }
+    }
+
+    PyObject_CallFinalizer(op);
+    _PyObject_ASSERT(op, is_finalized(op));
+
+    if (_PyObject_IS_GC(op) && Py_TYPE(op)->tp_traverse != NULL)
+    {
+        if (Py_EnterRecursiveCall(" while finalizing immortal objects") < 0)
+        {
+            PyErr_WriteUnraisable(op);
+            return -1;
+        }
+        int result = Py_TYPE(op)->tp_traverse(op, visit_finalize, list);
+        Py_LeaveRecursiveCall();
+        return result;
+    }
+
+    return 0;
+}
+
+/*
+ * Run the first phase of immortal object deallocation.
+ */
+static int
+_PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
+{
+    PyInterpreterState *interp = tstate->interp;
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        run_immortal_finalizer(immortal);
+    _Py_END_ITER_IMMORTALS()
+
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        if (Py_TYPE(op)->tp_traverse != NULL && immortal->gc_tracked)
+        {
+            PyObject **allocation = PyMem_RawCalloc(16, sizeof(PyObject *));
+            if (allocation == NULL)
+            {
+                return -1;
+            }
+
+            _Py_immortal_traversal list = {allocation, 0, 16};
+            PyObject_GC_Track(op);
+            if (Py_TYPE(op)->tp_traverse(op, visit_finalize, &list) < 0)
+            {
+                return -1;
+            }
+            PyObject_GC_UnTrack(op);
+            PyMem_RawFree(list.objects);
+        }
+    _Py_END_ITER_IMMORTALS();
+
+    return 0;
+}
+
+/*
+ * Run the second phase of immortal object deallocation.
+ *
+ * At this point, it's expected that the finalizer has been ran on each
+ * of the immortals.
+ */
+static void
+_PyInterpreterState_DestructImmortals(PyThreadState *tstate)
+{
+    assert(tstate != NULL);
+    PyInterpreterState *interp = tstate->interp;
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+
+    defer_memory(interp);
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        run_immortal_destructor(immortal);
+        _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+        _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+    _Py_END_ITER_IMMORTALS()
+    reset_memory(interp);
+
+    _PyGC_CollectNoFail(tstate);
+}
+
+static void
+_PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
+{
+
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        PyMem_RawFree(immortal);
+    _Py_END_ITER_IMMORTALS()
+
+    PyMem_RawFree(imm_state->values);
+    // Just in case
+    imm_state->values = NULL;
+
+    delete_deferred_memory(interp);
+}
+
 Py_ssize_t
 _Py_FindUserDefinedImmortal(PyObject *op)
 {
@@ -1126,67 +1222,6 @@ _Py_FindUserDefinedImmortal(PyObject *op)
     return -1;
 }
 
-/*
- * Run the first phase of immortal object deallocation.
- */
-static void
-_PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
-{
-    PyInterpreterState *interp = tstate->interp;
-    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    assert(imm_state->values != NULL);
-
-    _Py_ITER_IMMORTALS(imm_state, immortal, op)
-        run_immortal_finalizer(immortal);
-    _Py_END_ITER_IMMORTALS()
-}
-
-/*
- * Run the second phase of immortal object deallocation.
- *
- * At this point, it's expected that the finalizer has been ran on each
- * of the immortals.
- */
-static void
-_PyInterpreterState_DestructImmortals(PyThreadState *tstate)
-{
-    assert(tstate != NULL);
-    PyInterpreterState *interp = tstate->interp;
-    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    assert(imm_state->values != NULL);
-
-    defer_memory(interp);
-    _Py_ITER_IMMORTALS(imm_state, immortal, op)
-        run_immortal_destructor(immortal);
-        _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
-        _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
-    _Py_END_ITER_IMMORTALS()
-    reset_memory(interp);
-
-    /* Clean up any reference cycles created by immortal objects.
-     * If this could run finalizers, this would be a problem.
-     * Luckily, we know that it can't, because anything an immortal object
-     * traverses gets finalized much earlier.
-     */
-    _PyGC_CollectNoFail(tstate);
-}
-
-static void
-_PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
-{
-
-    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    assert(imm_state->values != NULL);
-    _Py_ITER_IMMORTALS(imm_state, immortal, op)
-        PyMem_RawFree(immortal);
-    _Py_END_ITER_IMMORTALS()
-
-    PyMem_RawFree(imm_state->values);
-    // Just in case
-    imm_state->values = NULL;
-
-    delete_deferred_memory(interp);
-}
 
 static void
 interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
@@ -1288,7 +1323,10 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     {
         // Clear the user-defined immortal objects.
         // This can run finalizers, so we need to be careful.
-        _PyInterpreterState_FinalizeImmortals(tstate);
+        if (_PyInterpreterState_FinalizeImmortals(tstate) < 0)
+        {
+            Py_FatalError("could not finalize immortals");
+        }
     }
 
 

@@ -576,8 +576,9 @@ PyObject_CallFinalizer(PyObject *self)
 
     _Py_immortal *immortal = NULL;
     /* tp_finalize should only be called once. */
-    if (is_finalized(self, &immortal))
+    if (is_finalized(self, &immortal)) {
         return;
+    }
 
     tp->tp_finalize(self);
     _PyObject_SetFinalized(self, immortal);
