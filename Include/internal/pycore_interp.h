@@ -94,7 +94,7 @@ typedef struct _Py_immortal {
 } _Py_immortal;
 
 
-Py_ssize_t
+_Py_immortal *
 _Py_FindUserDefinedImmortal(PyObject *op);
 
 
@@ -303,12 +303,12 @@ struct _is {
 
     /* User-defined immortal objects list. */
     struct _Py_runtime_immortals {
-        _Py_immortal **values;
-        Py_ssize_t capacity;
-        Py_ssize_t length;
-        _Py_immortal_trashcan objects;
-        _Py_immortal_trashcan memory;
-        struct _Py_freelist freelist_caches[_PyFreeLists_LENGTH];
+        _Py_hashtable_t *values;
+        struct {
+            _Py_immortal_trashcan objects;
+            _Py_immortal_trashcan memory;
+            struct _Py_freelist freelist_caches[_PyFreeLists_LENGTH];
+        } trashcan;
     } runtime_immortals;
 };
 

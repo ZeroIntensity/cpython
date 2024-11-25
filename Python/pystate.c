@@ -12,6 +12,7 @@
 #include "pycore_frame.h"
 #include "pycore_freelist.h"      // _PyObject_ClearFreeLists()
 #include "pycore_freelist_state.h"
+#include "pycore_hashtable.h"
 #include "pycore_initconfig.h"    // _PyStatus_OK()
 #include "pycore_object.h"        // _PyType_InitCache()
 #include "pycore_parking_lot.h"   // _PyParkingLot_AfterFork()
@@ -800,13 +801,13 @@ deferred_free_common(_Py_immortal_trashcan *deferred_trash, void *ptr)
 static void
 deferred_free_obj(void *ctx, void *ptr)
 {
-    deferred_free_common(&_PyInterpreterState_GET()->runtime_immortals.objects, ptr);
+    deferred_free_common(&_PyInterpreterState_GET()->runtime_immortals.trashcan.objects, ptr);
 }
 
 static void
 deferred_free_mem(void *ctx, void *ptr)
 {
-    deferred_free_common(&_PyInterpreterState_GET()->runtime_immortals.memory, ptr);
+    deferred_free_common(&_PyInterpreterState_GET()->runtime_immortals.trashcan.memory, ptr);
 }
 
 static void
@@ -870,13 +871,13 @@ static void
 defer_memory(PyInterpreterState *interp)
 {
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    defer_memory_for_allocator(PYMEM_DOMAIN_OBJ, &imm_state->objects, deferred_free_obj);
-    defer_memory_for_allocator(PYMEM_DOMAIN_MEM, &imm_state->memory, deferred_free_mem);
+    defer_memory_for_allocator(PYMEM_DOMAIN_OBJ, &imm_state->trashcan.objects, deferred_free_obj);
+    defer_memory_for_allocator(PYMEM_DOMAIN_MEM, &imm_state->trashcan.memory, deferred_free_mem);
     // Cache the size and pointer for when we re-enable freelists later.
     for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
-        imm_state->freelist_caches[i] = freelists[i];
+        imm_state->trashcan.freelist_caches[i] = freelists[i];
         freelists[i].freelist = NULL;
         freelists[i].size = -1;
     }
@@ -886,13 +887,13 @@ static void
 reset_memory(PyInterpreterState *interp)
 {
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    reset_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->objects);
-    reset_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory);
+    reset_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->trashcan.objects);
+    reset_memory_common(PYMEM_DOMAIN_MEM, &imm_state->trashcan.memory);
     // Re-enable freelists
     for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
     {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
-        freelists[i] = imm_state->freelist_caches[i];
+        freelists[i] = imm_state->trashcan.freelist_caches[i];
     }
 }
 
@@ -902,8 +903,8 @@ delete_deferred_memory(PyInterpreterState *interp)
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     // There shouldn't be any actual immortals left to do things with
     assert(imm_state->values == NULL);
-    delete_deferred_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->objects, PyObject_Free);
-    delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->memory, PyMem_Free);
+    delete_deferred_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->trashcan.objects, PyObject_Free);
+    delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->trashcan.memory, PyMem_Free);
 }
 
 static int
@@ -915,7 +916,7 @@ _Py_IsRuntimeImmortal(PyObject *op)
         return 0;
     }
 
-    if (_Py_FindUserDefinedImmortal(op) == -1)
+    if (_Py_FindUserDefinedImmortal(op) == NULL)
     {
         // Interpreter-defined immortal
         return 0;
@@ -1039,17 +1040,15 @@ run_immortal_destructor(_Py_immortal *immortal)
  *
  */
 
-#define _Py_ITER_IMMORTALS(imm_state, immortal, op)      \
-    for (Py_ssize_t i = 0; i < imm_state->capacity; ++i) \
-    {                                                    \
-        _Py_immortal *immortal = imm_state->values[i];   \
-        if (immortal == NULL) {                          \
-            continue;                                    \
-        }                                                \
-        PyObject *op = immortal->object;                 \
-        assert(op != NULL);                              \
+#define _Py_ITER_IMMORTALS(imm_state, immortal, op)                                \
+    for (size_t hv = 0; hv < imm_state->values->nbuckets; hv++) {                  \
+        _Py_hashtable_entry_t *entry = _Py_hashtable_HEAD(imm_state->values, hv);  \
+        while (entry != NULL) {                                                    \
+            PyObject *op = (PyObject *)entry->key;                                 \
+            _Py_immortal *immortal = (_Py_immortal *)entry->value;                 \
+            assert(immortal->object == op);
 
-#define _Py_END_ITER_IMMORTALS() }
+#define _Py_END_ITER_IMMORTALS() entry = _Py_hashtable_ENTRY_NEXT(entry); }}
 
 typedef struct _traversal_list _Py_immortal_traversal;
 
@@ -1195,39 +1194,26 @@ _PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
         PyMem_RawFree(immortal);
     _Py_END_ITER_IMMORTALS()
 
-    PyMem_RawFree(imm_state->values);
+    _Py_hashtable_destroy(imm_state->values);
     // Just in case
     imm_state->values = NULL;
 
     delete_deferred_memory(interp);
 }
 
-Py_ssize_t
+_Py_immortal *
 _Py_FindUserDefinedImmortal(PyObject *op)
 {
     if (!_Py_IsImmortal(op)) {
-        return -1;
+        return NULL;
     }
 
     PyInterpreterState *interp = _PyInterpreterState_GET();
     if (interp->runtime_immortals.values == NULL) {
-        return -1;
+        return NULL;
     }
 
-    for (Py_ssize_t i = 0; i < interp->runtime_immortals.capacity; ++i)
-    {
-        _Py_immortal *entry = interp->runtime_immortals.values[i];
-        if (entry == NULL)
-        {
-            return -1;
-        }
-
-        if (Py_Is(entry->object, op)) {
-            return i;
-        }
-    }
-
-    return -1;
+    return (_Py_immortal *)_Py_hashtable_get(interp->runtime_immortals.values, op);
 }
 
 
@@ -1409,19 +1395,17 @@ Py_Immortalize(PyObject *op)
 
     PyInterpreterState *interp = _PyInterpreterState_GET();
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    _Py_immortal **immortals;
+    _Py_hashtable_t *immortals;
     if (imm_state->values == NULL)
     {
-        // The immortals list hasn't been allocated yet!
-        immortals = PyMem_RawCalloc(16, sizeof(_Py_immortal));
+        // The immortals dictionary hasn't been allocated yet!
+        immortals = _Py_hashtable_new(_Py_hashtable_hash_ptr, _Py_hashtable_compare_direct);
         if (immortals == NULL)
         {
             PyErr_NoMemory();
             return -1;
         }
         imm_state->values = immortals;
-        imm_state->capacity = 16;
-        imm_state->length = 0;
     } else
     {
         immortals = imm_state->values;
@@ -1434,32 +1418,15 @@ Py_Immortalize(PyObject *op)
         PyErr_NoMemory();
         return -1;
     }
-    immortals[imm_state->length++] = entry;
-
-    if (imm_state->length == imm_state->capacity)
-    {
-        // Needs to get resized
-        imm_state->capacity *= 2;
-        imm_state->values = PyMem_RawRealloc(
-            imm_state->values,
-            sizeof(_Py_immortal) * imm_state->capacity
-        );
-        if (imm_state->values == NULL)
-        {
-            PyMem_RawFree(entry);
-            PyErr_NoMemory();
-            return -1;
-        }
-
-        // Zero-out the allocation
-        for (int i = imm_state->length; i < imm_state->capacity; ++i)
-        {
-            imm_state->values[i] = NULL;
-        }
-    }
-
     entry->object = op;
     entry->gc_tracked = PyObject_GC_IsTracked(op);
+
+    if (_Py_hashtable_set(imm_state->values, op, entry) < 0)
+    {
+        PyMem_RawFree(entry);
+        PyErr_NoMemory();
+        return -1;
+    }
 
     if (entry->gc_tracked) {
         _PyObject_GC_UNTRACK(op);

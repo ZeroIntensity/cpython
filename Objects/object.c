@@ -532,13 +532,12 @@ is_finalized(PyObject *op, _Py_immortal **immortal_ptr)
         return _PyGC_FINALIZED(op);
     }
     else {
-        Py_ssize_t index = _Py_FindUserDefinedImmortal(op);
-        if (index == -1)
+        _Py_immortal *immortal = _Py_FindUserDefinedImmortal(op);
+        if (immortal == NULL)
         {
             return 0;
         }
         PyInterpreterState *interp = _PyInterpreterState_GET();
-        _Py_immortal *immortal = interp->runtime_immortals.values[index];
         if (immortal_ptr != NULL)
         {
             *immortal_ptr = immortal;
@@ -2538,15 +2537,16 @@ _Py_SetImmortalKnown(PyObject *op)
 void
 _Py_SetImmortalUntracked(PyObject *op)
 {
-    Py_ssize_t user_immortal_index = _Py_FindUserDefinedImmortal(op);
-    if (user_immortal_index != -1)
+    _Py_immortal *user_immortal = _Py_FindUserDefinedImmortal(op);
+    if (user_immortal != NULL)
     {
         // This object is being tracked by user immortals.
         // We don't want to do that anymore, and let the interpreter do it instead.
         PyInterpreterState *interp = _PyInterpreterState_GET();
-        _Py_immortal *entry = interp->runtime_immortals.values[user_immortal_index];
-        PyMem_RawFree(entry);
-        interp->runtime_immortals.values[user_immortal_index] = NULL;
+        assert(interp->runtime_immortals.values != NULL);
+        void *ptr = _Py_hashtable_steal(interp->runtime_immortals.values, op);
+        assert(ptr == user_immortal);
+        PyMem_RawFree(user_immortal);
     }
     _Py_SetImmortalKnown(op);
 }

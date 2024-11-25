@@ -22,6 +22,10 @@ typedef struct {
 
 #define _Py_SLIST_HEAD(SLIST) _Py_RVALUE(((_Py_slist_t *)(SLIST))->head)
 
+#define _Py_hashtable_HEAD(HT, BUCKET) \
+        ((_Py_hashtable_entry_t *)_Py_SLIST_HEAD(&(HT)->buckets[BUCKET]))
+#define _Py_hashtable_ENTRY_NEXT(ENTRY) \
+        ((_Py_hashtable_entry_t *)_Py_SLIST_ITEM_NEXT(ENTRY))
 
 /* _Py_hashtable: table entry */
 
