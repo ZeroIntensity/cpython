@@ -565,22 +565,30 @@ _PyObject_SetFinalized(PyObject *op, _Py_immortal *immortal)
     }
 }
 
-void
-PyObject_CallFinalizer(PyObject *self)
+int
+_PyObject_MaybeCallFinalizer(PyObject *self)
 {
     PyTypeObject *tp = Py_TYPE(self);
 
-    if (tp->tp_finalize == NULL)
-        return;
+    if (tp->tp_finalize == NULL) {
+        return 0;
+    }
 
     _Py_immortal *immortal = NULL;
     /* tp_finalize should only be called once. */
     if (is_finalized(self, &immortal)) {
-        return;
+        return 0;
     }
 
     tp->tp_finalize(self);
     _PyObject_SetFinalized(self, immortal);
+    return 1;
+}
+
+void
+PyObject_CallFinalizer(PyObject *self)
+{
+    _PyObject_MaybeCallFinalizer(self);
 }
 
 int

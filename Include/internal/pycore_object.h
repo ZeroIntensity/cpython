@@ -904,7 +904,8 @@ PyAPI_DATA(int) _Py_SwappedOp[];
 
 extern void _Py_GetConstant_Init(void);
 
-PyAPI_FUNC(int) _PyObject_IsFinalized(PyObject *op);
+extern int _PyObject_IsFinalized(PyObject *op);
+extern int _PyObject_MaybeCallFinalizer(PyObject *self);
 
 #ifdef __cplusplus
 }

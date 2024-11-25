@@ -952,7 +952,7 @@ is_finalized(PyObject *op)
  * deallocation is enabled.
  */
 static void
-run_immortal_finalizer(_Py_immortal *immortal)
+run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
 {
     assert(immortal != NULL);
     PyObject *op = immortal->object;
@@ -968,7 +968,10 @@ run_immortal_finalizer(_Py_immortal *immortal)
     _Py_SetMortal(op, 1);
 
     // XXX What happens if the finalizer destroys itself?
+    defer_memory(interp);
     PyObject_CallFinalizer(op);
+    reset_memory(interp);
+
     _PyObject_ASSERT(op, is_finalized(op));
 
     // If another object references it, we don't want
@@ -1072,7 +1075,7 @@ visit_finalize(PyObject *op, void *parent)
         return -1;
     }
 
-    PyObject_CallFinalizer(op);
+    int result = _PyObject_MaybeCallFinalizer(op);
     _PyObject_ASSERT(op, is_finalized(op));
 
     if (_PyObject_IS_GC(op) && Py_TYPE(op)->tp_traverse != NULL)
@@ -1082,28 +1085,17 @@ visit_finalize(PyObject *op, void *parent)
             PyErr_WriteUnraisable(op);
             return -1;
         }
-        int result = Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing);
+        int this_result = Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing);
         Py_LeaveRecursiveCall();
-        return result;
+        return this_result;
     }
 
-    return 0;
+    return result;
 }
 
-/*
- * Run the first phase of immortal object deallocation.
- */
 static int
-_PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
+synchronize_finalization(struct _Py_runtime_immortals *imm_state)
 {
-    PyInterpreterState *interp = tstate->interp;
-    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
-    assert(imm_state->values != NULL);
-
-    _Py_ITER_IMMORTALS(imm_state, immortal, op)
-        run_immortal_finalizer(immortal);
-    _Py_END_ITER_IMMORTALS()
-
     /* This won't actually hold anything in the values
        It just acts as a set for O(1) lookups. */
     _Py_hashtable_t *traversing = _Py_hashtable_new(_Py_hashtable_hash_ptr,
@@ -1132,6 +1124,60 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
     return 0;
 }
 
+static int
+_PyInterpreterState_FinalizeImmortalReferents(PyThreadState *tstate)
+{
+    assert(tstate != NULL);
+    PyInterpreterState *interp = tstate->interp;
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+
+    while (true)
+    {
+        int result = synchronize_finalization(imm_state);
+        if (result == 1)
+        {
+            /* We called some finalizers.
+               That means those finalizers could have affected the
+               referents. So, keep doing this until no finalizers are ran with
+               a traversal. */
+            continue;
+        }
+
+        if (result < 0)
+        {
+            return -1;
+        }
+
+        // Yay! All finalizers have ran, so it shouldn't be possible for destruction of the
+        // immortal to run Python code.
+        assert(result == 0);
+        break;
+    }
+
+    // Clean up any extra references
+    _PyGC_CollectNoFail(tstate);
+    return 0;
+}
+
+/*
+ * Run the first phase of immortal object deallocation.
+ */
+static int
+_PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
+{
+    assert(tstate != NULL);
+    PyInterpreterState *interp = tstate->interp;
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        run_immortal_finalizer(interp, immortal);
+    _Py_END_ITER_IMMORTALS()
+
+    return _PyInterpreterState_FinalizeImmortalReferents(tstate);
+}
+
 /*
  * Run the second phase of immortal object deallocation.
  *
@@ -1146,6 +1192,11 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
 
+    if (_PyInterpreterState_FinalizeImmortalReferents(tstate) < 0)
+    {
+        Py_FatalError("failed to finalize immortal objects");
+    }
+
     defer_memory(interp);
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
         run_immortal_destructor(immortal);
@@ -1154,6 +1205,11 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     _Py_END_ITER_IMMORTALS()
     reset_memory(interp);
 
+    /*
+     * This is a problem if it can run finalizers.
+     * It really shouldn't be able to, because we ran them all
+     * in FinalizeImmortals, but we don't have a good way of making sure that's true.
+     */
     _PyGC_CollectNoFail(tstate);
 }
 
