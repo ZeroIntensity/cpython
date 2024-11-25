@@ -76,15 +76,11 @@ class TestUserImmortalObjects(unittest.TestCase):
 
     def test_bytearray(self):
         self.immortalize(bytearray([1, 2, 3, 4]))
-        self.immortalize(
-            bytearray(self.assert_mortal("my silly string"), "utf-8")
-        )
+        self.immortalize(bytearray(self.assert_mortal("my silly string"), "utf-8"))
         self.immortalize(bytearray(self.assert_mortal(999)))
 
     def test_memoryview(self):
-        self.immortalize(
-            memoryview(self.assert_mortal(bytearray("XYZ", "utf-8")))
-        )
+        self.immortalize(memoryview(self.assert_mortal(bytearray("XYZ", "utf-8"))))
         # Note: immortalizing the bytearray causes a false positive
         # SystemError (it shows up as "Error in sys.excepthook" because the
         # interpreter is almost dead) during finalization, because the
@@ -101,9 +97,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.assert_mortal(memoryview(self.immortalize(b"a duck"))).release()
 
         # Immortal view, mortal buffer
-        self.immortalize(memoryview(
-            self.assert_mortal(b"i'm mortal")
-        )).release()
+        self.immortalize(memoryview(self.assert_mortal(b"i'm mortal"))).release()
 
     def test_numbers(self):
         for i in range(1, 256):
@@ -120,12 +114,8 @@ class TestUserImmortalObjects(unittest.TestCase):
         with self.subTest(constructor=constructor):
             self.immortalize(constructor((1, 2, 3, False)))
             self.immortalize(constructor(("hello", sys.intern("world"))))
-            self.immortalize(
-                constructor(("hello", sys.intern("hello"), None, True))
-            )
-            self.immortalize(
-                constructor(("hello", SomeType(), 1, 2, 3, b"a", ""))
-            )
+            self.immortalize(constructor(("hello", sys.intern("hello"), None, True)))
+            self.immortalize(constructor(("hello", SomeType(), 1, 2, 3, b"a", "")))
 
             # Some random types
             self.immortalize(constructor((SomeType, range)))
@@ -302,7 +292,6 @@ class TestUserImmortalObjects(unittest.TestCase):
             # Mortal exception, immortal traceback
             self.immortalize(exc.__traceback__)
 
-    @unittest.skipIf(True, 'a')
     def test_frames(self):
         import inspect
         import weakref
@@ -344,7 +333,6 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.assertEqual(sys.getrefcount(mortal), _IMMORTAL_REFCNT)
 
     @support.requires_resource("cpu")
-    @unittest.skipIf(True, "a")
     def test_the_party_pack(self):
         import _interpreters
 
@@ -373,8 +361,7 @@ class TestUserImmortalObjects(unittest.TestCase):
 
             with contextlib.suppress(ImportError):
                 immortalize_everything(__import__(i))
-        """
-        )
+        """)
         interp = _interpreters.create()
         res = _interpreters.run_string(interp, source)
         self.assertEqual(res, None)

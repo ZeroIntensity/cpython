@@ -1115,6 +1115,8 @@ visit_finalize(PyObject *op, void *parent)
     return 0;
 }
 
+#define TRAVERSAL_ARRAY_INITIAL_SIZE 32
+
 /*
  * Run the first phase of immortal object deallocation.
  */
@@ -1129,28 +1131,34 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
         run_immortal_finalizer(immortal);
     _Py_END_ITER_IMMORTALS()
 
+    PyObject **allocation = PyMem_RawCalloc(TRAVERSAL_ARRAY_INITIAL_SIZE, sizeof(PyObject *));
+    if (allocation == NULL)
+    {
+        return -1;
+    }
+    _Py_immortal_traversal list = {allocation, 0, TRAVERSAL_ARRAY_INITIAL_SIZE};
+
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
         if (Py_TYPE(op)->tp_traverse != NULL && immortal->gc_tracked)
         {
-            PyObject **allocation = PyMem_RawCalloc(16, sizeof(PyObject *));
-            if (allocation == NULL)
-            {
-                return -1;
-            }
-
-            _Py_immortal_traversal list = {allocation, 0, 16};
             PyObject_GC_Track(op);
             if (Py_TYPE(op)->tp_traverse(op, visit_finalize, &list) < 0)
             {
                 return -1;
             }
             PyObject_GC_UnTrack(op);
-            PyMem_RawFree(list.objects);
+
+            // Optimization: reuse the allocation for each traversal.
+            memset(list.objects, 0, sizeof(PyObject *) * list.size);
+            list.index = 0;
         }
     _Py_END_ITER_IMMORTALS();
+    PyMem_RawFree(list.objects);
 
     return 0;
 }
+
+#undef TRAVERSAL_ARRAY_INITIAL_SIZE
 
 /*
  * Run the second phase of immortal object deallocation.
@@ -1326,7 +1334,7 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
         if (_PyInterpreterState_FinalizeImmortals(tstate) < 0)
         {
             Py_FatalError("could not finalize immortals");
-        }
+        };
     }
 
 
@@ -1454,7 +1462,7 @@ Py_Immortalize(PyObject *op)
     entry->gc_tracked = PyObject_GC_IsTracked(op);
 
     if (entry->gc_tracked) {
-        PyObject_GC_UnTrack(op);
+        _PyObject_GC_UNTRACK(op);
     }
 
 #ifdef Py_REF_DEBUG
