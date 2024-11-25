@@ -953,7 +953,7 @@ is_finalized(PyObject *op)
 static int
 visit_finalize(PyObject *op, void *parent)
 {
-    if (is_finalized(op) || _Py_IsImmortal(op))
+    if (_Py_IsImmortal(op) || is_finalized(op))
     {
         return 0;
     }
@@ -968,14 +968,20 @@ visit_finalize(PyObject *op, void *parent)
         if (Py_Immortalize((op)) < 0)
         {
             // Well, something went wrong. Not sure what to do about it.
+            // XXX Fatal error?
             PyErr_WriteUnraisable(op);
             return 0;
         }
     }
 
     PyObject_CallFinalizer(op);
-    _PyObject_ASSERT(op, is_finalized(op));
+
+    Py_ssize_t refcnt = Py_REFCNT(op);
+    _Py_SetImmortalKnown(op);
     TRAVERSE(op, visit_finalize);
+    _Py_SetMortal(op, refcnt);
+    _PyObject_ASSERT(op, is_finalized(op));
+
     return 0;
 }
 
@@ -1154,7 +1160,6 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
         run_immortal_destructor(immortal);
         _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
         _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
-        PyMem_RawFree(immortal);
     _Py_END_ITER_IMMORTALS()
     reset_memory(interp);
 
@@ -1164,7 +1169,23 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
      * traverses gets finalized much earlier.
      */
     _PyGC_CollectNoFail(tstate);
+}
+
+static void
+_PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
+{
+
+    struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
+    assert(imm_state->values != NULL);
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        PyMem_RawFree(immortal);
+    _Py_END_ITER_IMMORTALS()
+
     PyMem_RawFree(imm_state->values);
+    // Just in case
+    imm_state->values = NULL;
+
+    delete_deferred_memory(interp);
 }
 
 static void
@@ -1186,13 +1207,6 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
     if (_PySys_Audit(tstate, "cpython.PyInterpreterState_Clear", NULL) < 0) {
         _PyErr_Clear(tstate);
-    }
-
-    if (interp->runtime_immortals.values != NULL)
-    {
-        // Clear the user-defined immortal objects.
-        // This can run finalizers, so we need to be careful.
-        _PyInterpreterState_FinalizeImmortals(tstate);
     }
 
     // Clear the current/main thread state last.
@@ -1270,9 +1284,21 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     _PyWarnings_Fini(interp);
     _PyAtExit_Fini(interp);
 
+    if (interp->runtime_immortals.values != NULL)
+    {
+        // Clear the user-defined immortal objects.
+        // This can run finalizers, so we need to be careful.
+        _PyInterpreterState_FinalizeImmortals(tstate);
+    }
+
+
     // All Python types must be destroyed before the last GC collection. Python
     // types create a reference cycle to themselves in their in their
     // PyTypeObject.tp_mro member (the tuple contains the type).
+
+    /* The last garbage collection for this interpreter, unless we need an
+       extra one for the immortals */
+    _PyGC_CollectNoFail(tstate);
 
     /*
      * Run the tp_dealloc() for each immortal object.
@@ -1282,8 +1308,6 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
         _PyInterpreterState_DestructImmortals(tstate);
     }
 
-    /* The last garbage collection for this interpreter. */
-    _PyGC_CollectNoFail(tstate);
     _PyGC_Fini(interp);
 
     /* We don't clear sysdict and builtins until the end of this function.
@@ -1450,9 +1474,11 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
 
     // The immortal objects have lived a long and fruitful life, but now
     // they must perish with the rest of the interpreter.
-    delete_deferred_memory(interp);
     // XXX Hold a funeral for the immortal objects?
-
+    if (interp->runtime_immortals.values != NULL)
+    {
+        _PyInterpreterState_DeleteImmortals(interp);
+    }
 
     // XXX Clearing the "current" thread state should happen before
     // we start finalizing the interpreter (or the current thread state).
