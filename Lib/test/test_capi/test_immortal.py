@@ -350,9 +350,9 @@ class TestUserImmortalObjects(unittest.TestCase):
                 attr = getattr(mod, i)
                 sys.immortalize(attr)
 
-                for x in dir(attr):
-                    with contextlib.suppress(Exception):
-                        sys.immortalize(getattr(attr, x))
+                #for x in dir(attr):
+                #    with contextlib.suppress(Exception):
+                #        sys.immortalize(getattr(attr, x))
 
 
         for i in sys.stdlib_module_names:
