@@ -985,6 +985,33 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
     }
 }
 
+static void
+run_immortal_clear(_Py_immortal *immortal)
+{
+    assert(immortal != NULL);
+    PyObject *op = immortal->object;
+    assert(op != NULL);
+    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+
+    if (immortal->gc_tracked)
+    {
+        PyObject_GC_Track(op);
+    }
+
+    if (immortal->gc_tracked && Py_TYPE(op)->tp_clear != NULL)
+    {
+        Py_TYPE(op)->tp_clear(op);
+        // Edge case: it's possible for a clear function
+        // to untrack the object, so if we ever need it to be
+        // tracked temporarily, then be careful.
+    }
+
+    if (PyObject_GC_IsTracked(op)) {
+        _PyObject_GC_UNTRACK(op);
+    }
+}
+
 /*
  * Run the deallocator for an immortal object, without actually
  * freeing it. This assumes that deferred memory deallocation is
@@ -997,20 +1024,11 @@ run_immortal_destructor(_Py_immortal *immortal)
     PyObject *op = immortal->object;
     assert(op != NULL);
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
 
     if (immortal->gc_tracked)
     {
         PyObject_GC_Track(op);
-    }
-
-    if (PyObject_GC_IsTracked(op) && Py_TYPE(op)->tp_clear != NULL)
-    {
-        Py_TYPE(op)->tp_clear(op);
-        if (!_PyObject_GC_IS_TRACKED(op)) {
-            // Edge case: it's possible for a clear function
-            // to untrack the object.
-            _PyObject_GC_TRACK(op);
-        }
     }
 
     _Py_SetMortal(op, 1);
@@ -1198,6 +1216,12 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     }
 
     defer_memory(interp);
+    _Py_ITER_IMMORTALS(imm_state, immortal, op)
+        run_immortal_clear(immortal);
+        _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+        _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+    _Py_END_ITER_IMMORTALS()
+
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
         run_immortal_destructor(immortal);
         _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
