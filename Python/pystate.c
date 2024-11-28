@@ -1223,7 +1223,6 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
         _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
         _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
     _Py_END_ITER_IMMORTALS()
-    reset_memory(interp);
 
     /*
      * This is a problem if it can run finalizers.
@@ -1231,6 +1230,11 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
      * FinalizeImmortals, but we don't have a good way of making sure that's true.
      */
     _PyGC_CollectNoFail(tstate);
+
+    // Ok, DMD is now disabled. All of the immortals and their referents
+    // should now be in the deferred memory bank, and still technically valid
+    // pointers.
+    reset_memory(interp);
 }
 
 static void
