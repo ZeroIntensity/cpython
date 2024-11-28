@@ -453,6 +453,14 @@ static inline void _PyObject_GC_TRACK(
     _PyObject_ASSERT_FROM(op, !_PyObject_GC_IS_TRACKED(op),
                           "object already tracked by the garbage collector",
                           filename, lineno, __func__);
+    if (_Py_IsImmortal(op))
+    {
+        _Py_immortal *immortal = _Py_FindUserDefinedImmortal(op);
+        if (immortal != NULL)
+        {
+            immortal->gc_tracked = 1;
+        }
+    }
 #ifdef Py_GIL_DISABLED
     _PyObject_SET_GC_BITS(op, _PyGC_BITS_TRACKED);
 #else

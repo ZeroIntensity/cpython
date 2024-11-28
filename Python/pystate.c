@@ -985,6 +985,7 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
     }
 }
 
+
 static void
 run_immortal_clear(_Py_immortal *immortal)
 {
