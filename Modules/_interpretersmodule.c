@@ -207,7 +207,132 @@ register_memoryview_xid(PyObject *mod, PyTypeObject **p_state)
     return 0;
 }
 
+typedef struct {
+    PyObject_HEAD
+    PyInterpreterState *interp;
+    PyObject *object;
+    PyMutex lock;
+} SharedObjectProxy;
 
+static void
+sharedobjectproxy_dealloc(SharedObjectProxy *self)
+{
+    assert(_PyInterpreterState_GET() == self->interp);
+    Py_CLEAR(self->object);
+    PyTypeObject *tp = Py_TYPE(self);
+    tp->tp_free(self);
+    Py_DECREF(tp);
+}
+
+static PyObject *
+sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject **kwds)
+{
+    SharedObjectProxy *self = (SharedObjectProxy *)type->tp_alloc(type, 0);
+    if (self == NULL)
+    {
+        return NULL;
+    }
+
+    self->object = NULL;
+    self->interp = _PyInterpreterState_GET();
+    self->lock = (PyMutex){ 0 };
+
+    if (Py_Immortalize((PyObject *)self) < 0)
+    {
+        return NULL;
+    }
+
+    return (PyObject *)self;
+}
+
+PyObject *
+make_shareable(PyObject *object);
+
+static PyObject *
+sharedobjectproxy_getattro(SharedObjectProxy *self, PyObject *attribute)
+{
+    PyThreadState *to_switch = NULL;
+    PyThreadState *switch_back = NULL;
+
+    if (_PyInterpreterState_GET() != self->interp)
+    {
+        to_switch = PyThreadState_New(self->interp);
+        if (to_switch == NULL)
+        {
+            PyErr_NoMemory();
+            return NULL;
+        }
+    }
+
+    if (to_switch != NULL)
+    {
+        switch_back = PyThreadState_Swap(to_switch);
+    }
+    PyMutex_Lock(&self->lock);
+    /* We're now in the proper interpreter, and hold the lock. */
+    PyObject *result = PyObject_GetAttr(self->object, attribute);
+
+    if (result == NULL)
+    {
+        PyMutex_Unlock(&self->lock);
+        if (switch_back != NULL)
+        {
+            PyThreadState_Clear(to_switch);
+            PyThreadState_Swap(switch_back);
+            PyThreadState_Delete(to_switch);
+        }
+        return NULL;
+    }
+
+    PyObject *shareable_result = make_shareable(result);
+    PyMutex_Unlock(&self->lock);
+
+    if (switch_back != NULL)
+    {
+        PyThreadState_Swap(switch_back);
+    }
+
+    if (shareable_result == NULL)
+    {
+        PyErr_SetString(PyExc_InterpreterError, "failed to share object");
+        return NULL;
+    }
+
+    return shareable_result;
+}
+
+static PyType_Slot SharedObjectProxyType_slots[] = {
+    {Py_tp_new, (newfunc)sharedobjectproxy_new},
+    {Py_tp_dealloc, (destructor)sharedobjectproxy_dealloc},
+    {Py_tp_getattro, (getattrofunc)sharedobjectproxy_getattro},
+    {0, NULL},
+};
+
+static PyType_Spec SharedObjectProxyType_spec = {
+    .name = MODULE_NAME_STR ".SharedObjectProxy",
+    .basicsize = sizeof(SharedObjectProxy),
+    .flags = (Py_TPFLAGS_DEFAULT |
+              Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE),
+    .slots = SharedObjectProxyType_slots,
+};
+
+static int
+register_sharedobjectproxy(PyObject *mod, PyTypeObject **p_state)
+{
+    assert(*p_state == NULL);
+    PyTypeObject *cls = (PyTypeObject *)PyType_FromModuleAndSpec(
+                mod, &SharedObjectProxyType_spec, NULL);
+    if (cls == NULL) {
+        return -1;
+    }
+    if (PyModule_AddType(mod, cls) < 0) {
+        Py_DECREF(cls);
+        return -1;
+    }
+    *p_state = cls;
+
+    return 0;
+}
 
 /* module state *************************************************************/
 
@@ -216,6 +341,7 @@ typedef struct {
 
     /* heap types */
     PyTypeObject *XIBufferViewType;
+    PyTypeObject *SharedObjectProxyType;
 } module_state;
 
 static inline module_state *
@@ -247,6 +373,7 @@ traverse_module_state(module_state *state, visitproc visit, void *arg)
 {
     /* heap types */
     Py_VISIT(state->XIBufferViewType);
+    Py_VISIT(state->SharedObjectProxyType);
 
     return 0;
 }
@@ -256,6 +383,7 @@ clear_module_state(module_state *state)
 {
     /* heap types */
     Py_CLEAR(state->XIBufferViewType);
+    Py_CLEAR(state->SharedObjectProxyType);
 
     return 0;
 }
@@ -271,6 +399,42 @@ _get_current_xibufferview_type(void)
     return state->XIBufferViewType;
 }
 
+
+static PyTypeObject *
+_get_current_sharedobjectproxy_type(void)
+{
+    module_state *state = _get_current_module_state();
+    if (state == NULL) {
+        return NULL;
+    }
+    return state->SharedObjectProxyType;
+}
+
+
+PyObject *
+make_shareable(PyObject *object)
+{
+    PyTypeObject *tp = _get_current_sharedobjectproxy_type();
+    if (tp == NULL)
+    {
+        PyErr_SetString(PyExc_InterpreterError, "failed to get shared type");
+        return NULL;
+    }
+
+    SharedObjectProxy *proxy = (SharedObjectProxy *)sharedobjectproxy_new(tp, NULL, NULL);
+    if (proxy == NULL)
+    {
+        return NULL;
+    }
+
+    if (Py_Immortalize(object) < 0)
+    {
+        Py_DECREF(proxy);
+        return NULL;
+    }
+    proxy->object = object;
+    return (PyObject *)proxy;
+}
 
 /* Python code **************************************************************/
 
@@ -1430,6 +1594,11 @@ then the current exception, if any, is used (but not cleared).\n\
 \n\
 The returned snapshot is the same as what _interpreters.exec() returns.");
 
+static PyObject *
+interp_share(PyObject *mod, PyObject *object)
+{
+    return make_shareable(object);
+}
 
 static PyMethodDef module_functions[] = {
     {"new_config",                _PyCFunction_CAST(interp_new_config),
@@ -1474,7 +1643,7 @@ static PyMethodDef module_functions[] = {
 
     {"capture_exception",         _PyCFunction_CAST(capture_exception),
      METH_VARARGS | METH_KEYWORDS, capture_exception_doc},
-
+    {"share", _PyCFunction_CAST(interp_share), METH_O, NULL},
     {NULL,                        NULL}           /* sentinel */
 };
 
@@ -1522,6 +1691,11 @@ module_exec(PyObject *mod)
     }
 
     if (register_memoryview_xid(mod, &state->XIBufferViewType) < 0) {
+        goto error;
+    }
+
+    if (register_sharedobjectproxy(mod, &state->SharedObjectProxyType) < 0)
+    {
         goto error;
     }
 
