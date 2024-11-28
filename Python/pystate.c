@@ -1210,11 +1210,6 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
 
-    if (_PyInterpreterState_FinalizeImmortalReferents(tstate) < 0)
-    {
-        Py_FatalError("failed to finalize immortal objects");
-    }
-
     defer_memory(interp);
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
         run_immortal_clear(immortal);
@@ -1386,8 +1381,9 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     _PyGC_CollectNoFail(tstate);
 
     /*
-     * Run the tp_dealloc() for each immortal object.
-     * We really hope that this doesn't try to run Python code.
+     * Run the tp_clear() (if it exists) and tp_dealloc) for each immortal object.
+     * We really hope that this doesn't try to run Python code. If it does, that's
+     * a bug on the users end. (All finalizers have already been called.)
      */
     if (interp->runtime_immortals.values != NULL) {
         _PyInterpreterState_DestructImmortals(tstate);
