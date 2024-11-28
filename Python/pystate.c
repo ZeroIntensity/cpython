@@ -1226,8 +1226,8 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
 
     /*
      * This is a problem if it can run finalizers.
-     * It really shouldn't be able to, because we ran them all
-     * in FinalizeImmortals, but we don't have a good way of making sure that's true.
+     * It really shouldn't be able to, because we ran them all in
+     * FinalizeImmortals, but we don't have a good way of making sure that's true.
      */
     _PyGC_CollectNoFail(tstate);
 }
