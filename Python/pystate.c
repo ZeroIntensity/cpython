@@ -773,11 +773,9 @@ PyInterpreterState_New(void)
 /*
  * Deferred memory deletion.
  *
- * See the comment in _PyInterpreterState_ClearImmortals about what this
- * is for.
- *
  * Essentially, this temporarily makes free operations a no-op, and frees
- * the memory at a later time.
+ * the memory at a later time, which is important for immortal object
+ * deallocation.
  */
 
 static void
@@ -926,6 +924,7 @@ _Py_IsRuntimeImmortal(PyObject *op)
 }
 
 #ifndef NDEBUG
+// Only for use by assertions
 static int
 is_finalized(PyObject *op)
 {
@@ -984,83 +983,6 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
         _PyObject_GC_UNTRACK(op);
     }
 }
-
-
-static void
-run_immortal_clear(_Py_immortal *immortal)
-{
-    assert(immortal != NULL);
-    PyObject *op = immortal->object;
-    assert(op != NULL);
-    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
-    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
-
-    if (immortal->gc_tracked)
-    {
-        PyObject_GC_Track(op);
-    }
-
-    if (immortal->gc_tracked && Py_TYPE(op)->tp_clear != NULL)
-    {
-        Py_TYPE(op)->tp_clear(op);
-        // Edge case: it's possible for a clear function
-        // to untrack the object, so if we ever need it to be
-        // tracked temporarily, then be careful.
-    }
-
-    if (PyObject_GC_IsTracked(op)) {
-        _PyObject_GC_UNTRACK(op);
-    }
-}
-
-/*
- * Run the deallocator for an immortal object, without actually
- * freeing it. This assumes that deferred memory deallocation is
- * enabled.
- */
-static void
-run_immortal_destructor(_Py_immortal *immortal)
-{
-    assert(immortal != NULL);
-    PyObject *op = immortal->object;
-    assert(op != NULL);
-    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
-    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
-
-    if (immortal->gc_tracked)
-    {
-        PyObject_GC_Track(op);
-    }
-
-    _Py_SetMortal(op, 1);
-    // Run the deallocator for the immortal object.
-    // All of it's mortal references should get cleared, and
-    // we'll store it in the deferred memory bank.
-    Py_DECREF(op);
-
-    // The object should still be alive, despite our
-    // ruthless attempts to destroy it.
-    assert(!_PyObject_IsFreed(op));
-    _Py_SetImmortalKnown(op);
-
-    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
-
-    // However, it definitely should not be tracked by
-    // the garbage collector anymore.
-    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
-}
-
-/*
- * ** User-defined immortal object deallocation **
- *
- *  Runtime immortals can be any arbitrary object--heap types, interned
- *  strings, you name it! This means we have to be careful about
- *  deallocation, because two immortals might try to reference each other
- *  in their finalizers. If that's the case, simply deallocating the
- *  boring way (as in, mortalizing to a refcnt of 1 and then deallocating)
- *  would result in a use-after-free violation.
- *
- */
 
 #define _Py_ITER_IMMORTALS(imm_state, immortal, op)                                \
     for (size_t hv = 0; hv < imm_state->values->nbuckets; hv++) {                  \
@@ -1143,6 +1065,12 @@ synchronize_finalization(struct _Py_runtime_immortals *imm_state)
     return 0;
 }
 
+/*
+ * Run the finalizer for each of the referents of the immortal objects.
+ * This is recursive, and will make sure that *anything* that could be
+ * eventually freed by freeing an immortal will have it's finalizer ran
+ * before that happens.
+ */
 static int
 _PyInterpreterState_FinalizeImmortalReferents(PyThreadState *tstate)
 {
@@ -1180,7 +1108,8 @@ _PyInterpreterState_FinalizeImmortalReferents(PyThreadState *tstate)
 }
 
 /*
- * Run the first phase of immortal object deallocation.
+ * Run only the tp_finalize() for each immortal object, as well
+ * as any object that they eventually traverse.
  */
 static int
 _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
@@ -1197,11 +1126,77 @@ _PyInterpreterState_FinalizeImmortals(PyThreadState *tstate)
     return _PyInterpreterState_FinalizeImmortalReferents(tstate);
 }
 
+/* Run the tp_clear() for an immortal object, if it has one. */
+static void
+run_immortal_clear(_Py_immortal *immortal)
+{
+    assert(immortal != NULL);
+    PyObject *op = immortal->object;
+    assert(op != NULL);
+    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+
+    if (immortal->gc_tracked)
+    {
+        PyObject_GC_Track(op);
+    }
+
+    if (immortal->gc_tracked && Py_TYPE(op)->tp_clear != NULL)
+    {
+        Py_TYPE(op)->tp_clear(op);
+        // Edge case: it's possible for a clear function
+        // to untrack the object, so if we ever need it to be
+        // tracked temporarily, then be careful.
+    }
+
+    if (PyObject_GC_IsTracked(op)) {
+        _PyObject_GC_UNTRACK(op);
+    }
+}
+
 /*
- * Run the second phase of immortal object deallocation.
+ * Run the deallocator for an immortal object, without actually
+ * freeing it via deferred memory deallocation.
+ */
+static void
+run_immortal_destructor(_Py_immortal *immortal)
+{
+    assert(immortal != NULL);
+    PyObject *op = immortal->object;
+    assert(op != NULL);
+    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+
+    if (immortal->gc_tracked)
+    {
+        PyObject_GC_Track(op);
+    }
+
+    _Py_SetMortal(op, 1);
+    // Run the deallocator for the immortal object.
+    // All of it's mortal references should get cleared, and
+    // we'll store it in the deferred memory bank.
+    Py_DECREF(op);
+
+    // The object should still be alive, despite our
+    // ruthless attempts to destroy it.
+    assert(!_PyObject_IsFreed(op));
+    _Py_SetImmortalKnown(op);
+
+    _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
+
+    // However, it definitely should not be tracked by
+    // the garbage collector anymore.
+    _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
+}
+
+/*
+ * Run the tp_clear() and subsequently tp_dealloc() on each immortal
+ * object, and then run a garbage collection.
  *
  * At this point, it's expected that the finalizer has been ran on each
- * of the immortals.
+ * of the immortals and their referents, so the garbage collection
+ * and other things won't screw it up.
  */
 static void
 _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
@@ -1237,23 +1232,30 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     reset_memory(interp);
 }
 
+/* Free all memory related to object immortalization.
+ * This cannot run finalizers, as it just executes the OS-level free routine. */
 static void
 _PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
 {
-
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
+
+    // Destroy each immortal structure
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
         PyMem_RawFree(immortal);
     _Py_END_ITER_IMMORTALS()
 
+    // Destroy the set containing the immortals
     _Py_hashtable_destroy(imm_state->values);
-    // Just in case
     imm_state->values = NULL;
 
+    // Alas, we've made it! The immortals shall now
+    // officially get freed bby clearing the deferred memory bank.
     delete_deferred_memory(interp);
 }
 
+/* Find immortal data for an object immortalize by Py_Immortalize()
+ * Returns NULL if not immortal or not found. */
 _Py_immortal *
 _Py_FindUserDefinedImmortal(PyObject *op)
 {
