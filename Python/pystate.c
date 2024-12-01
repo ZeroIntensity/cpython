@@ -1028,7 +1028,7 @@ visit_finalize(PyObject *op, void *parent)
         }
         int this_result = Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing);
         Py_LeaveRecursiveCall();
-        return this_result;
+        return this_result == 0 ? result : 1;
     }
 
     return result;
@@ -1205,6 +1205,10 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     PyInterpreterState *interp = tstate->interp;
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
+    if (_PyInterpreterState_FinalizeImmortalReferents(tstate) < 0)
+    {
+        Py_FatalError("failed to finalize immortal objects");
+    }
 
     defer_memory(interp);
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
