@@ -1500,7 +1500,9 @@ Py_Immortalize(PyObject *op)
         _Py_DECREF_DecRefTotal();
     }
 #endif
+    _PyEval_StopTheWorld(interp);
     _Py_SetImmortalKnown(op);
+    _PyEval_StartTheWorld(interp);
     _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
 
