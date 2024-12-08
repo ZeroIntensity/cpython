@@ -267,27 +267,33 @@ do {                                                              \
     PyObject *op = self->object;                                  \
     PyObject *result;                                             \
 
-#define SharedObjectProxy_EXIT() \
-    if (result == NULL) {                                                  \
-        PyMutex_Unlock(&self->lock);                                       \
-        if (switch_back != NULL) {                                         \
-            PyThreadState_Clear(to_switch);                                \
-            PyThreadState_Swap(switch_back);                               \
-            PyThreadState_Delete(to_switch);                               \
-        }                                                                  \
-        return NULL;                                                       \
-    }                                                                      \
-    PyObject *shareable_result = make_shareable(result);                   \
+#define SharedObjectProxy_EXIT_NO_SHARE() \
     PyMutex_Unlock(&self->lock);                                           \
     if (switch_back != NULL) {                                             \
         PyThreadState_Swap(switch_back);                                   \
     }                                                                      \
-    if (shareable_result == NULL) {                                        \
+    if (result == NULL) {                                                  \
         PyErr_SetString(PyExc_InterpreterError, "failed to share object"); \
         return NULL;                                                       \
     }                                                                      \
-    return shareable_result;                                               \
+    return result;                                                         \
 } while (0);
+
+#define SharedObjectProxy_EXIT_EARLY()   \
+    PyMutex_Unlock(&self->lock);         \
+    if (switch_back != NULL) {           \
+        PyThreadState_Clear(to_switch);  \
+        PyThreadState_Swap(switch_back); \
+        PyThreadState_Delete(to_switch); \
+    }                                    \
+
+#define SharedObjectProxy_EXIT()        \
+    if (result == NULL) {               \
+        SharedObjectProxy_EXIT_EARLY(); \
+        return NULL;                    \
+    }                                   \
+    result = make_shareable(result);    \
+    SharedObjectProxy_EXIT_NO_SHARE()
 
 static PyObject *
 sharedobjectproxy_getattro(SharedObjectProxy *self, PyObject *attribute) {
@@ -337,7 +343,12 @@ sharedobjectproxy_repr(SharedObjectProxy *self)
 {
     SharedObjectProxy_ENTER();
     result = PyObject_Repr(op);
-    SharedObjectProxy_EXIT()
+    if (Py_Immortalize(result) < 0)
+    {
+        SharedObjectProxy_EXIT_EARLY();
+        return NULL;
+    }
+    SharedObjectProxy_EXIT_NO_SHARE();
 }
 
 static PyType_Slot SharedObjectProxyType_slots[] = {
