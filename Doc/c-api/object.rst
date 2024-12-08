@@ -599,3 +599,28 @@ Object Protocol
 
    .. versionadded:: next
 
+.. c:function:: int Py_Immortalize(PyObject *obj)
+
+   Make *obj* :term:`immortal`. An :term:`immortal` object can have improved performance for
+   :term:`reference count` modifications, via :c:macro:`Py_INCREF` or :c:macro:`Py_DECREF`, with
+   the cost of being less memory efficient. See :func:`sys.immortalize` for more information.
+
+   In order for an object to safely be made immortal, the object must follow a set of rules:
+
+   * It must use the object   memory allocator. See :ref:`Allocator Domains <_allocator-domains>` for more information.
+   * It must not rely on the object's :term:`reference count` (via :c:macro:`Py_REFCNT`).
+   * It must not attempt to call Python code in its :c:member:`~PyTypeObject.tp_dealloc` slot, other than
+     through :c:func:`PyObject_CallFinalizerFromDealloc` and :c:member:`~PyTypeObject.tp_finalize`.
+   * If the object can have circular references, any references released in the object's
+     :c:member:`~PyTypeObject.tp_dealloc` slot must also be traversed by the :c:member:`~PyTypeObject.tp_traverse`.
+
+   See also (PEP number).
+
+   .. versionadded:: next
+
+.. c:function:: int Py_IsImmortal(PyObject *obj)
+
+   Return ``1`` if *obj* is an :term:`immortal` object, and ``0`` otherwise. This function cannot
+   fail. See also :func:`sys.is_immortal`.
+
+   .. versionadded:: next

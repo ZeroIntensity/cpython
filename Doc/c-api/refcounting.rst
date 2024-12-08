@@ -21,6 +21,8 @@ of Python objects.
    reflect the actual number of references.  Consequently, do not rely
    on the returned value to be accurate, other than a value of 0 or 1.
 
+   If trying to idenitfy an :term:`immortal` object, use :c:func:`Py_IsImmortal` instead.
+
    Use the :c:func:`Py_SET_REFCNT()` function to set an object reference count.
 
    .. versionchanged:: 3.10

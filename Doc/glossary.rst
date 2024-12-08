@@ -657,6 +657,10 @@ Glossary
       If an object is immortal, its :term:`reference count` is never modified,
       and therefore it is never deallocated while the interpreter is running.
       For example, :const:`True` and :const:`None` are immortal in CPython.
+      You can identify an immortal object through :func:`sys.is_immortal`.
+
+      As of (pep number), any object can be made immortal through :func:`sys.immortalize`
+      or :c:func:`Py_Immortalize`.
 
    immutable
       An object with a fixed value.  Immutable objects include numbers, strings and

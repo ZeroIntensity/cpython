@@ -848,6 +848,8 @@ always available.
    reflect the actual number of references.  Consequently, do not rely
    on the returned value to be accurate, other than a value of 0 or 1.
 
+   If trying to identify an :term:`immortal` object, use :func:`sys.is_immortal` instead.
+
    .. versionchanged:: 3.12
       Immortal objects have very large refcounts that do not match
       the actual number of references to the object.
@@ -1120,6 +1122,33 @@ always available.
 
    More details of ``hexversion`` can be found at :ref:`apiabiversion`.
 
+.. function:: immortalize(obj)
+
+   Make *obj* an :term:`immortal` object. This means that it will not be deallocated for the
+   lifetime of the Python interpreter.
+
+   For objects that have costly modifications to their :term:`reference count`, making them :term:`immortal`
+   can help improve performance. For example, on the :term:`free-threaded <free threading>` build, making
+   an object :term:`immortal` can help mitigate bottlenecks that come from concurrent modification of
+   an object's :term:`reference count`.
+
+   See (pep number) for more information.
+
+   .. warning::
+      This function should be considered a low-level routine that most users should avoid. Making too many
+      objects :term:`immortal` can result in drastically higher memory usage for a program.
+
+   .. impl-detail:: This function is specific to CPython.
+
+   .. versionadded:: next
+
+.. function:: is_immortal(obj)
+
+   Return ``True`` if *obj* is an :term:`immortal` object, and ``False`` otherwise.
+
+   .. impl-detail:: This function is specific to CPython.
+
+   .. versionadded:: next
 
 .. data:: implementation
 
