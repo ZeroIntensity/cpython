@@ -147,7 +147,6 @@ def always_isolate(test_method):
         def isolated_test(self):
             _isolate_subinterpreter(test_method, _interpreters)
 
-        raise ImportError
         return isolated_test
     except ImportError:
         # _interpreters not available
