@@ -2391,20 +2391,6 @@ Py_NewInterpreter(void)
     return tstate;
 }
 
-PyStatus
-Py_NewIsolatedInterpreter(PyThreadState **tstate_p)
-{
-    PyInterpreterConfig config = {
-        .use_main_obmalloc = 1,
-        .allow_exec = 1,
-        .allow_fork = 1,
-        .allow_threads = 1,
-        .check_multi_interp_extensions = 1,
-        .gil = PyInterpreterConfig_OWN_GIL
-    };
-    return Py_NewInterpreterFromConfig(tstate_p, &config);
-}
-
 /* Delete an interpreter and its last thread.  This requires that the
    given thread state is current, that the thread has no remaining
    frames, and that it is its interpreter's only remaining thread.

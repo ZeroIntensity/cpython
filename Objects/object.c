@@ -526,7 +526,6 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 static int
 is_finalized(PyObject *op, _Py_immortal **immortal_ptr)
 {
-    // TODO: Make this thread safe
     if (_PyType_IS_GC(Py_TYPE(op)))
     {
         return _PyGC_FINALIZED(op);
@@ -3115,7 +3114,6 @@ PyRefTracer PyRefTracer_GetTracer(void** data) {
     }
     return _PyRuntime.ref_tracer.tracer_func;
 }
-
 
 
 static PyObject* constants[] = {

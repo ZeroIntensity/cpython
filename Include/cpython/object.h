@@ -537,3 +537,4 @@ PyAPI_FUNC(int) PyUnstable_Object_EnableDeferredRefcount(PyObject *);
 
 PyAPI_FUNC(int) Py_Immortalize(PyObject *op);
 PyAPI_FUNC(int) Py_IsImmortal(PyObject *op);
+
