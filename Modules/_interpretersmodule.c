@@ -217,6 +217,12 @@ typedef struct {
 static int
 sharedobjectproxy_clear(SharedObjectProxy *self)
 {
+    // Don't clear from another interpreter
+    if (self->interp != _PyInterpreterState_GET())
+    {
+        return 0;
+    }
+
     Py_CLEAR(self->object);
     return 0;
 }
@@ -224,6 +230,12 @@ sharedobjectproxy_clear(SharedObjectProxy *self)
 static int
 sharedobjectproxy_traverse(SharedObjectProxy *self, visitproc visit, void *arg)
 {
+    // Don't traverse from another interpreter
+    if (self->interp != _PyInterpreterState_GET())
+    {
+        return 0;
+    }
+
     Py_VISIT(self->object);
     return 0;
 }
