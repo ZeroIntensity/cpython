@@ -5,7 +5,6 @@ from test.support import import_helper
 import sys
 import functools
 import inspect
-import contextlib
 
 _testcapi = import_helper.import_module("_testcapi")
 
@@ -99,8 +98,14 @@ def _gen_isolated_source(test_method):
 import traceback
 import sys
 import unittest
+import types
+
+support = types.SimpleNamespace(Py_GIL_DISABLED={support.Py_GIL_DISABLED})
 
 def isolate(test_method):
+    return test_method
+
+def always_isolate(test_method):
     return test_method
 
 {utilities}
@@ -134,12 +139,7 @@ def _isolate_subinterpreter(test_method, _interpreters):
         raise RuntimeError(f"Error in interpreter: {err.formatted}")
 
 
-def isolate(test_method):
-    # For debugging and performance, don't isolate
-    # the tests when executing this module directly
-    if __name__ == "__main__":
-        return test_method
-
+def always_isolate(test_method):
     try:
         import _interpreters
 
@@ -161,6 +161,14 @@ def isolate(test_method):
             return isolated_test
         except ImportError:
             raise unittest.SkipTest("_interpreters and subprocess are not available")
+
+def isolate(test_method):
+    # For debugging and performance, don't isolate
+    # the tests when executing this module directly
+    if __name__ == "__main__":
+        return test_method
+
+    return always_isolate(test_method)
 
 
 class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
@@ -479,10 +487,14 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
 
         inner()
 
-    @support.requires_resource("cpu")
     @unittest.skipIf(support.Py_GIL_DISABLED, "slow for free-threading")
-    @isolate
+    @always_isolate
     def test_the_party_pack(self):
+        import contextlib
+        import warnings
+
+        warnings.simplefilter("ignore", DeprecationWarning)
+
         # These have weird side effects
         blacklisted = {"antigravity", "this"}
 
