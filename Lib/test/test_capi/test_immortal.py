@@ -32,10 +32,10 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         if loose is None:
             if already is True:
-                self.assertEqual(refcnt, _IMMORTAL_REFCNT)
+                self.assertEqual(refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be mortal")
                 self.assertTrue(_testcapi.is_immortal(obj))
             else:
-                self.assertNotEqual(refcnt, _IMMORTAL_REFCNT)
+                self.assertNotEqual(refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be immortal")
                 self.assertFalse(_testcapi.is_immortal(obj))
 
         _testcapi.immortalize_object(obj)
@@ -49,73 +49,103 @@ class TestUserImmortalObjects(unittest.TestCase):
 
         return obj
 
+    def mortal(self):
+        class MortalType:
+            pass
+
+        return self.assert_mortal(MortalType())
+
+    def mortable_type(self, tp):
+        class my_tp(tp):
+            pass
+
+        return my_tp
+
+    def mortal_int(self):
+        my_int = self.mortable_type(int)
+        return self.assert_mortal(my_int(1000000))
+
+    def mortal_str(self):
+        my_str = self.mortable_type(str)
+        return self.assert_mortal(my_str("nobody expects the spanish inquisition"))
+
+    def mortal_bytes(self):
+        my_bytes = self.mortable_type(bytes)
+        return self.assert_mortal(my_bytes(b"peter was here"))
+
+    def immortal(self):
+        return self.immortalize(self.mortal())
+
     def assert_mortal(self, obj):
-        self.assertNotEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
+        self.assertNotEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT, f"{obj!r} is immortal somehow")
         return obj
 
     def test_strings(self):
         # Mortal interned string
-        self.immortalize(sys.intern("interned string"))
+        self.immortalize(sys.intern("interned string"), loose=True)
 
         self.immortalize("a", already=True)  # 1-byte string
-        self.immortalize("nobody expects the spanish inquisition")
+        self.immortalize(self.mortal_str())
         self.immortalize("not interned bytes".encode("utf-8"))
 
-        sys.intern(self.immortalize("i'm immortal"))
+        sys.intern(self.immortalize("i'm immortal", loose=support.Py_GIL_DISABLED))
 
         # Now, test using those strings again.
         self.immortalize(b"i'm immortal".decode("utf-8") + "abc")
 
     def test_bytes(self):
-        self.immortalize(b"byte string")
+        self.immortalize(b"bytes literal", loose=support.Py_GIL_DISABLED)
+        self.immortalize(self.mortal_bytes())
+        self.immortalize(self.mortal_str().encode("utf-8"))
         self.immortalize(b"a", already=True, loose=True)  # 1-byte string
         self.immortalize(bytes.fromhex("FFD9"))
 
-        # Make sure that using it doesn't accidentially make it immortal
-        self.assert_mortal(b"byte string" + b"abc")
+        # All bytes are immortal on the free-threaded build
+        if not support.Py_GIL_DISABLED:
+            # Make sure that using it doesn't accidentially make it immortal
+            self.assert_mortal(b"byte string" + b"abc")
 
     def test_bytearray(self):
-        self.immortalize(bytearray([1, 2, 3, 4]))
-        self.immortalize(bytearray(self.assert_mortal("my silly string"), "utf-8"))
-        self.immortalize(bytearray(self.assert_mortal(999)))
+        mortal_int = self.mortable_type(int)
+        self.immortalize(bytearray([mortal_int(1), mortal_int(2)]))
+        self.immortalize(bytearray(self.mortal_str(), "utf-8"))
+        # TODO: Add more
 
     def test_memoryview(self):
-        self.immortalize(memoryview(self.assert_mortal(bytearray("XYZ", "utf-8"))))
-        # Note: immortalizing the bytearray causes a false positive
-        # SystemError (it shows up as "Error in sys.excepthook" because the
-        # interpreter is almost dead) during finalization, because the
-        # memoryview is also immortal, and it hasn't given the buffer back.
-        # However, this is perfectly safe because of deferred memory deletion,
-        # so it's really just a cause for confusion. I'm disabling it for now.
+        self.immortalize(memoryview(self.assert_mortal(bytearray(self.mortal_str(), "utf-8"))))
+        ba = self.immortalize(bytearray(self.mortal_str(), 'utf-8'))
+        ba = bytearray(self.mortal_str(), "utf-8")
 
-        # ba = self.immortalize(bytearray("XYZ", 'utf-8'))
-        ba = bytearray("XYZ", "utf-8")
+        # Trigger some weird things with finalization
+        # In my prior implementations of AOI, this caused an
+        # unraisable SystemError during finalization
         memoryview(ba)
+
         self.immortalize(memoryview(ba))
 
         # Mortal view, immortal buffer
-        self.assert_mortal(memoryview(self.immortalize(b"a duck"))).release()
+        self.assert_mortal(memoryview(self.immortalize(self.mortal_bytes()))).release()
 
         # Immortal view, mortal buffer
-        self.immortalize(memoryview(self.assert_mortal(b"i'm mortal"))).release()
+        self.immortalize(memoryview(self.mortal_bytes())).release()
 
     def test_numbers(self):
         for i in range(1, 256):
             with self.subTest(i=i):
                 self.immortalize(i, already=True)
 
-        self.immortalize(1000)
-        self.immortalize(10**1000)  # Really big number
-        self.immortalize(100j)
-        self.immortalize(0.0)
-        self.immortalize(42.42)
+        self.immortalize(self.mortal_int())
+        self.immortalize(10**1000, loose=support.Py_GIL_DISABLED)  # Really big number
+        self.immortalize(self.mortable_type(complex)(100j))
+        self.immortalize(self.mortable_type(float)(0.0))
 
     def sequence(self, constructor):
         with self.subTest(constructor=constructor):
-            self.immortalize(constructor((1, 2, 3, False)))
-            self.immortalize(constructor(("hello", sys.intern("world"))))
-            self.immortalize(constructor(("hello", sys.intern("hello"), None, True)))
-            self.immortalize(constructor(("hello", SomeType(), 1, 2, 3, b"a", "")))
+            self.immortalize(constructor((1, 2, 3, False)), loose=True)
+            self.immortalize(constructor((1, 2, 3, self.mortal_int())))
+            self.immortalize(constructor((self.mortal_str(), sys.intern("world"))))
+            self.immortalize(constructor((self.mortal_str(), sys.intern("hello"), None, True)))
+            self.immortalize(constructor((self.mortal_str(), SomeType(), 1, self.mortal_int(), 3, b"a", "")))
 
             # Some random types
             self.immortalize(constructor((SomeType, range)))
@@ -123,7 +153,7 @@ class TestUserImmortalObjects(unittest.TestCase):
     def circular(self, constructor):
         with self.subTest(constructor=constructor):
             test = constructor()
-            self.immortalize(constructor((test, self.assert_mortal(999))))
+            self.immortalize(constructor((test, self.mortal_int())))
 
     def test_lists(self):
         self.immortalize([])
@@ -147,13 +177,13 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.sequence(lambda seq: {a: b for a, b in itertools.pairwise(seq)})
         x = {}
         x["y"] = x
-        _testcapi.immortalize_object(x)
+        self.immortalize(x)
 
         y = {}
         y["x"] = y
         y["y"] = x
         x["y"] = y
-        _testcapi.immortalize_object(y)
+        self.immortalize(y)
 
     def test_types(self):
         for static_type in (type, range, str, list, int, dict, super):
@@ -221,24 +251,49 @@ class TestUserImmortalObjects(unittest.TestCase):
         weakref.finalize(some_immortal, finalize)
 
     def test_zip(self):
-        zip_iter = zip([2000, 3000, 4000], [5000, 6000, 7000])
+        # Immortal iterator, mortal contents
+        zip_iter = zip(
+            [self.mortal_int(), self.mortal_int(), self.mortal_int()],
+            [self.mortal(), self.mortal_bytes(), self.mortal_str()]
+        )
         self.immortalize(zip_iter)
         for a, b in zip_iter:
             with self.subTest(a=a, b=b):
                 self.assert_mortal(a)
                 self.assert_mortal(b)
 
+        # Mortal iterator, immortal contents
+        for a, b in zip(
+            [self.immortal(), self.immortal()],
+            [self.immortal(), self.immortal()],
+        ):
+            self.immortalize(a, already=True)
+            self.immortalize(b, already=True)
+
+        # Mortal iterator, immortal contents with circular reference
+        mortal_zip = self.assert_mortal(
+            zip(
+                [self.immortal(), self.immortal()],
+                [self.immortal(), self.immortal()]
+            )
+        )
+        for a, b in mortal_zip:
+            self.immortalize(a, already=True)
+            self.immortalize(b, already=True)
+            a.circular = mortal_zip
+            b.a = a
+
     def test_iter(self):
         # Immortal iterator, mortal contents
         for i in self.immortalize(
-            iter(["nobody immortalizes", "the spanish inquisition"])
+            iter([self.mortal_str(), self.mortal_bytes(), self.mortal_int(), self.mortal()])
         ):
             with self.subTest(i=i):
                 self.assert_mortal(i)
 
         # Mortal iterator, immortal contents
         mortal_iterator = self.assert_mortal(
-            iter([self.immortalize(9999), self.immortalize(-9999)])
+            iter([self.immortal(), self.immortal()])
         )
         for _ in mortal_iterator:
             self.assert_mortal(mortal_iterator)
@@ -302,8 +357,8 @@ class TestUserImmortalObjects(unittest.TestCase):
             class Foo:
                 pass
 
-            hello = self.assert_mortal("silly")
-            some_other_var = self.assert_mortal(6000)
+            hello = self.mortal_str()
+            some_other_var = self.mortal_int()
 
             def exotic_finalizer():
                 with contextlib.suppress(NameError):
@@ -333,6 +388,7 @@ class TestUserImmortalObjects(unittest.TestCase):
         self.assertEqual(sys.getrefcount(mortal), _IMMORTAL_REFCNT)
 
     @support.requires_resource("cpu")
+    @unittest.skipIf(support.Py_GIL_DISABLED, "slow for free-threading")
     def test_the_party_pack(self):
         import _interpreters
 
