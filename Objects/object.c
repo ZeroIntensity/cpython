@@ -537,7 +537,6 @@ is_finalized(PyObject *op, _Py_immortal **immortal_ptr)
         {
             return 0;
         }
-        PyInterpreterState *interp = _PyInterpreterState_GET();
         if (immortal_ptr != NULL)
         {
             *immortal_ptr = immortal;
