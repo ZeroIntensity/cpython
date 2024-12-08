@@ -338,13 +338,12 @@ sharedobjectproxy_call(SharedObjectProxy *self, PyObject *args, PyObject *kwargs
         {
             return NULL;
         }
-        _PyObject_Dump(arg);
         PyObject *shareable = make_shareable(arg);
         if (shareable == NULL)
         {
             return NULL;
         }
-        if (PyTuple_SetItem(shared_args, i, Py_None) < 0)
+        if (PyTuple_SetItem(shared_args, i, shareable) < 0)
         {
             Py_DECREF(shared_args);
             return NULL;
@@ -496,6 +495,11 @@ _get_current_xibufferview_type(void)
 PyObject *
 make_shareable(PyObject *object)
 {
+    if (Py_TYPE(object) == &SharedObjectProxy_Type)
+    {
+        assert(Py_IsImmortal(object));
+        return object;
+    }
     SharedObjectProxy *proxy = (SharedObjectProxy *)sharedobjectproxy_new(&SharedObjectProxy_Type, NULL, NULL);
     if (proxy == NULL)
     {
