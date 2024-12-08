@@ -1518,7 +1518,7 @@ Py_Immortalize(PyObject *op)
     _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
 
-    return 0;
+    return 1;
 }
 
 int

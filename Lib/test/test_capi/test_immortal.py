@@ -383,8 +383,8 @@ class TestUserImmortalObjects(unittest.TestCase):
     def test_sys_immortalize(self):
         # sys.immortalize() does pretty much the same thing
         # as Py_Immortalize(), but we might as well test it.
-        mortal = self.assert_mortal([1, 2, 3])
-        sys.immortalize(mortal)
+        mortal = self.mortal()
+        self.assertEqual(sys.immortalize(mortal), 1)
         self.assertEqual(sys.getrefcount(mortal), _IMMORTAL_REFCNT)
 
     @support.requires_resource("cpu")

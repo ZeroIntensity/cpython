@@ -2545,12 +2545,13 @@ static PyObject *
 sys_immortalize(PyObject *module, PyObject *object)
 /*[clinic end generated code: output=d5a3fdec54342de1 input=8c8520b96815994b]*/
 {
-    if (Py_Immortalize(object) < 0)
+    int result = Py_Immortalize(object);
+    if (result < 0)
     {
         return NULL;
     }
     assert(_Py_IsImmortal(object));
-    Py_RETURN_NONE;
+    return PyLong_FromLong(result);
 }
 
 static PyMethodDef sys_methods[] = {
