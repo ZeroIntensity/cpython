@@ -293,12 +293,14 @@ do {                                                              \
 } while (0);
 
 #define SharedObjectProxy_EXIT_EARLY()   \
+    PyErr_WriteUnraisable(self->object); \
     PyMutex_Unlock(&self->lock);         \
     if (switch_back != NULL) {           \
         PyThreadState_Clear(to_switch);  \
         PyThreadState_Swap(switch_back); \
         PyThreadState_Delete(to_switch); \
     }                                    \
+    PyErr_SetString(PyExc_InterpreterError, "can't raise error from proxy"); \
 
 #define SharedObjectProxy_EXIT()        \
     if (result == NULL) {               \
@@ -329,20 +331,30 @@ sharedobjectproxy_call(SharedObjectProxy *self, PyObject *args, PyObject *kwargs
         return NULL;
     }
 
-    if (Py_Immortalize(shared_args) < 0)
-    {
-        Py_DECREF(shared_args);
-        return NULL;
-    }
-
     for (Py_ssize_t i = 0; i < size; ++i)
     {
-        PyObject *shareable = make_shareable(PyTuple_GET_ITEM(args, i));
+        PyObject *arg = PyTuple_GetItem(args, i);
+        if (arg == NULL)
+        {
+            return NULL;
+        }
+        _PyObject_Dump(arg);
+        PyObject *shareable = make_shareable(arg);
         if (shareable == NULL)
         {
             return NULL;
         }
-        PyTuple_SET_ITEM(shared_args, i, shareable);
+        if (PyTuple_SetItem(shared_args, i, Py_None) < 0)
+        {
+            Py_DECREF(shared_args);
+            return NULL;
+        }
+    }
+
+    if (Py_Immortalize(shared_args) < 0)
+    {
+        Py_DECREF(shared_args);
+        return NULL;
     }
 
     SharedObjectProxy_ENTER();
