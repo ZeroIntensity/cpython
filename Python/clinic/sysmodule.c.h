@@ -1629,10 +1629,38 @@ PyDoc_STRVAR(sys_immortalize__doc__,
 "immortalize($module, object, /)\n"
 "--\n"
 "\n"
-"Make the object immortal. This means that it\'s reference count will never be modified while the interpreter is running.");
+"Make the object immortal.");
 
 #define SYS_IMMORTALIZE_METHODDEF    \
     {"immortalize", (PyCFunction)sys_immortalize, METH_O, sys_immortalize__doc__},
+
+PyDoc_STRVAR(sys_is_immortal__doc__,
+"is_immortal($module, object, /)\n"
+"--\n"
+"\n"
+"Is the object immortal?");
+
+#define SYS_IS_IMMORTAL_METHODDEF    \
+    {"is_immortal", (PyCFunction)sys_is_immortal, METH_O, sys_is_immortal__doc__},
+
+static int
+sys_is_immortal_impl(PyObject *module, PyObject *object);
+
+static PyObject *
+sys_is_immortal(PyObject *module, PyObject *object)
+{
+    PyObject *return_value = NULL;
+    int _return_value;
+
+    _return_value = sys_is_immortal_impl(module, object);
+    if ((_return_value == -1) && PyErr_Occurred()) {
+        goto exit;
+    }
+    return_value = PyLong_FromLong((long)_return_value);
+
+exit:
+    return return_value;
+}
 
 #ifndef SYS_GETWINDOWSVERSION_METHODDEF
     #define SYS_GETWINDOWSVERSION_METHODDEF
@@ -1677,4 +1705,4 @@ PyDoc_STRVAR(sys_immortalize__doc__,
 #ifndef SYS_GETANDROIDAPILEVEL_METHODDEF
     #define SYS_GETANDROIDAPILEVEL_METHODDEF
 #endif /* !defined(SYS_GETANDROIDAPILEVEL_METHODDEF) */
-/*[clinic end generated code: output=2cfce824a6b99f96 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=2222f9c11a0f72f2 input=a9049054013a1b77]*/
