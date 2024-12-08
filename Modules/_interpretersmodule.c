@@ -357,6 +357,19 @@ static PyType_Spec SharedObjectProxyType_spec = {
     .slots = SharedObjectProxyType_slots,
 };
 
+static PyObject *
+sharedobjectproxy_xid(_PyXIData_t *data)
+{
+    return data->obj;
+}
+
+static int
+sharedobjectproxy_shared(PyThreadState *tstate, PyObject *obj, _PyXIData_t *data)
+{
+    _PyXIData_Init(data, tstate->interp, NULL, obj, sharedobjectproxy_xid);
+    return 0;
+}
+
 static int
 register_sharedobjectproxy(PyObject *mod, PyTypeObject **p_state)
 {
@@ -371,6 +384,10 @@ register_sharedobjectproxy(PyObject *mod, PyTypeObject **p_state)
         return -1;
     }
     *p_state = cls;
+
+    if (ensure_xid_class(cls, sharedobjectproxy_shared) < 0) {
+        return -1;
+    }
 
     return 0;
 }
