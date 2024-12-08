@@ -248,63 +248,104 @@ sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject **kwds)
 PyObject *
 make_shareable(PyObject *object);
 
-static PyObject *
-sharedobjectproxy_getattro(SharedObjectProxy *self, PyObject *attribute)
-{
-    PyThreadState *to_switch = NULL;
-    PyThreadState *switch_back = NULL;
+#define SharedObjectProxy_ENTER()                                 \
+do {                                                              \
+    PyThreadState *to_switch = NULL;                              \
+    PyThreadState *switch_back = NULL;                            \
+    if (_PyInterpreterState_GET() != self->interp) {              \
+        to_switch = PyThreadState_New(self->interp);              \
+        if (to_switch == NULL) {                                  \
+            PyErr_NoMemory();                                     \
+            return NULL;                                          \
+        }                                                         \
+    }                                                             \
+    if (to_switch != NULL) {                                      \
+        switch_back = PyThreadState_Swap(to_switch);              \
+    }                                                             \
+    PyMutex_Lock(&self->lock);                                    \
+    /* We're now in the proper interpreter, and hold the lock. */ \
+    PyObject *op = self->object;                                  \
+    PyObject *result;                                             \
 
-    if (_PyInterpreterState_GET() != self->interp)
+#define SharedObjectProxy_EXIT() \
+    if (result == NULL) {                                                  \
+        PyMutex_Unlock(&self->lock);                                       \
+        if (switch_back != NULL) {                                         \
+            PyThreadState_Clear(to_switch);                                \
+            PyThreadState_Swap(switch_back);                               \
+            PyThreadState_Delete(to_switch);                               \
+        }                                                                  \
+        return NULL;                                                       \
+    }                                                                      \
+    PyObject *shareable_result = make_shareable(result);                   \
+    PyMutex_Unlock(&self->lock);                                           \
+    if (switch_back != NULL) {                                             \
+        PyThreadState_Swap(switch_back);                                   \
+    }                                                                      \
+    if (shareable_result == NULL) {                                        \
+        PyErr_SetString(PyExc_InterpreterError, "failed to share object"); \
+        return NULL;                                                       \
+    }                                                                      \
+    return shareable_result;                                               \
+} while (0);
+
+static PyObject *
+sharedobjectproxy_getattro(SharedObjectProxy *self, PyObject *attribute) {
+    if (Py_Immortalize(attribute) < 0)
     {
-        to_switch = PyThreadState_New(self->interp);
-        if (to_switch == NULL)
+        return NULL;
+    }
+
+    SharedObjectProxy_ENTER();
+    result = PyObject_GetAttr(op, attribute);
+    SharedObjectProxy_EXIT()
+}
+
+static PyObject *
+sharedobjectproxy_call(SharedObjectProxy *self, PyObject *args, PyObject *kwargs) {
+    Py_ssize_t size = PyTuple_Size(args);
+    PyObject *shared_args = PyTuple_New(size);
+    if (shared_args == NULL)
+    {
+        return NULL;
+    }
+
+    if (Py_Immortalize(shared_args) < 0)
+    {
+        Py_DECREF(shared_args);
+        return NULL;
+    }
+
+    for (Py_ssize_t i = 0; i < size; ++i)
+    {
+        PyObject *shareable = make_shareable(PyTuple_GET_ITEM(args, i));
+        if (shareable == NULL)
         {
-            PyErr_NoMemory();
             return NULL;
         }
+        PyTuple_SET_ITEM(shared_args, i, shareable);
     }
 
-    if (to_switch != NULL)
-    {
-        switch_back = PyThreadState_Swap(to_switch);
-    }
-    PyMutex_Lock(&self->lock);
-    /* We're now in the proper interpreter, and hold the lock. */
-    PyObject *result = PyObject_GetAttr(self->object, attribute);
+    SharedObjectProxy_ENTER();
+    // kwargs aren't supported yet
+    result = PyObject_Call(op, shared_args, NULL);
+    SharedObjectProxy_EXIT()
+}
 
-    if (result == NULL)
-    {
-        PyMutex_Unlock(&self->lock);
-        if (switch_back != NULL)
-        {
-            PyThreadState_Clear(to_switch);
-            PyThreadState_Swap(switch_back);
-            PyThreadState_Delete(to_switch);
-        }
-        return NULL;
-    }
-
-    PyObject *shareable_result = make_shareable(result);
-    PyMutex_Unlock(&self->lock);
-
-    if (switch_back != NULL)
-    {
-        PyThreadState_Swap(switch_back);
-    }
-
-    if (shareable_result == NULL)
-    {
-        PyErr_SetString(PyExc_InterpreterError, "failed to share object");
-        return NULL;
-    }
-
-    return shareable_result;
+static PyObject *
+sharedobjectproxy_repr(SharedObjectProxy *self)
+{
+    SharedObjectProxy_ENTER();
+    result = PyObject_Repr(op);
+    SharedObjectProxy_EXIT()
 }
 
 static PyType_Slot SharedObjectProxyType_slots[] = {
     {Py_tp_new, (newfunc)sharedobjectproxy_new},
     {Py_tp_dealloc, (destructor)sharedobjectproxy_dealloc},
     {Py_tp_getattro, (getattrofunc)sharedobjectproxy_getattro},
+    {Py_tp_call, (ternaryfunc)sharedobjectproxy_call},
+    {Py_tp_repr, (reprfunc)sharedobjectproxy_repr},
     {0, NULL},
 };
 
