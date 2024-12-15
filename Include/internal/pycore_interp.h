@@ -309,9 +309,11 @@ struct _is {
             struct _Py_freelist freelist_caches[_PyFreeLists_LENGTH];
         } trashcan;
     } runtime_immortals;
+
+    /* the initial PyInterpreterState.threads.head */
+    _PyThreadStateImpl _initial_thread;
     // _initial_thread should be the last field of PyInterpreterState.
     // See https://github.com/python/cpython/issues/127117.
-    _PyThreadStateImpl _initial_thread;
 };
 
 

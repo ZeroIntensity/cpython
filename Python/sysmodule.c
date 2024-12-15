@@ -2567,14 +2567,31 @@ Make the object immortal.
 
 static PyObject *
 sys_immortalize(PyObject *module, PyObject *object)
-/*[clinic end generated code: output=d5a3fdec54342de1 input=8c8520b96815994b]*/
+/*[clinic end generated code: output=d5a3fdec54342de1 input=fb95877c9b815c82]*/
 {
-    if (Py_Immortalize(object) < 0)
+    int result = Py_Immortalize(object);
+    if (result < 0)
     {
         return NULL;
     }
     assert(_Py_IsImmortal(object));
-    Py_RETURN_NONE;
+    return PyLong_FromLong(result);
+}
+
+/*[clinic input]
+sys.is_immortal -> int
+
+    object:  object
+    /
+
+Is the object immortal?
+[clinic start generated code]*/
+
+static int
+sys_is_immortal_impl(PyObject *module, PyObject *object)
+/*[clinic end generated code: output=ba76f7fdcec1c2c1 input=d55aaf342e7b74ec]*/
+{
+    return Py_IsImmortal(object);
 }
 
 static PyMethodDef sys_methods[] = {
@@ -2649,6 +2666,7 @@ static PyMethodDef sys_methods[] = {
     SYS__IS_GIL_ENABLED_METHODDEF
     SYS_IMMORTALIZE_METHODDEF
     SYS__DUMP_TRACELETS_METHODDEF
+    SYS_IS_IMMORTAL_METHODDEF
     {NULL, NULL}  // sentinel
 };
 

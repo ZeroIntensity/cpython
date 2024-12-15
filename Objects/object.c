@@ -567,7 +567,6 @@ is_finalized(PyObject *op, _Py_immortal **immortal_ptr)
         {
             return 0;
         }
-        PyInterpreterState *interp = _PyInterpreterState_GET();
         if (immortal_ptr != NULL)
         {
             *immortal_ptr = immortal;
@@ -3145,7 +3144,6 @@ PyRefTracer PyRefTracer_GetTracer(void** data) {
     }
     return _PyRuntime.ref_tracer.tracer_func;
 }
-
 
 
 static PyObject* constants[] = {
