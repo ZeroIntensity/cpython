@@ -136,7 +136,7 @@ try:
 except BaseException:
     traceback.print_exc()
     raise
-    """
+"""
     return source
 
 
@@ -155,8 +155,11 @@ def _isolate_subinterpreter(test_method, _interpreters):
         raise RuntimeError(f"Error in interpreter: {err.formatted}")
 
 
-def always_isolate(test_method):
+def always_isolate(test_method, *, via_subprocess=None):
     try:
+        if via_subprocess is True:
+            raise ImportError("fallthrough")
+
         import _interpreters
 
         @functools.wraps(test_method)
@@ -165,6 +168,8 @@ def always_isolate(test_method):
 
         return isolated_test
     except ImportError:
+        if via_subprocess is False:
+            raise unittest.SkipTest("_interpreters must be available")
         # _interpreters not available
         try:
             import subprocess
@@ -177,13 +182,19 @@ def always_isolate(test_method):
         except ImportError:
             raise unittest.SkipTest("_interpreters and subprocess are not available")
 
-def isolate(test_method):
+def isolate(raw_test_method=None, *, via_subprocess=None):
     # For debugging and performance, don't isolate
     # the tests when executing this module directly
-    if __name__ == "__main__":
-        return test_method
+    def decorator(test_method):
+        if __name__ == "__main__":
+            return test_method
 
-    return always_isolate(test_method)
+        return always_isolate(test_method, via_subprocess=via_subprocess)
+
+    if raw_test_method is None:
+        return decorator
+
+    return decorator(raw_test_method)
 
 
 class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
@@ -432,8 +443,9 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
         finally:
             loop.close()
 
-    # This can't be isolated because subinterpreters can't load
+    # This can't be isolated with a subinterpreter because subinterpreters can't load
     # single-phase init modules
+    @isolate(via_subprocess=True)
     def test_modules(self):
         import io
         import _io
@@ -501,6 +513,38 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
             del hello
 
         inner()
+
+    @isolate
+    def test_descriptors(self):
+        class Test:
+            @staticmethod
+            def static():
+                pass
+
+            @classmethod
+            def clas(cls):
+                pass
+
+            def instance(self):
+                pass
+
+        for parent in (Test(), Test):
+            with self.subTest(parent=parent):
+                self.assert_mortal(parent)
+                self.immortalize(parent.clas)
+                self.immortalize(parent.instance)
+                self.immortalize(parent.static, loose=True)
+
+    @isolate
+    def test_builtins_shenanigans(self):
+        # builtins is cleared very late during finalization
+        import builtins
+
+        def foo():
+            exec("10 ** 10")
+
+        builtins.foo = foo
+        self.immortalize(foo)
 
     @unittest.skipIf(support.Py_GIL_DISABLED, "slow for free-threading")
     @always_isolate
