@@ -546,6 +546,25 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
         builtins.foo = foo
         self.immortalize(foo)
 
+    @isolate
+    def test_atexit(self):
+        import atexit
+
+        @atexit.register
+        def on_exit():
+            self.assert_mortal(on_exit)
+            self.immortalize(atexit)
+
+        mortal = [42]
+
+        @atexit.register
+        def on_exit_immortal():
+            self.immortalize(on_exit_immortal, already=True)
+            self.assert_mortal(mortal)
+            self.assertEqual(mortal[0], 42)
+
+        self.immortalize(on_exit_immortal)
+
     @unittest.skipIf(support.Py_GIL_DISABLED, "slow for free-threading")
     @always_isolate
     def test_the_party_pack(self):
