@@ -1445,12 +1445,8 @@ CharArray_set_raw(CDataObject *self, PyObject *value, void *Py_UNUSED(ignored))
 static PyObject *
 CharArray_get_raw(CDataObject *self, void *Py_UNUSED(ignored))
 {
-    LOCK_CDATA(self);
-    /* In 99.999% of cases, PyBytes_FromStringAndSize() will not be re-entrant.
-     * I guess it is possible to reenter if an embedder did shenanigans with
-     * the object allocator, but I *really* doubt someone will. */
-    PyObject *result = PyBytes_FromStringAndSize(self->b_ptr, self->b_size);
-    UNLOCK_CDATA(self);
+    PyObject *result;
+    result = PyBytes_FromStringAndSize(self->b_ptr, self->b_size);
     return result;
 }
 
@@ -1458,13 +1454,14 @@ static PyObject *
 CharArray_get_value(CDataObject *self, void *Py_UNUSED(ignored))
 {
     Py_ssize_t i;
-    LOCK_CDATA(self);
+    PyObject *result;
+    Py_BEGIN_CRITICAL_SECTION(self);
     char *ptr = self->b_ptr;
     for (i = 0; i < self->b_size; ++i)
         if (*ptr++ == '\0')
             break;
-    PyObject *result = PyBytes_FromStringAndSize(self->b_ptr, i);
-    UNLOCK_CDATA(result);
+    result = PyBytes_FromStringAndSize(self->b_ptr, i);
+    Py_END_CRITICAL_SECTION();
     return result;
 }
 
@@ -1496,11 +1493,11 @@ CharArray_set_value(CDataObject *self, PyObject *value, void *Py_UNUSED(ignored)
     }
 
     ptr = PyBytes_AS_STRING(value);
-    LOCK_CDATA(self);
+    Py_BEGIN_CRITICAL_SECTION(self);
     memcpy(self->b_ptr, ptr, size);
     if (size < self->b_size)
         self->b_ptr[size] = '\0';
-    UNLOCK_CDATA(self);
+    Py_END_CRITICAL_SECTION();
     Py_DECREF(value);
 
     return 0;
@@ -1518,13 +1515,14 @@ static PyObject *
 WCharArray_get_value(CDataObject *self, void *Py_UNUSED(ignored))
 {
     Py_ssize_t i;
-    LOCK_CDATA(self);
+    PyObject *unicode;
+    Py_BEGIN_CRITICAL_SECTION(self);
     wchar_t *ptr = (wchar_t *)self->b_ptr;
     for (i = 0; i < self->b_size/(Py_ssize_t)sizeof(wchar_t); ++i)
         if (*ptr++ == (wchar_t)0)
             break;
-    PyObject *unicode = PyUnicode_FromWideChar((wchar_t *)self->b_ptr, i);
-    UNLOCK_CDATA(self);
+    unicode = PyUnicode_FromWideChar((wchar_t *)self->b_ptr, i);
+    Py_END_CRITICAL_SECTION();
     return unicode;
 }
 
@@ -3034,9 +3032,10 @@ PyCData_reduce_impl(PyObject *myself, PyTypeObject *cls)
     if (dict == NULL) {
         return NULL;
     }
-    LOCK_CDATA(self);
-    PyObject *bytes = PyBytes_FromStringAndSize(self->b_ptr, self->b_size);
-    UNLOCK_CDATA(self);
+    PyObject *bytes;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    bytes = PyBytes_FromStringAndSize(self->b_ptr, self->b_size);
+    Py_END_CRITICAL_SECTION();
     return Py_BuildValue("O(O(NN))", st->_unpickle, Py_TYPE(myself), dict,
                          bytes);
 }
@@ -3058,9 +3057,9 @@ PyCData_setstate(PyObject *myself, PyObject *args)
         len = self->b_size;
 
     // XXX Can we use memcpy() here?
-    LOCK_CDATA(self);
+    Py_BEGIN_CRITICAL_SECTION(self);
     memmove(self->b_ptr, data, len);
-    UNLOCK_CDATA(self);
+    Py_END_CRITICAL_SECTION();
     mydict = PyObject_GetAttrString(myself, "__dict__");
     if (mydict == NULL) {
         return NULL;
@@ -3239,7 +3238,7 @@ int _ctypes_simple_instance(ctypes_state *st, PyObject *obj)
     return 0;
 }
 
-static PyObject *
+PyObject *
 PyCData_get(ctypes_state *st, PyObject *type, GETFUNC getfunc, PyObject *src,
           Py_ssize_t index, Py_ssize_t size, char *adr)
 {
@@ -4853,12 +4852,12 @@ Array_subscript(PyObject *myself, PyObject *item)
             if (dest == NULL)
                 return PyErr_NoMemory();
 
-            LOCK_CDATA(self);
+            Py_BEGIN_CRITICAL_SECTION(self);
             for (cur = start, i = 0; i < slicelen;
                  cur += step, i++) {
                 dest[i] = ptr[cur];
             }
-            UNLOCK_CDATA(self);
+            Py_END_CRITICAL_SECTION();
 
             np = PyBytes_FromStringAndSize(dest, slicelen);
             PyMem_Free(dest);
@@ -4881,12 +4880,12 @@ Array_subscript(PyObject *myself, PyObject *item)
                 return NULL;
             }
 
-            LOCK_CDATA(self);
+            Py_BEGIN_CRITICAL_SECTION(self);
             for (cur = start, i = 0; i < slicelen;
                  cur += step, i++) {
                 dest[i] = ptr[cur];
             }
-            UNLOCK_CDATA(self);
+            Py_END_CRITICAL_SECTION();
 
             np = PyUnicode_FromWideChar(dest, slicelen);
             PyMem_Free(dest);
@@ -5210,9 +5209,11 @@ static PyMethodDef Simple_methods[] = {
 
 static int Simple_bool(CDataObject *self)
 {
-    LOCK_CDATA(self);
-    int res = memcmp(self->b_ptr, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", self->b_size);
-    UNLOCK_CDATA(self);
+    int res;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    res = memcmp(self->b_ptr, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", self->b_size);
+    Py_END_CRITICAL_SECTION();
+    return res;
 }
 
 /* "%s(%s)" % (self.__class__.__name__, self.value) */
@@ -5543,11 +5544,11 @@ Pointer_subscript(PyObject *myself, PyObject *item)
             dest = (char *)PyMem_Malloc(len);
             if (dest == NULL)
                 return PyErr_NoMemory();
-            LOCK_CDATA(self);
+            Py_BEGIN_CRITICAL_SECTION(self);
             for (cur = start, i = 0; i < len; cur += step, i++) {
                 dest[i] = ptr[cur];
             }
-            UNLOCK_CDATA(self);
+            Py_END_CRITICAL_SECTION();
             np = PyBytes_FromStringAndSize(dest, len);
             PyMem_Free(dest);
             return np;
