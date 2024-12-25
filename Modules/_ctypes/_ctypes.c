@@ -129,8 +129,9 @@ bytes(cdata)
 /*[clinic input]
 module _ctypes
 class _ctypes.CFuncPtr "PyCFuncPtrObject *" "&PyCFuncPtr_Type"
+class _ctypes._Pointer "CDataObject *" "&PyCPointer_Type"
 [clinic start generated code]*/
-/*[clinic end generated code: output=da39a3ee5e6b4b0d input=58e8c99474bc631e]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=261d7c41be03bcc8]*/
 
 #define clinic_state() (get_module_state_by_class(cls))
 #define clinic_state_sub() (get_module_state_by_class(cls->tp_base))
@@ -2775,7 +2776,7 @@ static PyType_Spec pycfuncptr_type_spec = {
  */
 
 static CDataObject *
-PyCData_GetContainer(CDataObject *self)
+_PyCData_GetContainer(CDataObject *self)
 {
     while (self->b_base)
         self = self->b_base;
@@ -2789,6 +2790,15 @@ PyCData_GetContainer(CDataObject *self)
         }
     }
     return self;
+}
+static CDataObject *
+PyCData_GetContainer(CDataObject *self)
+{
+    CDataObject *res;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    res = _PyCData_GetContainer(self);
+    Py_END_CRITICAL_SECTION();
+    return res;
 }
 
 static PyObject *
@@ -3238,8 +3248,8 @@ int _ctypes_simple_instance(ctypes_state *st, PyObject *obj)
     return 0;
 }
 
-PyObject *
-PyCData_get(ctypes_state *st, PyObject *type, GETFUNC getfunc, PyObject *src,
+static PyObject *
+_PyCData_get(ctypes_state *st, PyObject *type, GETFUNC getfunc, PyObject *src,
           Py_ssize_t index, Py_ssize_t size, char *adr)
 {
     if (getfunc)
@@ -3255,6 +3265,16 @@ PyCData_get(ctypes_state *st, PyObject *type, GETFUNC getfunc, PyObject *src,
     return PyCData_FromBaseObj(st, type, src, index, adr);
 }
 
+PyObject *
+PyCData_get(ctypes_state *st, PyObject *type, GETFUNC getfunc, PyObject *src,
+          Py_ssize_t index, Py_ssize_t size, char *adr)
+{
+    PyObject *res;
+    Py_BEGIN_CRITICAL_SECTION(src);
+    res = _PyCData_get(st, type, getfunc, src, index, size, adr);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
 /*
   Helper function for PyCData_set below.
 */
@@ -3386,8 +3406,10 @@ PyCData_set(ctypes_state *st,
         return -1;
     }
 
+    Py_BEGIN_CRITICAL_SECTION(dst);
     result = _PyCData_set(st, mem, type, setfunc, value,
                         size, ptr);
+    Py_END_CRITICAL_SECTION();
     if (result == NULL)
         return -1;
 
@@ -4771,7 +4793,7 @@ Array_init(CDataObject *self, PyObject *args, PyObject *kw)
 }
 
 static PyObject *
-Array_item(PyObject *myself, Py_ssize_t index)
+_Array_item_lock_held(PyObject *myself, Py_ssize_t index)
 {
     CDataObject *self = (CDataObject *)myself;
     Py_ssize_t offset, size;
@@ -4799,7 +4821,17 @@ Array_item(PyObject *myself, Py_ssize_t index)
 }
 
 static PyObject *
-Array_subscript(PyObject *myself, PyObject *item)
+Array_item(PyObject *myself, Py_ssize_t index)
+{
+    PyObject *res;
+    Py_BEGIN_CRITICAL_SECTION(myself);
+    res = _Array_item_lock_held(myself, index);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
+
+static PyObject *
+_Array_subscript_lock_held(PyObject *myself, PyObject *item)
 {
     CDataObject *self = (CDataObject *)myself;
 
@@ -4852,12 +4884,10 @@ Array_subscript(PyObject *myself, PyObject *item)
             if (dest == NULL)
                 return PyErr_NoMemory();
 
-            Py_BEGIN_CRITICAL_SECTION(self);
             for (cur = start, i = 0; i < slicelen;
                  cur += step, i++) {
                 dest[i] = ptr[cur];
             }
-            Py_END_CRITICAL_SECTION();
 
             np = PyBytes_FromStringAndSize(dest, slicelen);
             PyMem_Free(dest);
@@ -4880,12 +4910,10 @@ Array_subscript(PyObject *myself, PyObject *item)
                 return NULL;
             }
 
-            Py_BEGIN_CRITICAL_SECTION(self);
             for (cur = start, i = 0; i < slicelen;
                  cur += step, i++) {
                 dest[i] = ptr[cur];
             }
-            Py_END_CRITICAL_SECTION();
 
             np = PyUnicode_FromWideChar(dest, slicelen);
             PyMem_Free(dest);
@@ -4915,8 +4943,18 @@ Array_subscript(PyObject *myself, PyObject *item)
 
 }
 
+static PyObject *
+Array_subscript(PyObject *myself, PyObject *item)
+{
+    PyObject *res;
+    Py_BEGIN_CRITICAL_SECTION(myself);
+    res = _Array_subscript_lock_held(myself, item);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
+
 static int
-Array_ass_item(PyObject *myself, Py_ssize_t index, PyObject *value)
+_Array_ass_item_lock_held(PyObject *myself, Py_ssize_t index, PyObject *value)
 {
     CDataObject *self = (CDataObject *)myself;
     Py_ssize_t size, offset;
@@ -4950,7 +4988,17 @@ Array_ass_item(PyObject *myself, Py_ssize_t index, PyObject *value)
 }
 
 static int
-Array_ass_subscript(PyObject *myself, PyObject *item, PyObject *value)
+Array_ass_item(PyObject *myself, Py_ssize_t index, PyObject *value)
+{
+    int res;
+    Py_BEGIN_CRITICAL_SECTION2(myself, value);
+    res = _Array_ass_item_lock_held(myself, index, value);
+    Py_END_CRITICAL_SECTION2();
+    return res;
+}
+
+static int
+_Array_ass_subscript_lock_held(PyObject *myself, PyObject *item, PyObject *value)
 {
     CDataObject *self = (CDataObject *)myself;
 
@@ -5006,11 +5054,25 @@ Array_ass_subscript(PyObject *myself, PyObject *item, PyObject *value)
     }
 }
 
+static int
+Array_ass_subscript(PyObject *myself, PyObject *item, PyObject *value)
+{
+    int res;
+    Py_BEGIN_CRITICAL_SECTION2(myself, value);
+    res = _Array_ass_subscript_lock_held(myself, item, value);
+    Py_END_CRITICAL_SECTION2();
+    return res;
+}
+
 static Py_ssize_t
 Array_length(PyObject *myself)
 {
     CDataObject *self = (CDataObject *)myself;
-    return self->b_length;
+    Py_ssize_t length;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    length = self->b_length;
+    Py_END_CRITICAL_SECTION();
+    return length;
 }
 
 static PyMethodDef Array_methods[] = {
@@ -5121,12 +5183,19 @@ PyCArrayType_from_ctype(ctypes_state *st, PyObject *itemtype, Py_ssize_t length)
 */
 
 /*[clinic input]
-class _ctypes.Simple "PyObject *" "clinic_state()->Simple_Type"
+class _ctypes.Simple "CDataObject *" "clinic_state()->Simple_Type"
 [clinic start generated code]*/
-/*[clinic end generated code: output=da39a3ee5e6b4b0d input=016c476c7aa8b8a8]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=e0493451fecf8cd4]*/
+
+/*[clinic input]
+@setter
+@critical_section
+_ctypes.Simple.value
+[clinic start generated code]*/
 
 static int
-Simple_set_value(CDataObject *self, PyObject *value, void *Py_UNUSED(ignored))
+_ctypes_Simple_value_set_impl(CDataObject *self, PyObject *value)
+/*[clinic end generated code: output=f267186118939863 input=b937ff506eb9539d]*/
 {
     PyObject *result;
 
@@ -5159,12 +5228,21 @@ Simple_init(CDataObject *self, PyObject *args, PyObject *kw)
     if (!PyArg_UnpackTuple(args, "__init__", 0, 1, &value))
         return -1;
     if (value)
-        return Simple_set_value(self, value, NULL);
+        return _ctypes_Simple_value_set_impl(self, value);
     return 0;
 }
 
+/*[clinic input]
+@getter
+@critical_section
+_ctypes.Simple.value
+
+current value
+[clinic start generated code]*/
+
 static PyObject *
-Simple_get_value(CDataObject *self, void *Py_UNUSED(ignored))
+_ctypes_Simple_value_get_impl(CDataObject *self)
+/*[clinic end generated code: output=ce5a26570830a243 input=ee19623e0ca53be8]*/
 {
     ctypes_state *st = get_module_state_by_def(Py_TYPE(Py_TYPE(self)));
     StgInfo *info;
@@ -5177,8 +5255,7 @@ Simple_get_value(CDataObject *self, void *Py_UNUSED(ignored))
 }
 
 static PyGetSetDef Simple_getsets[] = {
-    { "value", (getter)Simple_get_value, (setter)Simple_set_value,
-      "current value", NULL },
+    _CTYPES_SIMPLE_VALUE_GETSETDEF
     { NULL, NULL }
 };
 
@@ -5199,7 +5276,7 @@ Simple_from_outparm_impl(PyObject *self, PyTypeObject *cls)
         return Py_NewRef(self);
     }
     /* call stginfo->getfunc */
-    return Simple_get_value((CDataObject *)self, NULL);
+    return _ctypes_Simple_value_get((CDataObject *)self, NULL);
 }
 
 static PyMethodDef Simple_methods[] = {
@@ -5263,7 +5340,7 @@ static PyType_Spec pycsimple_spec = {
   PyCPointer_Type
 */
 static PyObject *
-Pointer_item(PyObject *myself, Py_ssize_t index)
+_Pointer_item_lock_held(PyObject *myself, Py_ssize_t index)
 {
     CDataObject *self = (CDataObject *)myself;
     Py_ssize_t size;
@@ -5300,8 +5377,18 @@ Pointer_item(PyObject *myself, Py_ssize_t index)
                      index, size, (*(char **)self->b_ptr) + offset);
 }
 
+static PyObject *
+Pointer_item(PyObject *myself, Py_ssize_t index)
+{
+    PyObject *res;
+    Py_BEGIN_CRITICAL_SECTION(myself);
+    res = _Pointer_item_lock_held(myself, index);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
+
 static int
-Pointer_ass_item(PyObject *myself, Py_ssize_t index, PyObject *value)
+_Pointer_ass_item_lock_held(PyObject *myself, Py_ssize_t index, PyObject *value)
 {
     CDataObject *self = (CDataObject *)myself;
     Py_ssize_t size;
@@ -5344,8 +5431,26 @@ Pointer_ass_item(PyObject *myself, Py_ssize_t index, PyObject *value)
                      index, size, (*(char **)self->b_ptr) + offset);
 }
 
+static int
+Pointer_ass_item(PyObject *myself, Py_ssize_t index, PyObject *value)
+{
+    int res;
+    Py_BEGIN_CRITICAL_SECTION2(myself, value);
+    res = _Pointer_ass_item_lock_held(myself, index, value);
+    Py_END_CRITICAL_SECTION2();
+    return res;
+}
+/*[clinic input]
+@getter
+@critical_section
+_ctypes._Pointer.contents
+
+the object this pointer points to (read-write)
+[clinic start generated code]*/
+
 static PyObject *
-Pointer_get_contents(CDataObject *self, void *closure)
+_ctypes__Pointer_contents_get_impl(CDataObject *self)
+/*[clinic end generated code: output=e13e2c529f34d93c input=afc906566a71626a]*/
 {
     if (*(void **)self->b_ptr == NULL) {
         PyErr_SetString(PyExc_ValueError,
@@ -5365,8 +5470,15 @@ Pointer_get_contents(CDataObject *self, void *closure)
                              *(void **)self->b_ptr);
 }
 
+/*[clinic input]
+@setter
+@critical_section
+_ctypes._Pointer.contents
+[clinic start generated code]*/
+
 static int
-Pointer_set_contents(CDataObject *self, PyObject *value, void *closure)
+_ctypes__Pointer_contents_set_impl(CDataObject *self, PyObject *value)
+/*[clinic end generated code: output=23c29d8b8b844a79 input=ba9e7013533f400c]*/
 {
     CDataObject *dst;
     PyObject *keep;
@@ -5396,8 +5508,10 @@ Pointer_set_contents(CDataObject *self, PyObject *value, void *closure)
         }
     }
 
+    Py_BEGIN_CRITICAL_SECTION(value);
     dst = (CDataObject *)value;
     *(void **)self->b_ptr = dst->b_ptr;
+    Py_END_CRITICAL_SECTION();
 
     /*
        A Pointer instance must keep the value it points to alive.  So, a
@@ -5417,9 +5531,7 @@ Pointer_set_contents(CDataObject *self, PyObject *value, void *closure)
 }
 
 static PyGetSetDef Pointer_getsets[] = {
-    { "contents", (getter)Pointer_get_contents,
-      (setter)Pointer_set_contents,
-      "the object this pointer points to (read-write)", NULL },
+    _CTYPES__POINTER_CONTENTS_GETSETDEF
     { NULL, NULL }
 };
 
@@ -5452,7 +5564,7 @@ Pointer_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 }
 
 static PyObject *
-Pointer_subscript(PyObject *myself, PyObject *item)
+_Pointer_subscript_lock_held(PyObject *myself, PyObject *item)
 {
     CDataObject *self = (CDataObject *)myself;
     if (PyIndex_Check(item)) {
@@ -5544,11 +5656,9 @@ Pointer_subscript(PyObject *myself, PyObject *item)
             dest = (char *)PyMem_Malloc(len);
             if (dest == NULL)
                 return PyErr_NoMemory();
-            Py_BEGIN_CRITICAL_SECTION(self);
             for (cur = start, i = 0; i < len; cur += step, i++) {
                 dest[i] = ptr[cur];
             }
-            Py_END_CRITICAL_SECTION();
             np = PyBytes_FromStringAndSize(dest, len);
             PyMem_Free(dest);
             return np;
@@ -5590,11 +5700,26 @@ Pointer_subscript(PyObject *myself, PyObject *item)
         return NULL;
     }
 }
+static PyObject *
+Pointer_subscript(PyObject *myself, PyObject *item)
+{
+    PyObject *res;
+    /* _Pointer_subscript is doing some shady things
+     * with the item, let's lock it to be safe. */
+    Py_BEGIN_CRITICAL_SECTION2(myself, item);
+    res = _Pointer_subscript_lock_held(myself, item);
+    Py_END_CRITICAL_SECTION2();
+    return res;
+}
 
 static int
 Pointer_bool(CDataObject *self)
 {
-    return (*(void **)self->b_ptr != NULL);
+    int res;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    res = (*(void **)self->b_ptr != NULL);
+    Py_END_CRITICAL_SECTION();
+    return res;
 }
 
 static PyType_Slot pycpointer_slots[] = {
@@ -5747,7 +5872,7 @@ cast_check_pointertype(ctypes_state *st, PyObject *arg)
 }
 
 static PyObject *
-cast(void *ptr, PyObject *src, PyObject *ctype)
+_cast(void *ptr, PyObject *src, PyObject *ctype)
 {
     PyObject *mod = PyType_GetModuleByDef(Py_TYPE(ctype), &_ctypesmodule);
     if (!mod) {
@@ -5811,6 +5936,15 @@ cast(void *ptr, PyObject *src, PyObject *ctype)
     return NULL;
 }
 
+static PyObject *
+cast(void *ptr, PyObject *src, PyObject *ctype)
+{
+    PyObject *res;
+    Py_BEGIN_CRITICAL_SECTION(src);
+    res = _cast(ptr, src, ctype);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
 
 static PyObject *
 wstring_at(const wchar_t *ptr, int size)

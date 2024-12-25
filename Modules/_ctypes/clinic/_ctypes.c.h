@@ -773,6 +773,63 @@ _ctypes_CFuncPtr_argtypes_get(PyCFuncPtrObject *self, void *Py_UNUSED(context))
     return return_value;
 }
 
+#if !defined(_ctypes_Simple_value_DOCSTR)
+#  define _ctypes_Simple_value_DOCSTR NULL
+#endif
+#if defined(_CTYPES_SIMPLE_VALUE_GETSETDEF)
+#  undef _CTYPES_SIMPLE_VALUE_GETSETDEF
+#  define _CTYPES_SIMPLE_VALUE_GETSETDEF {"value", (getter)_ctypes_Simple_value_get, (setter)_ctypes_Simple_value_set, _ctypes_Simple_value_DOCSTR},
+#else
+#  define _CTYPES_SIMPLE_VALUE_GETSETDEF {"value", NULL, (setter)_ctypes_Simple_value_set, NULL},
+#endif
+
+static int
+_ctypes_Simple_value_set_impl(CDataObject *self, PyObject *value);
+
+static int
+_ctypes_Simple_value_set(CDataObject *self, PyObject *value, void *Py_UNUSED(context))
+{
+    int return_value;
+
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _ctypes_Simple_value_set_impl(self, value);
+    Py_END_CRITICAL_SECTION();
+
+    return return_value;
+}
+
+PyDoc_STRVAR(_ctypes_Simple_value__doc__,
+"current value");
+#if defined(_ctypes_Simple_value_DOCSTR)
+#   undef _ctypes_Simple_value_DOCSTR
+#endif
+#define _ctypes_Simple_value_DOCSTR _ctypes_Simple_value__doc__
+
+#if !defined(_ctypes_Simple_value_DOCSTR)
+#  define _ctypes_Simple_value_DOCSTR NULL
+#endif
+#if defined(_CTYPES_SIMPLE_VALUE_GETSETDEF)
+#  undef _CTYPES_SIMPLE_VALUE_GETSETDEF
+#  define _CTYPES_SIMPLE_VALUE_GETSETDEF {"value", (getter)_ctypes_Simple_value_get, (setter)_ctypes_Simple_value_set, _ctypes_Simple_value_DOCSTR},
+#else
+#  define _CTYPES_SIMPLE_VALUE_GETSETDEF {"value", (getter)_ctypes_Simple_value_get, NULL, _ctypes_Simple_value_DOCSTR},
+#endif
+
+static PyObject *
+_ctypes_Simple_value_get_impl(CDataObject *self);
+
+static PyObject *
+_ctypes_Simple_value_get(CDataObject *self, void *Py_UNUSED(context))
+{
+    PyObject *return_value = NULL;
+
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _ctypes_Simple_value_get_impl(self);
+    Py_END_CRITICAL_SECTION();
+
+    return return_value;
+}
+
 PyDoc_STRVAR(Simple_from_outparm__doc__,
 "__ctypes_from_outparam__($self, /)\n"
 "--\n"
@@ -793,4 +850,61 @@ Simple_from_outparm(PyObject *self, PyTypeObject *cls, PyObject *const *args, Py
     }
     return Simple_from_outparm_impl(self, cls);
 }
-/*[clinic end generated code: output=cb3583522a2c5ce5 input=a9049054013a1b77]*/
+
+PyDoc_STRVAR(_ctypes__Pointer_contents__doc__,
+"the object this pointer points to (read-write)");
+#if defined(_ctypes__Pointer_contents_DOCSTR)
+#   undef _ctypes__Pointer_contents_DOCSTR
+#endif
+#define _ctypes__Pointer_contents_DOCSTR _ctypes__Pointer_contents__doc__
+
+#if !defined(_ctypes__Pointer_contents_DOCSTR)
+#  define _ctypes__Pointer_contents_DOCSTR NULL
+#endif
+#if defined(_CTYPES__POINTER_CONTENTS_GETSETDEF)
+#  undef _CTYPES__POINTER_CONTENTS_GETSETDEF
+#  define _CTYPES__POINTER_CONTENTS_GETSETDEF {"contents", (getter)_ctypes__Pointer_contents_get, (setter)_ctypes__Pointer_contents_set, _ctypes__Pointer_contents_DOCSTR},
+#else
+#  define _CTYPES__POINTER_CONTENTS_GETSETDEF {"contents", (getter)_ctypes__Pointer_contents_get, NULL, _ctypes__Pointer_contents_DOCSTR},
+#endif
+
+static PyObject *
+_ctypes__Pointer_contents_get_impl(CDataObject *self);
+
+static PyObject *
+_ctypes__Pointer_contents_get(CDataObject *self, void *Py_UNUSED(context))
+{
+    PyObject *return_value = NULL;
+
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _ctypes__Pointer_contents_get_impl(self);
+    Py_END_CRITICAL_SECTION();
+
+    return return_value;
+}
+
+#if !defined(_ctypes__Pointer_contents_DOCSTR)
+#  define _ctypes__Pointer_contents_DOCSTR NULL
+#endif
+#if defined(_CTYPES__POINTER_CONTENTS_GETSETDEF)
+#  undef _CTYPES__POINTER_CONTENTS_GETSETDEF
+#  define _CTYPES__POINTER_CONTENTS_GETSETDEF {"contents", (getter)_ctypes__Pointer_contents_get, (setter)_ctypes__Pointer_contents_set, _ctypes__Pointer_contents_DOCSTR},
+#else
+#  define _CTYPES__POINTER_CONTENTS_GETSETDEF {"contents", NULL, (setter)_ctypes__Pointer_contents_set, NULL},
+#endif
+
+static int
+_ctypes__Pointer_contents_set_impl(CDataObject *self, PyObject *value);
+
+static int
+_ctypes__Pointer_contents_set(CDataObject *self, PyObject *value, void *Py_UNUSED(context))
+{
+    int return_value;
+
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _ctypes__Pointer_contents_set_impl(self, value);
+    Py_END_CRITICAL_SECTION();
+
+    return return_value;
+}
+/*[clinic end generated code: output=37d4377c19b9f300 input=a9049054013a1b77]*/
