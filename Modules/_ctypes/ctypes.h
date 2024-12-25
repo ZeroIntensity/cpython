@@ -161,7 +161,36 @@ struct tagCDataObject {
                                b_object list */
     PyObject *b_objects;        /* dictionary of references we need to keep, or Py_None */
     union value b_value;
+#ifdef Py_GIL_DISABLED
+    PyMutex lock;               /* lock for reads and writes to the memory */
+#endif
 };
+
+#ifdef Py_GIL_DISABLED
+#  define LOCK_CDATA(cdata) PyMutex_Lock(&cdata->lock)
+#  define UNLOCK_CDATA(cdata) PyMutex_Unlock(&cdata->lock);
+#else
+#  define LOCK_CDATA(cdata)
+#  define UNLOCK_CDATA(cdata)
+#endif
+
+/* atomic memcpy() to cdata->b_ptr from src */
+static inline void
+locked_memcpy_to(CDataObject *dest, const void *src, Py_ssize_t size)
+{
+    LOCK_CDATA(dest);
+    memcpy(dest->b_ptr, src, size);
+    UNLOCK_CDATA(dest);
+}
+
+/* atomic memcpy() from cdata->b_ptr to dest */
+static inline void
+locked_memcpy_from(void *dest, CDataObject *src, Py_ssize_t size)
+{
+    LOCK_CDATA(dest);
+    memcpy(dest, src->b_ptr, size);
+    UNLOCK_CDATA(dest);
+}
 
 typedef struct {
     PyObject_VAR_HEAD
