@@ -68,6 +68,10 @@ extern PyTypeObject _PyCoroWrapper_Type;
 extern PyTypeObject _PyAsyncGenWrappedValue_Type;
 extern PyTypeObject _PyAsyncGenAThrow_Type;
 
+// Export for '_types' shared extension
+PyAPI_FUNC(PyCodeObject *)
+_PyGen_GetCode(PyGenObject *gen);
+
 #ifdef __cplusplus
 }
 #endif

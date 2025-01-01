@@ -39,7 +39,7 @@ static const char *ASYNC_GEN_IGNORED_EXIT_MSG =
                                  "async generator ignored GeneratorExit";
 
 /* Returns a borrowed reference */
-static inline PyCodeObject *
+PyCodeObject *
 _PyGen_GetCode(PyGenObject *gen) {
     return _PyFrame_GetCode(&gen->gi_iframe);
 }
