@@ -230,6 +230,55 @@ _types_resolve_bases_impl(PyObject *module, PyObject *bases)
     return new_bases;
 }
 
+/*[clinic input]
+_types.get_original_bases
+
+    cls: object(subclass_of="type")
+
+Return the class's "original" bases prior to modification by `__mro_entries__`.
+
+Examples::
+
+    from typing import TypeVar, Generic, NamedTuple, TypedDict
+
+    T = TypeVar("T")
+    class Foo(Generic[T]): ...
+    class Bar(Foo[int], float): ...
+    class Baz(list[str]): ...
+    Eggs = NamedTuple("Eggs", [("a", int), ("b", str)])
+    Spam = TypedDict("Spam", {"a": int, "b": str})
+
+    assert get_original_bases(Bar) == (Foo[int], float)
+    assert get_original_bases(Baz) == (list[str],)
+    assert get_original_bases(Eggs) == (NamedTuple,)
+    assert get_original_bases(Spam) == (TypedDict,)
+    assert get_original_bases(int) == (object,)
+[clinic start generated code]*/
+
+static PyObject *
+_types_get_original_bases_impl(PyObject *module, PyObject *cls)
+/*[clinic end generated code: output=f42e23aec2fb73a9 input=f2159580e0385a5b]*/
+{
+    PyObject *orig_bases;
+    if (PyObject_GetOptionalAttrString(cls, "__orig_bases__", &orig_bases) < 0)
+    {
+        return NULL;
+    }
+
+    if (orig_bases != NULL)
+    {
+        return orig_bases;
+    }
+
+    PyObject *bases;
+    if (PyObject_GetOptionalAttr(cls, &_Py_ID(__bases__), &bases) < 0)
+    {
+        return NULL;
+    }
+
+    return bases;
+}
+
 static int
 types_exec(PyObject *mod)
 {
@@ -317,6 +366,7 @@ types_exec(PyObject *mod)
 static struct PyMethodDef types_methods[] = {
     _TYPES_COROUTINE_METHODDEF
     _TYPES_RESOLVE_BASES_METHODDEF
+    _TYPES_GET_ORIGINAL_BASES_METHODDEF
     {NULL, NULL}
 };
 
