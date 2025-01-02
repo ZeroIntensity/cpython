@@ -128,6 +128,108 @@ _types_coroutine_impl(PyObject *module, PyObject *func)
     return PyCFunction_New((PyMethodDef *)&wrapped_decorator_md, func);
 }
 
+/*[clinic input]
+_types.resolve_bases
+
+    bases: object
+
+Resolve MRO entries dynamically as specified by PEP 560.
+[clinic start generated code]*/
+
+static PyObject *
+_types_resolve_bases_impl(PyObject *module, PyObject *bases)
+/*[clinic end generated code: output=4f8e2e4bfdaeba2e input=84fbb8401697b712]*/
+{
+    PyObject *iterator = PyObject_GetIter(bases);
+    if (iterator == NULL)
+    {
+        return NULL;
+    }
+    Py_ssize_t shift = 0;
+    Py_ssize_t index = -1;
+    /* Optimization: lazily initialize the list */
+    PyObject *new_bases = NULL;
+
+    PyObject *item;
+    while (PyIter_NextItem(iterator, &item))
+    {
+        ++index;
+        if (item == NULL)
+        {
+            Py_DECREF(iterator);
+            Py_XDECREF(new_bases);
+            return NULL;
+        }
+
+        if (PyType_Check(item))
+        {
+            continue;
+        }
+
+        PyObject *mro_entries;
+        if (PyObject_GetOptionalAttr(item, &_Py_ID(__mro_entries__), &mro_entries) < 0)
+        {
+            Py_DECREF(iterator);
+            Py_XDECREF(new_bases);
+            return NULL;
+        }
+
+        if (mro_entries == NULL)
+        {
+            continue;
+        }
+
+        PyObject *new_base = PyObject_CallOneArg(mro_entries, bases);
+        Py_DECREF(mro_entries);
+        if (new_base == NULL)
+        {
+            Py_DECREF(iterator);
+            Py_XDECREF(new_bases);
+            return NULL;
+        }
+
+        if (!PyTuple_Check(new_base))
+        {
+            Py_DECREF(iterator);
+            Py_XDECREF(new_bases);
+            Py_DECREF(new_base);
+            PyErr_SetString(PyExc_TypeError,
+                            "__mro_entries__ must return a tuple");
+            return NULL;
+        }
+
+        if (new_bases == NULL)
+        {
+            new_bases = PyObject_CallOneArg((PyObject *)&PyList_Type, bases);
+            if (new_bases == NULL)
+            {
+                Py_DECREF(iterator);
+                Py_DECREF(new_base);
+                return NULL;
+            }
+        }
+
+        assert(new_bases != NULL);
+        if (PyList_SetSlice(new_bases, index + shift, index + shift + 1, new_base) < 0)
+        {
+            Py_DECREF(iterator);
+            Py_DECREF(new_bases);
+            Py_DECREF(new_base);
+            return NULL;
+        }
+        Py_DECREF(new_base);
+    }
+    Py_DECREF(iterator);
+    assert(!PyErr_Occurred());
+
+    if (new_bases == NULL)
+    {
+        return Py_NewRef(bases);
+    }
+
+    return new_bases;
+}
+
 static int
 types_exec(PyObject *mod)
 {
@@ -214,6 +316,7 @@ types_exec(PyObject *mod)
 
 static struct PyMethodDef types_methods[] = {
     _TYPES_COROUTINE_METHODDEF
+    _TYPES_RESOLVE_BASES_METHODDEF
     {NULL, NULL}
 };
 

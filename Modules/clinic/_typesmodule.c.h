@@ -63,4 +63,60 @@ _types_coroutine(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyOb
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=7a0cf9b143f09f86 input=a9049054013a1b77]*/
+
+PyDoc_STRVAR(_types_resolve_bases__doc__,
+"resolve_bases($module, /, bases)\n"
+"--\n"
+"\n"
+"Resolve MRO entries dynamically as specified by PEP 560.");
+
+#define _TYPES_RESOLVE_BASES_METHODDEF    \
+    {"resolve_bases", _PyCFunction_CAST(_types_resolve_bases), METH_FASTCALL|METH_KEYWORDS, _types_resolve_bases__doc__},
+
+static PyObject *
+_types_resolve_bases_impl(PyObject *module, PyObject *bases);
+
+static PyObject *
+_types_resolve_bases(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    #if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+
+    #define NUM_KEYWORDS 1
+    static struct {
+        PyGC_Head _this_is_not_used;
+        PyObject_VAR_HEAD
+        PyObject *ob_item[NUM_KEYWORDS];
+    } _kwtuple = {
+        .ob_base = PyVarObject_HEAD_INIT(&PyTuple_Type, NUM_KEYWORDS)
+        .ob_item = { &_Py_ID(bases), },
+    };
+    #undef NUM_KEYWORDS
+    #define KWTUPLE (&_kwtuple.ob_base.ob_base)
+
+    #else  // !Py_BUILD_CORE
+    #  define KWTUPLE NULL
+    #endif  // !Py_BUILD_CORE
+
+    static const char * const _keywords[] = {"bases", NULL};
+    static _PyArg_Parser _parser = {
+        .keywords = _keywords,
+        .fname = "resolve_bases",
+        .kwtuple = KWTUPLE,
+    };
+    #undef KWTUPLE
+    PyObject *argsbuf[1];
+    PyObject *bases;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser,
+            /*minpos*/ 1, /*maxpos*/ 1, /*minkw*/ 0, /*varpos*/ 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    bases = args[0];
+    return_value = _types_resolve_bases_impl(module, bases);
+
+exit:
+    return return_value;
+}
+/*[clinic end generated code: output=11cf11df2d120aca input=a9049054013a1b77]*/
