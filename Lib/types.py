@@ -78,6 +78,54 @@ except ImportError:
             return type(_socket.CAPI)
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
+    def resolve_bases(bases):
+        """Resolve MRO entries dynamically as specified by PEP 560."""
+        new_bases = list(bases)
+        updated = False
+        shift = 0
+        for i, base in enumerate(bases):
+            if isinstance(base, type):
+                continue
+            if not hasattr(base, "__mro_entries__"):
+                continue
+            new_base = base.__mro_entries__(bases)
+            updated = True
+            if not isinstance(new_base, tuple):
+                raise TypeError("__mro_entries__ must return a tuple")
+            else:
+                new_bases[i+shift:i+shift+1] = new_base
+                shift += len(new_base) - 1
+        if not updated:
+            return bases
+        return tuple(new_bases)
+
+    def get_original_bases(cls, /):
+        """Return the class's "original" bases prior to modification by `__mro_entries__`.
+
+        Examples::
+
+            from typing import TypeVar, Generic, NamedTuple, TypedDict
+
+            T = TypeVar("T")
+            class Foo(Generic[T]): ...
+            class Bar(Foo[int], float): ...
+            class Baz(list[str]): ...
+            Eggs = NamedTuple("Eggs", [("a", int), ("b", str)])
+            Spam = TypedDict("Spam", {"a": int, "b": str})
+
+            assert get_original_bases(Bar) == (Foo[int], float)
+            assert get_original_bases(Baz) == (list[str],)
+            assert get_original_bases(Eggs) == (NamedTuple,)
+            assert get_original_bases(Spam) == (TypedDict,)
+            assert get_original_bases(int) == (object,)
+        """
+        try:
+            return cls.__dict__.get("__orig_bases__", cls.__bases__)
+        except AttributeError:
+            raise TypeError(
+                f"Expected an instance of type, not {type(cls).__name__!r}"
+            ) from None
+
 # Provide a PEP 3115 compliant mechanism for class creation
 def new_class(name, bases=(), kwds=None, exec_body=None):
     """Create a class object dynamically using the appropriate metaclass."""
@@ -88,27 +136,6 @@ def new_class(name, bases=(), kwds=None, exec_body=None):
     if resolved_bases is not bases:
         ns['__orig_bases__'] = bases
     return meta(name, resolved_bases, ns, **kwds)
-
-def resolve_bases(bases):
-    """Resolve MRO entries dynamically as specified by PEP 560."""
-    new_bases = list(bases)
-    updated = False
-    shift = 0
-    for i, base in enumerate(bases):
-        if isinstance(base, type):
-            continue
-        if not hasattr(base, "__mro_entries__"):
-            continue
-        new_base = base.__mro_entries__(bases)
-        updated = True
-        if not isinstance(new_base, tuple):
-            raise TypeError("__mro_entries__ must return a tuple")
-        else:
-            new_bases[i+shift:i+shift+1] = new_base
-            shift += len(new_base) - 1
-    if not updated:
-        return bases
-    return tuple(new_bases)
 
 def prepare_class(name, bases=(), kwds=None):
     """Call the __prepare__ method of the appropriate metaclass.
@@ -158,35 +185,6 @@ def _calculate_meta(meta, bases):
                         "must be a (non-strict) subclass "
                         "of the metaclasses of all its bases")
     return winner
-
-
-def get_original_bases(cls, /):
-    """Return the class's "original" bases prior to modification by `__mro_entries__`.
-
-    Examples::
-
-        from typing import TypeVar, Generic, NamedTuple, TypedDict
-
-        T = TypeVar("T")
-        class Foo(Generic[T]): ...
-        class Bar(Foo[int], float): ...
-        class Baz(list[str]): ...
-        Eggs = NamedTuple("Eggs", [("a", int), ("b", str)])
-        Spam = TypedDict("Spam", {"a": int, "b": str})
-
-        assert get_original_bases(Bar) == (Foo[int], float)
-        assert get_original_bases(Baz) == (list[str],)
-        assert get_original_bases(Eggs) == (NamedTuple,)
-        assert get_original_bases(Spam) == (TypedDict,)
-        assert get_original_bases(int) == (object,)
-    """
-    try:
-        return cls.__dict__.get("__orig_bases__", cls.__bases__)
-    except AttributeError:
-        raise TypeError(
-            f"Expected an instance of type, not {type(cls).__name__!r}"
-        ) from None
-
 
 class DynamicClassAttribute:
     """Route attribute access on a class to __getattr__.
