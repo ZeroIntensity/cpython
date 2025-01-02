@@ -5,7 +5,10 @@
 #endif
 
 #include "Python.h"
-#include "pycore_genobject.h"
+#include "pycore_descrobject.h" // _PyMethodWrapper_Type
+#include "pycore_genobject.h"   // _PyGen_GetCode
+#include "pycore_object.h"      // _PyNone_Type, _PyNotImplemented_Type
+#include "pycore_unionobject.h" // _PyUnion_Type
 
 /*[clinic input]
 module _types
@@ -125,12 +128,97 @@ _types_coroutine_impl(PyObject *module, PyObject *func)
     return PyCFunction_New((PyMethodDef *)&wrapped_decorator_md, func);
 }
 
+static int
+types_exec(PyObject *mod)
+{
+    if (PyModule_AddObjectRef(mod, "FunctionType", (PyObject *)&PyFunction_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "CodeType", (PyObject *)&PyCode_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "CodeType", (PyObject *)&PyCode_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "MappingProxyType", (PyObject *)&PyDictProxy_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "CellType", (PyObject *)&PyCell_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "GeneratorType", (PyObject *)&PyGen_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "CoroutineType", (PyObject *)&PyCoro_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "AsyncGeneratorType", (PyObject *)&PyAsyncGen_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "MethodType", (PyObject *)&PyMethod_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "BuiltinFunctionType", (PyObject *)&PyCMethod_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "BuiltinMethodType", (PyObject *)&PyCMethod_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "WrapperDescriptorType", (PyObject *)&PyWrapperDescr_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "MethodWrapperType", (PyObject *)&_PyMethodWrapper_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "MethodDescriptorType", (PyObject *)&PyMethodDescr_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "ClassMethodDescriptorType", (PyObject *)&PyClassMethodDescr_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "TracebackType", (PyObject *)&PyTraceBack_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "FrameType", (PyObject *)&PyFrame_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "GetSetDescriptorType", (PyObject *)&PyGetSetDescr_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "MemberDescriptorType", (PyObject *)&PyMemberDescr_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "ModuleType", (PyObject *)&PyModule_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "GenericAlias", (PyObject *)&Py_GenericAliasType) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "UnionType", (PyObject *)&_PyUnion_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "EllipsisType", (PyObject *)&PyEllipsis_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "NoneType", (PyObject *)&_PyNone_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "NotImplementedType", (PyObject *)&_PyNotImplemented_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "CapsuleType", (PyObject *)&PyCapsule_Type) < 0) {
+        return -1;
+    }
+    return 0;
+}
+
 static struct PyMethodDef types_methods[] = {
     _TYPES_COROUTINE_METHODDEF
     {NULL, NULL}
 };
 
 static PyModuleDef_Slot types_slots[] = {
+    {Py_mod_exec, types_exec},
     {Py_mod_multiple_interpreters, Py_MOD_PER_INTERPRETER_GIL_SUPPORTED},
     {Py_mod_gil, Py_MOD_GIL_NOT_USED},
     {0, NULL}

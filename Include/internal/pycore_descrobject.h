@@ -20,7 +20,8 @@ typedef struct {
 
 typedef propertyobject _PyPropertyObject;
 
-extern PyTypeObject _PyMethodWrapper_Type;
+// Export for '_types' shared extension
+PyAPI_DATA(PyTypeObject) _PyMethodWrapper_Type;
 
 #ifdef __cplusplus
 }
