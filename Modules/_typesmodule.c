@@ -190,6 +190,7 @@ const PyMethodDef wrapped_decorator_md = {
 };
 
 struct _GeneratorWrapper {
+    PyObject_HEAD;
     PyObject *wrapped;
     int isgen;
 };
@@ -254,6 +255,7 @@ static PyObject *
 generatorwrapper_new(PyTypeObject *tp, PyObject *args, PyObject *kwds)
 {
     // Note: args and kwds can be NULL if we call it ourselves
+    assert(tp != NULL);
     PyObject *self = tp->tp_alloc(tp, 0);
     if (self == NULL) {
         return PyErr_NoMemory();
@@ -279,8 +281,8 @@ static PyObject *
 generatorwrapper_fast_new(PyObject *self, PyObject *wrapped)
 {
     types_state *state = get_module_state(self);
-    assert(state->_GeneratorWrapper != NULL);
     PyTypeObject *tp = (PyTypeObject *)state->_GeneratorWrapper;
+    assert(tp != NULL);
     PyObject *obj = tp->tp_new(tp, NULL, NULL);
     if (obj == NULL) {
         return NULL;
