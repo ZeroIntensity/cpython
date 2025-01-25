@@ -1493,7 +1493,7 @@ class ClassCreationTests(unittest.TestCase):
             typing.TypedDict
         )
 
-        with self.assertRaisesRegex(TypeError, "Expected an instance of type"):
+        with self.assertRaisesRegex(TypeError, "argument 'cls' must be type, not object"):
             types.get_original_bases(object())
 
     # Many of the following tests are derived from test_descr.py

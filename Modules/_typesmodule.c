@@ -645,23 +645,23 @@ _types_get_original_bases_impl(PyObject *module, PyObject *cls)
 /*[clinic end generated code: output=f42e23aec2fb73a9 input=30e786bccf62cac8]*/
 {
     PyObject *orig_bases;
-    if (PyObject_GetOptionalAttrString(cls, "__orig_bases__", &orig_bases) < 0)
-    {
+    PyObject *dict = PyObject_GenericGetDict(cls, NULL);
+    if (dict == NULL) {
         return NULL;
     }
+
+    if (PyDict_GetItemStringRef(dict, "__orig_bases__", &orig_bases) < 0) {
+        Py_DECREF(dict);
+        return NULL;
+    }
+    Py_DECREF(dict);
 
     if (orig_bases != NULL)
     {
         return orig_bases;
     }
 
-    PyObject *bases;
-    if (PyObject_GetOptionalAttr(cls, &_Py_ID(__bases__), &bases) < 0)
-    {
-        return NULL;
-    }
-
-    return bases;
+    return PyObject_GetAttr(cls, &_Py_ID(__bases__));
 }
 
 static PyObject *
