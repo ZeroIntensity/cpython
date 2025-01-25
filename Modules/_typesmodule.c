@@ -644,6 +644,8 @@ static PyObject *
 _types_get_original_bases_impl(PyObject *module, PyObject *cls)
 /*[clinic end generated code: output=f42e23aec2fb73a9 input=30e786bccf62cac8]*/
 {
+    // Apparently, cls.__dict__['__orig_bases__'] can be different from
+    // cls.__orig_bases__. We want the former.
     PyObject *orig_bases;
     PyObject *dict = PyObject_GenericGetDict(cls, NULL);
     if (dict == NULL) {
