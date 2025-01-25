@@ -4,6 +4,7 @@ Define names for built-in types that aren't directly accessible as a builtin.
 
 try:
     from _types import *
+    from _types import _GeneratorWrapper
 except ImportError:
     # _types not available
     import sys

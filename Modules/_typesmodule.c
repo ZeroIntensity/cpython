@@ -456,7 +456,8 @@ static PyType_Slot GeneratorWrapper_Slots[] = {
 PyType_Spec _GeneratorWrapper_Spec = {
     .name = "types._GeneratorWrapper",
     .basicsize = sizeof(GeneratorWrapper),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+             Py_TPFLAGS_BASETYPE | Py_TPFLAGS_MANAGED_DICT,
     .slots = GeneratorWrapper_Slots,
 };
 
@@ -865,7 +866,7 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
     PyObject *ns = PyTuple_GET_ITEM(prepared_tuple, 1);
     PyObject *prep_kwds = PyTuple_GET_ITEM(prepared_tuple, 2);
 
-    if (exec_body != NULL) {
+    if (exec_body != NULL || exec_body == Py_None) {
         PyObject *res = PyObject_CallOneArg(exec_body, ns);
         Py_XDECREF(res);
         if (res == NULL) {
