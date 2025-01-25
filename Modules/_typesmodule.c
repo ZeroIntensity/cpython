@@ -240,6 +240,21 @@ static int generatorwrapper_fast_init(PyObject *self, PyObject *wrapped)
     return 0;
 }
 
+static PyObject *
+generatorwrapper_new(PyTypeObject *tp, PyObject *args, PyObject *kwds)
+{
+    // Note: args and kwds can be NULL if we call it ourselves
+    PyObject *self = tp->tp_alloc(tp, 0);
+    if (self == NULL) {
+        return PyErr_NoMemory();
+    }
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    gw->isgen = 0;
+    gw->wrapped = NULL;
+    PyObject_GC_Track(self);
+    return self;
+}
+
 static int
 generatorwrapper_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -423,6 +438,7 @@ static PyType_Slot GeneratorWrapper_Slots[] = {
     {Py_tp_iternext, generatorwrapper_next},
     {Py_tp_iter, generatorwrapper_iter},
     {Py_am_await, generatorwrapper_iter},
+    {Py_tp_new, generatorwrapper_new},
     {0, NULL}
 };
 
@@ -872,6 +888,26 @@ struct _DynamicClassAttribute {
     int is_abstract_method;
 };
 
+static PyObject *
+dynamicclassattribute_new(PyTypeObject *tp, PyObject *args, PyObject *kwds)
+{
+    // Note: args and kwds could be NULL if we initialize it ourselves
+    PyObject *self = tp->tp_alloc(tp, 0);
+    if (self == NULL) {
+        return PyErr_NoMemory();
+    }
+
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)self;
+    dca->fget = NULL;
+    dca->fset = NULL;
+    dca->fdel = NULL;
+    dca->doc = NULL;
+    dca->overwrite_doc = 0;
+    dca->is_abstract_method = 0;
+    PyObject_GC_Track(self);
+    return self;
+}
+
 static int
 dynamicclassattribute_build(DynamicClassAttribute *dca, PyObject *fget,
                             PyObject *fset, PyObject *fdel, PyObject *doc)
@@ -1136,6 +1172,7 @@ static PyMemberDef dynamicclassattribute_members[] = {
 };
 
 static PyType_Slot DynamicClassAttribute_Slots[] = {
+    {Py_tp_new, dynamicclassattribute_new},
     {Py_tp_init, dynamicclassattribute_init},
     {Py_tp_clear, dynamicclassattribute_clear},
     {Py_tp_traverse, dynamicclassattribute_traverse},
