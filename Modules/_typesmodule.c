@@ -21,7 +21,9 @@ class _types._GeneratorWrapper "GeneratorWrapper *" ""
 
 typedef struct {
     PyObject *DynamicClassAttribute;
-    PyObject *GeneratorWrapper;
+    PyObject *_GeneratorWrapper;
+    PyObject *_collections_abc_Coroutine;
+    PyObject *_collections_abc_Generator;
 } types_state;
 
 static types_state *
@@ -82,10 +84,44 @@ generator_as_coroutine(PyObject *func, PyCodeObject *code)
     return func_copy;
 }
 
-static PyObject *
-wrapped_decorator(PyObject *self, PyObject *args, PyObject *kwargs)
+static int
+init_state_collections(types_state *state)
 {
-    PyObject *coro = PyObject_Call(self, args, kwargs);
+    assert(state->_collections_abc_Generator == NULL);
+    assert(state->_collections_abc_Coroutine == NULL);
+    PyObject *_collections_abc = PyImport_ImportModule("_collections_abc");
+    if (_collections_abc == NULL) {
+        return -1;
+    }
+    PyObject *generator = PyObject_GetAttrString(_collections_abc, "Generator");
+    if (generator == NULL) {
+        Py_DECREF(_collections_abc);
+        return -1;
+    }
+    state->_collections_abc_Generator = generator;
+
+    PyObject *coroutine = PyObject_GetAttrString(_collections_abc, "Coroutine");
+    if (coroutine == NULL) {
+        Py_DECREF(_collections_abc);
+        return -1;
+    }
+
+    state->_collections_abc_Coroutine = coroutine;
+    Py_DECREF(_collections_abc);
+    return 0;
+}
+
+static PyObject *
+generatorwrapper_fast_new(PyObject *self, PyObject *wrapped);
+
+static PyObject *
+wrapped_decorator(PyObject *transport, PyObject *args, PyObject *kwargs)
+{
+    assert(PyTuple_CheckExact(transport));
+    PyObject *mod = PyTuple_GET_ITEM(transport, 0);
+    PyObject *func = PyTuple_GET_ITEM(transport, 1);
+
+    PyObject *coro = PyObject_Call(func, args, kwargs);
     if (coro == NULL)
     {
         return NULL;
@@ -105,10 +141,50 @@ wrapped_decorator(PyObject *self, PyObject *args, PyObject *kwargs)
         }
     }
 
+    types_state *state = get_module_state(mod);
+    if (state->_collections_abc_Generator == NULL)
+    {
+        if (init_state_collections(state) < 0)
+        {
+            Py_DECREF(coro);
+            return NULL;
+        }
+    }
+    assert(state->_collections_abc_Generator != NULL);
+    assert(state->_collections_abc_Coroutine != NULL);
+
+    int is_coroutine = PyObject_IsInstance(coro,
+                                           state->_collections_abc_Coroutine);
+    if (is_coroutine < 0) {
+        Py_DECREF(coro);
+        return NULL;
+    }
+
+    if (is_coroutine) {
+        return coro;
+    }
+
+    int is_generator = PyObject_IsInstance(coro,
+                                           state->_collections_abc_Generator);
+    if (is_generator < 0) {
+        Py_DECREF(coro);
+        return NULL;
+    }
+
+    if (is_generator) {
+        // Something that implements the generator protocol, but
+        // not the coroutine protocol. Wrap it.
+        PyObject *wrapped = generatorwrapper_fast_new(mod, coro);
+        Py_DECREF(coro);
+        return wrapped;
+    }
+
+    // No idea what it is, let it through
     return coro;
 }
 
 const PyMethodDef wrapped_decorator_md = {
+    .ml_name = "wrapped_decorator",
     .ml_meth = (PyCFunction)wrapped_decorator,
     .ml_flags = METH_VARARGS|METH_KEYWORDS
 };
@@ -135,12 +211,8 @@ static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
     return 0;
 }
 
-static int generatorwrapper_init(PyObject *self, PyObject *args, PyObject *kwds)
+static int generatorwrapper_fast_init(PyObject *self, PyObject *wrapped)
 {
-    PyObject *wrapped;
-    if (!PyArg_ParseTuple(args, "O", &wrapped)) {
-        return -1;
-    }
 
     if (copy_attribute(self, wrapped, &_Py_ID(__name__)) < 0) {
         return -1;
@@ -166,6 +238,35 @@ static int generatorwrapper_init(PyObject *self, PyObject *args, PyObject *kwds)
     gw->wrapped = Py_NewRef(wrapped);
     gw->isgen = PyGen_CheckExact(wrapped);
     return 0;
+}
+
+static int
+generatorwrapper_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *wrapped;
+    if (!PyArg_ParseTuple(args, "O", &wrapped)) {
+        return -1;
+    }
+
+    return generatorwrapper_fast_init(self, wrapped);
+}
+
+static PyObject *
+generatorwrapper_fast_new(PyObject *self, PyObject *wrapped)
+{
+    types_state *state = get_module_state(self);
+    assert(state->_GeneratorWrapper != NULL);
+    PyTypeObject *tp = (PyTypeObject *)state->_GeneratorWrapper;
+    PyObject *obj = tp->tp_new(tp, NULL, NULL);
+    if (obj == NULL) {
+        return NULL;
+    }
+    if (generatorwrapper_fast_init(obj, wrapped) < 0) {
+        Py_DECREF(obj);
+        return NULL;
+    }
+
+    return obj;
 }
 
 static int
@@ -325,7 +426,7 @@ static PyType_Slot GeneratorWrapper_Slots[] = {
     {0, NULL}
 };
 
-PyType_Spec GeneratorWrapper_Spec = {
+PyType_Spec _GeneratorWrapper_Spec = {
     .name = "types._GeneratorWrapper",
     .basicsize = sizeof(GeneratorWrapper),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE,
@@ -365,7 +466,17 @@ _types_coroutine_impl(PyObject *module, PyObject *func)
         }
     }
 
-    return PyCFunction_New((PyMethodDef *)&wrapped_decorator_md, func);
+    PyObject *transport = PyTuple_New(2);
+    if (transport == NULL)
+    {
+        return NULL;
+    }
+    PyTuple_SET_ITEM(transport, 0, Py_NewRef(module));
+    PyTuple_SET_ITEM(transport, 1, Py_NewRef(func));
+
+    PyObject *cfunc = PyCFunction_New((PyMethodDef *)&wrapped_decorator_md, transport);
+    Py_DECREF(transport);
+    return cfunc;
 }
 
 static int
@@ -1140,7 +1251,10 @@ types_exec(PyObject *mod)
     state->DynamicClassAttribute = name## Object                           \
 
     ADD_TYPE(DynamicClassAttribute);
+    ADD_TYPE(_GeneratorWrapper);
 #undef ADD_TYPE
+    state->_collections_abc_Generator = NULL;
+    state->_collections_abc_Coroutine = NULL;
 
     return 0;
 }
@@ -1162,13 +1276,44 @@ static PyModuleDef_Slot types_slots[] = {
     {0, NULL}
 };
 
+static int
+types_traverse(PyObject *mod, visitproc visit, void *arg)
+{
+    types_state *state = get_module_state(mod);
+    Py_VISIT(state->DynamicClassAttribute);
+    Py_VISIT(state->_GeneratorWrapper);
+    Py_VISIT(state->_collections_abc_Coroutine);
+    Py_VISIT(state->_collections_abc_Generator);
+    return 0;
+}
+
+static int
+types_clear(PyObject *mod)
+{
+    types_state *state = get_module_state(mod);
+    Py_CLEAR(state->DynamicClassAttribute);
+    Py_CLEAR(state->_GeneratorWrapper);
+    Py_CLEAR(state->_collections_abc_Coroutine);
+    Py_CLEAR(state->_collections_abc_Generator);
+    return 0;
+}
+
+static void
+types_free(void *mod)
+{
+    (void)types_clear(mod);
+}
+
 static PyModuleDef types_module = {
     .m_base = PyModuleDef_HEAD_INIT,
     .m_name = "_types",
     .m_doc = types__doc__,
     .m_methods = types_methods,
     .m_slots = types_slots,
-    .m_size = sizeof(types_state)
+    .m_size = sizeof(types_state),
+    .m_clear = types_clear,
+    .m_traverse = types_traverse,
+    .m_free = types_free
 };
 
 PyMODINIT_FUNC
