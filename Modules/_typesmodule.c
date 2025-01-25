@@ -508,7 +508,8 @@ _types_coroutine_impl(PyObject *module, PyObject *func)
 }
 
 static int
-resolve_bases_lock_held(PyObject *fast_bases, PyObject *new_bases, PyObject *bases)
+resolve_bases_lock_held(PyObject *fast_bases, PyObject *new_bases,
+                        PyObject *bases, int *updated)
 {
     assert(new_bases != NULL);
     assert(PyList_CheckExact(new_bases));
@@ -535,6 +536,7 @@ resolve_bases_lock_held(PyObject *fast_bases, PyObject *new_bases, PyObject *bas
             continue;
         }
 
+        *updated = 1;
         PyObject *new_base = PyObject_CallOneArg(mro_entries, bases);
         Py_DECREF(mro_entries);
         if (new_base == NULL) {
@@ -594,13 +596,18 @@ _types_resolve_bases_impl(PyObject *module, PyObject *bases)
         return NULL;
     }
 
+    int updated = 0;
     int res;
     Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(fast_bases);
-    res = resolve_bases_lock_held(fast_bases, new_bases, bases);
+    res = resolve_bases_lock_held(fast_bases, new_bases, bases, &updated);
     Py_END_CRITICAL_SECTION_SEQUENCE_FAST();
     if (res < 0) {
         Py_DECREF(new_bases);
         return NULL;
+    }
+    if (!updated) {
+        Py_DECREF(new_bases);
+        return Py_NewRef(bases);
     }
 
     PyObject *result = PyList_AsTuple(new_bases);
