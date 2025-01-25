@@ -802,7 +802,9 @@ _types_prepare_class_impl(PyObject *module, const char *name,
 
     PyObject *namespace;
     if (prepare != NULL) {
-        namespace = PyObject_VectorcallDict(prepare, (PyObject *[]) { name_str, bases }, 2, kwds);
+        namespace = PyObject_VectorcallDict(prepare,
+                                            (PyObject *[]) { name_str, bases },
+                                            2, kwds);
     }
     else {
         namespace = PyDict_New();
