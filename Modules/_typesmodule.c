@@ -196,9 +196,8 @@ struct _GeneratorWrapper {
 
 static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
 {
-    PyObject *attr;
-
-    if (PyObject_GetOptionalAttr(src, name, &attr) < 0) {
+    PyObject *attr = PyObject_GetAttr(src, name);
+    if (attr == NULL) {
         return -1;
     }
 
