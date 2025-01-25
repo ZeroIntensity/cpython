@@ -296,6 +296,59 @@ _types_get_original_bases_impl(PyObject *module, PyObject *cls)
     return bases;
 }
 
+
+/*[clinic input]
+_types._calculate_meta
+
+    meta: object(subclass_of="&PyType_Type"),
+    bases: object
+
+Calculate the most derived metaclass.
+[clinic start generated code]*/
+
+static PyObject *
+_types__calculate_meta_impl(PyObject *module, PyObject *meta,
+                            PyObject *bases)
+/*[clinic end generated code: output=28e8861429963892 input=e9e200da498b891e]*/
+
+/*[clinic input]
+_types.prepare_class
+
+    name: str,
+    bases: object = NULL
+    kwds: object = NULL
+
+Call the __prepare__ method of the appropriate metaclass.
+
+Returns (metaclass, namespace, kwds) as a 3-tuple
+*metaclass* is the appropriate metaclass
+*namespace* is the prepared class namespace
+*kwds* is an updated copy of the passed in kwds argument with any
+'metaclass' entry removed. If no kwds argument is passed in, this will
+be an empty dict.
+[clinic start generated code]*/
+
+static PyObject *
+_types_prepare_class_impl(PyObject *module, const char *name,
+                          PyObject *bases, PyObject *kwds)
+/*[clinic end generated code: output=fd787fbe110b28fd input=360e666a1295e075]*/
+
+/*[clinic input]
+_types.new_class
+
+    name: str
+    bases: object = NULL
+    kwds: object = NULL
+    exec_body: object = NULL
+
+Create a class object dynamically using the appropriate metaclass.
+[clinic start generated code]*/
+
+static PyObject *
+_types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
+                      PyObject *kwds, PyObject *exec_body)
+/*[clinic end generated code: output=0d1cb5e70abb6971 input=312127772876125b]*/
+
 struct _DynamicClassAttribute {
     PyObject_HEAD;
     PyObject *fget;
