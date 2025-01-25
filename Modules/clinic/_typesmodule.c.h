@@ -6,6 +6,7 @@ preserve
 #  include "pycore_gc.h"          // PyGC_Head
 #  include "pycore_runtime.h"     // _Py_ID()
 #endif
+#include "pycore_critical_section.h"// Py_BEGIN_CRITICAL_SECTION()
 #include "pycore_modsupport.h"    // _PyArg_UnpackKeywords()
 
 PyDoc_STRVAR(_types_coroutine__doc__,
@@ -196,4 +197,178 @@ _types_get_original_bases(PyObject *module, PyObject *const *args, Py_ssize_t na
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=2d5bcc5db6ff0824 input=a9049054013a1b77]*/
+
+PyDoc_STRVAR(_types_DynamicClassAttribute_getter__doc__,
+"getter($self, /, fget)\n"
+"--\n"
+"\n");
+
+#define _TYPES_DYNAMICCLASSATTRIBUTE_GETTER_METHODDEF    \
+    {"getter", _PyCFunction_CAST(_types_DynamicClassAttribute_getter), METH_FASTCALL|METH_KEYWORDS, _types_DynamicClassAttribute_getter__doc__},
+
+static PyObject *
+_types_DynamicClassAttribute_getter_impl(DynamicClassAttribute *self,
+                                         PyObject *fget);
+
+static PyObject *
+_types_DynamicClassAttribute_getter(DynamicClassAttribute *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    #if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+
+    #define NUM_KEYWORDS 1
+    static struct {
+        PyGC_Head _this_is_not_used;
+        PyObject_VAR_HEAD
+        PyObject *ob_item[NUM_KEYWORDS];
+    } _kwtuple = {
+        .ob_base = PyVarObject_HEAD_INIT(&PyTuple_Type, NUM_KEYWORDS)
+        .ob_item = { &_Py_ID(fget), },
+    };
+    #undef NUM_KEYWORDS
+    #define KWTUPLE (&_kwtuple.ob_base.ob_base)
+
+    #else  // !Py_BUILD_CORE
+    #  define KWTUPLE NULL
+    #endif  // !Py_BUILD_CORE
+
+    static const char * const _keywords[] = {"fget", NULL};
+    static _PyArg_Parser _parser = {
+        .keywords = _keywords,
+        .fname = "getter",
+        .kwtuple = KWTUPLE,
+    };
+    #undef KWTUPLE
+    PyObject *argsbuf[1];
+    PyObject *fget;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser,
+            /*minpos*/ 1, /*maxpos*/ 1, /*minkw*/ 0, /*varpos*/ 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    fget = args[0];
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _types_DynamicClassAttribute_getter_impl(self, fget);
+    Py_END_CRITICAL_SECTION();
+
+exit:
+    return return_value;
+}
+
+PyDoc_STRVAR(_types_DynamicClassAttribute_setter__doc__,
+"setter($self, /, fset)\n"
+"--\n"
+"\n");
+
+#define _TYPES_DYNAMICCLASSATTRIBUTE_SETTER_METHODDEF    \
+    {"setter", _PyCFunction_CAST(_types_DynamicClassAttribute_setter), METH_FASTCALL|METH_KEYWORDS, _types_DynamicClassAttribute_setter__doc__},
+
+static PyObject *
+_types_DynamicClassAttribute_setter_impl(DynamicClassAttribute *self,
+                                         PyObject *fset);
+
+static PyObject *
+_types_DynamicClassAttribute_setter(DynamicClassAttribute *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    #if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+
+    #define NUM_KEYWORDS 1
+    static struct {
+        PyGC_Head _this_is_not_used;
+        PyObject_VAR_HEAD
+        PyObject *ob_item[NUM_KEYWORDS];
+    } _kwtuple = {
+        .ob_base = PyVarObject_HEAD_INIT(&PyTuple_Type, NUM_KEYWORDS)
+        .ob_item = { &_Py_ID(fset), },
+    };
+    #undef NUM_KEYWORDS
+    #define KWTUPLE (&_kwtuple.ob_base.ob_base)
+
+    #else  // !Py_BUILD_CORE
+    #  define KWTUPLE NULL
+    #endif  // !Py_BUILD_CORE
+
+    static const char * const _keywords[] = {"fset", NULL};
+    static _PyArg_Parser _parser = {
+        .keywords = _keywords,
+        .fname = "setter",
+        .kwtuple = KWTUPLE,
+    };
+    #undef KWTUPLE
+    PyObject *argsbuf[1];
+    PyObject *fset;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser,
+            /*minpos*/ 1, /*maxpos*/ 1, /*minkw*/ 0, /*varpos*/ 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    fset = args[0];
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _types_DynamicClassAttribute_setter_impl(self, fset);
+    Py_END_CRITICAL_SECTION();
+
+exit:
+    return return_value;
+}
+
+PyDoc_STRVAR(_types_DynamicClassAttribute_deleter__doc__,
+"deleter($self, /, fdel)\n"
+"--\n"
+"\n");
+
+#define _TYPES_DYNAMICCLASSATTRIBUTE_DELETER_METHODDEF    \
+    {"deleter", _PyCFunction_CAST(_types_DynamicClassAttribute_deleter), METH_FASTCALL|METH_KEYWORDS, _types_DynamicClassAttribute_deleter__doc__},
+
+static PyObject *
+_types_DynamicClassAttribute_deleter_impl(DynamicClassAttribute *self,
+                                          PyObject *fdel);
+
+static PyObject *
+_types_DynamicClassAttribute_deleter(DynamicClassAttribute *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    #if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+
+    #define NUM_KEYWORDS 1
+    static struct {
+        PyGC_Head _this_is_not_used;
+        PyObject_VAR_HEAD
+        PyObject *ob_item[NUM_KEYWORDS];
+    } _kwtuple = {
+        .ob_base = PyVarObject_HEAD_INIT(&PyTuple_Type, NUM_KEYWORDS)
+        .ob_item = { &_Py_ID(fdel), },
+    };
+    #undef NUM_KEYWORDS
+    #define KWTUPLE (&_kwtuple.ob_base.ob_base)
+
+    #else  // !Py_BUILD_CORE
+    #  define KWTUPLE NULL
+    #endif  // !Py_BUILD_CORE
+
+    static const char * const _keywords[] = {"fdel", NULL};
+    static _PyArg_Parser _parser = {
+        .keywords = _keywords,
+        .fname = "deleter",
+        .kwtuple = KWTUPLE,
+    };
+    #undef KWTUPLE
+    PyObject *argsbuf[1];
+    PyObject *fdel;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser,
+            /*minpos*/ 1, /*maxpos*/ 1, /*minkw*/ 0, /*varpos*/ 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    fdel = args[0];
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _types_DynamicClassAttribute_deleter_impl(self, fdel);
+    Py_END_CRITICAL_SECTION();
+
+exit:
+    return return_value;
+}
+/*[clinic end generated code: output=01259dd857acd635 input=a9049054013a1b77]*/

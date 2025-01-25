@@ -5,15 +5,30 @@
 #endif
 
 #include "Python.h"
-#include "pycore_descrobject.h" // _PyMethodWrapper_Type
-#include "pycore_genobject.h"   // _PyGen_GetCode
-#include "pycore_object.h"      // _PyNone_Type, _PyNotImplemented_Type
-#include "pycore_unionobject.h" // _PyUnion_Type
+#include "pycore_critical_section.h"    // _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED
+#include "pycore_descrobject.h"         // _PyMethodWrapper_Type
+#include "pycore_genobject.h"           // _PyGen_GetCode
+#include "pycore_object.h"              // _PyNone_Type, _PyNotImplemented_Type
+#include "pycore_unionobject.h"         // _PyUnion_Type
 
 /*[clinic input]
 module _types
+class _types.DynamicClassAttribute "DynamicClassAttribute *" ""
 [clinic start generated code]*/
-/*[clinic end generated code: output=da39a3ee5e6b4b0d input=530308b1011b659d]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=4dc7a5af8cc69b62]*/
+
+typedef struct {
+    PyObject *DynamicClassAttribute;
+} types_state;
+
+static types_state *
+get_module_state(PyObject *module)
+{
+    assert(PyModule_Check(module));
+    types_state *state = PyModule_GetState(module);
+    assert(state != NULL);
+    return state;
+}
 
 #include "clinic/_typesmodule.c.h"
 
@@ -279,9 +294,273 @@ _types_get_original_bases_impl(PyObject *module, PyObject *cls)
     return bases;
 }
 
+typedef struct {
+    PyObject_HEAD;
+    PyObject *fget;
+    PyObject *fset;
+    PyObject *fdel;
+    PyObject *doc;
+    int overwrite_doc;
+    int is_abstract_method;
+} DynamicClassAttribute;
+
+static int
+dynamicclassattribute_build(DynamicClassAttribute *dca, PyObject *fget,
+                            PyObject *fset, PyObject *fdel, PyObject *doc)
+{
+    dca->fget = Py_XNewRef(fget);
+    dca->fset = Py_XNewRef(fset);
+    dca->fdel = Py_XNewRef(fdel);
+
+    PyObject *the_doc = doc == NULL
+                        ? PyObject_GetAttr(Py_None, &_Py_ID(__doc__))
+                        : Py_NewRef(doc);
+    if (the_doc == NULL)
+    {
+        return -1;
+    }
+    dca->doc = the_doc;
+    dca->overwrite_doc = doc == NULL;
+    int is_abstract_method = PyObject_HasAttrStringWithError(fget, "__abstractmethod__");
+    if (is_abstract_method < 0)
+    {
+        return -1;
+    }
+    dca->is_abstract_method = is_abstract_method;
+    return 0;
+}
+
+static int
+dynamicclassattribute_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwlist[] = {"fget", "fset", "fdel", "doc", NULL};
+    PyObject *fget = NULL, *fset = NULL, *fdel = NULL, *doc = NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OOOO", kwlist, &fget,
+                                     &fset, &fdel, &doc)) {
+        return -1;
+    }
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)self;
+    return dynamicclassattribute_build(dca, fget, fset, fdel, doc);
+}
+
+static int
+dynamicclassattribute_clear(PyObject *self)
+{
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)self;
+    Py_CLEAR(dca->fget);
+    Py_CLEAR(dca->fdel);
+    Py_CLEAR(dca->fset);
+    Py_CLEAR(dca->doc);
+    return 0;
+}
+
+static int
+dynamicclassattribute_traverse(PyObject *self, visitproc visit, void *arg)
+{
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)self;
+    Py_VISIT(dca->fget);
+    Py_VISIT(dca->fdel);
+    Py_VISIT(dca->fset);
+    Py_VISIT(dca->doc);
+    return 0;
+}
+
+static void
+dynamicclassattribute_dealloc(PyObject *self)
+{
+    if (PyObject_CallFinalizerFromDealloc(self) < 0) {
+        return;
+    }
+    PyTypeObject *type = Py_TYPE(self);
+    PyObject_GC_UnTrack(self);
+    (void)dynamicclassattribute_clear(self);
+    type->tp_free(self);
+    Py_DECREF(type);
+}
+
+static PyObject *
+dynamicclassattribute_descr_get_lock_held(PyObject *self, PyObject *obj, PyObject *type)
+{
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(self);
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)self;
+    if (Py_IsNone(obj)) {
+        if (dca->is_abstract_method) {
+            return Py_NewRef(self);
+        }
+
+        PyErr_SetObject(PyExc_AttributeError, Py_None);
+        return NULL;
+    }
+
+    if (dca->fget == NULL) {
+        PyErr_SetString(PyExc_AttributeError, "unreadable attribute");
+        return NULL;
+    }
+
+    return PyObject_CallOneArg(dca->fget, obj);
+}
+
+static int
+dynamicclassattribute_descr_del_lock_held(DynamicClassAttribute *dca, PyObject *obj)
+{
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(dca);
+    if (dca->fdel == NULL) {
+        PyErr_SetString(PyExc_AttributeError, "can't delete attribute");
+        return -1;
+    }
+    PyObject *res = PyObject_CallOneArg(dca->fdel, obj);
+    if (res == NULL) {
+        return -1;
+    }
+    Py_DECREF(res);
+    return 0;
+}
+
+static int
+dynamicclassattribute_descr_set_lock_held(PyObject *self, PyObject *obj, PyObject *value)
+{
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(self);
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)self;
+    if (value == NULL) {
+        return dynamicclassattribute_descr_del_lock_held(dca, obj);
+    }
+
+    if (dca->fset == NULL) {
+        PyErr_SetString(PyExc_AttributeError, "can't set attribute");
+        return NULL;
+    }
+
+    PyObject *res = PyObject_Vectorcall(dca->fset, (PyObject *[]) { obj, value }, 2, NULL);
+    if (res == NULL) {
+        return -1;
+    }
+    Py_DECREF(res);
+    return 0;
+}
+
+static PyObject *
+dynamicclassattribute_descr_get(PyObject *self, PyObject *obj, PyObject *type)
+{
+    PyObject *res;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    res = dynamicclassattribute_descr_get_lock_held(self, obj, type);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
+
+static int
+dynamicclassattribute_descr_set(PyObject *self, PyObject *obj, PyObject *value)
+{
+    int res;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    res = dynamicclassattribute_descr_set_lock_held(self, obj, value);
+    Py_END_CRITICAL_SECTION();
+    return res;
+}
+
+static PyObject *
+dynamicclassattribute_fast_init(DynamicClassAttribute *instance, PyObject *fget,
+                                PyObject *fset, PyObject *fdel, PyObject *doc)
+{
+    assert(instance != NULL);
+    PyTypeObject *type = Py_TYPE(instance);
+    DynamicClassAttribute *dca = (DynamicClassAttribute *)type->tp_new(type, NULL, NULL);
+    if (dynamicclassattribute_build(dca, fget, fset, fdel, doc) < 0) {
+        Py_DECREF(dca);
+        return NULL;
+    }
+    dca->overwrite_doc = instance->overwrite_doc;
+
+    return (PyObject *)dca;
+}
+
+/*[clinic input]
+@critical_section
+_types.DynamicClassAttribute.getter
+
+    fget: object
+[clinic start generated code]*/
+
+static PyObject *
+_types_DynamicClassAttribute_getter_impl(DynamicClassAttribute *self,
+                                         PyObject *fget)
+/*[clinic end generated code: output=dbb3b3e914430af4 input=2e59779855a1e02f]*/
+{
+    PyObject *doc = NULL;
+    if (self->overwrite_doc)
+    {
+        if (PyObject_GetOptionalAttr(fget, &_Py_ID(__doc__), &doc) < 0) {
+            return NULL;
+        }
+    }
+
+    PyObject *obj = dynamicclassattribute_fast_init(self, fget, self->fset, self->fdel,
+                                      doc == NULL ? self->doc : doc);
+    Py_XDECREF(doc);
+    return obj;
+}
+
+/*[clinic input]
+@critical_section
+_types.DynamicClassAttribute.setter
+
+    fset: object
+[clinic start generated code]*/
+
+static PyObject *
+_types_DynamicClassAttribute_setter_impl(DynamicClassAttribute *self,
+                                         PyObject *fset)
+/*[clinic end generated code: output=25e077e16413129a input=c16acff4ed6f8aa5]*/
+{
+    return dynamicclassattribute_fast_init(self, self->fget,
+                                           fset, self->fdel, self->doc);
+}
+
+/*[clinic input]
+@critical_section
+_types.DynamicClassAttribute.deleter
+
+    fdel: object
+[clinic start generated code]*/
+
+static PyObject *
+_types_DynamicClassAttribute_deleter_impl(DynamicClassAttribute *self,
+                                          PyObject *fdel)
+/*[clinic end generated code: output=34cd8b0e47e00899 input=046702a7439d2c7a]*/
+{
+    return dynamicclassattribute_fast_init(self, self->fget,
+                                           self->fset, fdel, self->doc);
+}
+
+static PyMethodDef dynamicclassattribute_methods[] = {
+    _TYPES_DYNAMICCLASSATTRIBUTE_GETTER_METHODDEF
+    _TYPES_DYNAMICCLASSATTRIBUTE_SETTER_METHODDEF
+    _TYPES_DYNAMICCLASSATTRIBUTE_DELETER_METHODDEF
+    {NULL, NULL, 0, NULL}
+};
+
+static PyType_Slot DynamicClassAttribute_Slots[] = {
+    {Py_tp_init, dynamicclassattribute_init},
+    {Py_tp_clear, dynamicclassattribute_clear},
+    {Py_tp_traverse, dynamicclassattribute_traverse},
+    {Py_tp_dealloc, dynamicclassattribute_dealloc},
+    {Py_tp_descr_get, dynamicclassattribute_descr_get},
+    {Py_tp_descr_set, dynamicclassattribute_descr_set},
+    {Py_tp_methods, dynamicclassattribute_methods},
+    {0, NULL}
+};
+
+PyType_Spec DynamicClassAttribute_Spec = {
+    .name = "types.DynamicClassAttribute",
+    .basicsize = sizeof(DynamicClassAttribute),
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .slots = DynamicClassAttribute_Slots,
+};
+
 static int
 types_exec(PyObject *mod)
 {
+    types_state *state = get_module_state(mod);
     if (PyModule_AddObjectRef(mod, "FunctionType", (PyObject *)&PyFunction_Type) < 0) {
         return -1;
     }
@@ -360,6 +639,21 @@ types_exec(PyObject *mod)
     if (PyModule_AddObjectRef(mod, "CapsuleType", (PyObject *)&PyCapsule_Type) < 0) {
         return -1;
     }
+#define ADD_TYPE(name)                                                     \
+    PyObject *name## Object = PyType_FromModuleAndSpec(mod, &name ##_Spec, \
+                                                       NULL);              \
+    if (name## Object == NULL) {                                           \
+        return -1;                                                         \
+    }                                                                      \
+    if (PyModule_AddType(mod, (PyTypeObject *)name## Object) < 0) {        \
+        Py_DECREF(name## Object);                                          \
+        return -1;                                                         \
+    }                                                                      \
+    state->DynamicClassAttribute = name## Object                           \
+
+    ADD_TYPE(DynamicClassAttribute);
+#undef ADD_TYPE
+
     return 0;
 }
 
@@ -383,6 +677,7 @@ static PyModuleDef types_module = {
     .m_doc = types__doc__,
     .m_methods = types_methods,
     .m_slots = types_slots,
+    .m_size = sizeof(types_state)
 };
 
 PyMODINIT_FUNC
