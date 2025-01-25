@@ -187,8 +187,8 @@ _types_get_original_bases(PyObject *module, PyObject *const *args, Py_ssize_t na
     if (!args) {
         goto exit;
     }
-    if (!PyObject_TypeCheck(args[0], type)) {
-        _PyArg_BadArgument("get_original_bases", "argument 'cls'", (type)->tp_name, args[0]);
+    if (!PyObject_TypeCheck(args[0], &PyType_Type)) {
+        _PyArg_BadArgument("get_original_bases", "argument 'cls'", (&PyType_Type)->tp_name, args[0]);
         goto exit;
     }
     cls = args[0];
@@ -371,4 +371,4 @@ _types_DynamicClassAttribute_deleter(DynamicClassAttribute *self, PyObject *cons
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=01259dd857acd635 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=e1fd8f9332f1bf42 input=a9049054013a1b77]*/

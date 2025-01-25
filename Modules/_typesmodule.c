@@ -30,6 +30,8 @@ get_module_state(PyObject *module)
     return state;
 }
 
+typedef struct _DynamicClassAttribute DynamicClassAttribute;
+
 #include "clinic/_typesmodule.c.h"
 
 PyDoc_STRVAR(types__doc__,
@@ -248,7 +250,7 @@ _types_resolve_bases_impl(PyObject *module, PyObject *bases)
 /*[clinic input]
 _types.get_original_bases
 
-    cls: object(subclass_of="type")
+    cls: object(subclass_of="&PyType_Type")
 
 Return the class's "original" bases prior to modification by `__mro_entries__`.
 
@@ -272,7 +274,7 @@ Examples::
 
 static PyObject *
 _types_get_original_bases_impl(PyObject *module, PyObject *cls)
-/*[clinic end generated code: output=f42e23aec2fb73a9 input=f2159580e0385a5b]*/
+/*[clinic end generated code: output=f42e23aec2fb73a9 input=30e786bccf62cac8]*/
 {
     PyObject *orig_bases;
     if (PyObject_GetOptionalAttrString(cls, "__orig_bases__", &orig_bases) < 0)
@@ -294,7 +296,7 @@ _types_get_original_bases_impl(PyObject *module, PyObject *cls)
     return bases;
 }
 
-typedef struct {
+struct _DynamicClassAttribute {
     PyObject_HEAD;
     PyObject *fget;
     PyObject *fset;
@@ -302,7 +304,7 @@ typedef struct {
     PyObject *doc;
     int overwrite_doc;
     int is_abstract_method;
-} DynamicClassAttribute;
+};
 
 static int
 dynamicclassattribute_build(DynamicClassAttribute *dca, PyObject *fget,
@@ -427,7 +429,7 @@ dynamicclassattribute_descr_set_lock_held(PyObject *self, PyObject *obj, PyObjec
 
     if (dca->fset == NULL) {
         PyErr_SetString(PyExc_AttributeError, "can't set attribute");
-        return NULL;
+        return -1;
     }
 
     PyObject *res = PyObject_Vectorcall(dca->fset, (PyObject *[]) { obj, value }, 2, NULL);
