@@ -196,6 +196,8 @@ struct _GeneratorWrapper {
 
 static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
 {
+    assert(dst != NULL);
+    assert(src != NULL);
     PyObject *attr;
 
     if (PyObject_GetOptionalAttr(src, name, &attr) < 0) {
@@ -206,6 +208,7 @@ static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
         attr = Py_None;
     }
 
+    assert(attr != NULL);
     if (PyObject_SetAttr(dst, name, attr) < 0) {
         Py_DECREF(attr);
         return -1;
