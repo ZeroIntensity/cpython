@@ -836,6 +836,8 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
             return NULL;
         }
     }
+    // bases == NULL will imply that both the bases and resolved bases
+    // are an empty tuple.
     if (bases != NULL && resolved_bases != bases) {
         if (PyDict_SetItemString(ns, "__orig_bases__", bases) < 0) {
             Py_DECREF(resolved_bases);
