@@ -829,7 +829,7 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
 
     if (exec_body != NULL) {
         PyObject *res = PyObject_CallOneArg(exec_body, ns);
-        Py_DECREF(res);
+        Py_XDECREF(res);
         if (res == NULL) {
             Py_DECREF(resolved_bases);
             Py_DECREF(prepared_tuple);
