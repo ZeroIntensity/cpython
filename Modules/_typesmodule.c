@@ -560,11 +560,12 @@ static PyGetSetDef dynamicclassattribute_getset[] = {
 };
 
 static PyMemberDef dynamicclassattribute_members[] = {
-    {"fget", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fget), NULL},
-    {"fset", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fset), NULL},
-    {"fdel", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fdel), NULL},
-    {"__doc__", _Py_T_OBJECT, offsetof(DynamicClassAttribute, doc), NULL},
-    {"__isabstractmethod__", Py_T_BOOL | Py_READONLY, offsetof(DynamicClassAttribute, is_abstract_method), NULL},
+    {"fget", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fget), 0, NULL},
+    {"fset", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fset), 0, NULL},
+    {"fdel", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fdel), 0, NULL},
+    {"__doc__", _Py_T_OBJECT, offsetof(DynamicClassAttribute, doc), 0, NULL},
+    {"__isabstractmethod__", Py_T_BOOL | Py_READONLY,
+        offsetof(DynamicClassAttribute, is_abstract_method), 0, NULL},
     {NULL}
 };
 
