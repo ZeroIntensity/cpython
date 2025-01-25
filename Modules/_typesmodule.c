@@ -836,7 +836,7 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
             return NULL;
         }
     }
-    if (resolved_bases != bases) {
+    if (bases != NULL && resolved_bases != bases) {
         if (PyDict_SetItemString(ns, "__orig_bases__", bases) < 0) {
             Py_DECREF(resolved_bases);
             Py_DECREF(prepared_tuple);
@@ -851,7 +851,7 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
         return NULL;
     }
 
-    PyObject *cls = PyObject_Vectorcall(meta,
+    PyObject *cls = PyObject_VectorcallDict(meta,
                                         (PyObject *[]) { name_str, resolved_bases, ns },
                                         2, prep_kwds);
     Py_DECREF(name_str);
