@@ -873,7 +873,7 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
     PyObject *ns = PyTuple_GET_ITEM(prepared_tuple, 1);
     PyObject *prep_kwds = PyTuple_GET_ITEM(prepared_tuple, 2);
 
-    if (exec_body != NULL || exec_body != Py_None) {
+    if (exec_body != NULL && exec_body != Py_None) {
         PyObject *res = PyObject_CallOneArg(exec_body, ns);
         Py_XDECREF(res);
         if (res == NULL) {
