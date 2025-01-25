@@ -893,8 +893,8 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
     }
 
     PyObject *cls = PyObject_VectorcallDict(meta,
-                                        (PyObject *[]) { name_str, resolved_bases, ns },
-                                        2, prep_kwds);
+                                            (PyObject *[]) { name_str, resolved_bases, ns },
+                                            3, prep_kwds);
     Py_DECREF(name_str);
     Py_DECREF(resolved_bases);
     Py_DECREF(prepared_tuple);
