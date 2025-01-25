@@ -8,6 +8,7 @@
 #include "pycore_critical_section.h"    // _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED
 #include "pycore_descrobject.h"         // _PyMethodWrapper_Type
 #include "pycore_genobject.h"           // _PyGen_GetCode
+#include "pycore_namespace.h"           // _PyNamespace_Type
 #include "pycore_object.h"              // _PyNone_Type, _PyNotImplemented_Type
 #include "pycore_unionobject.h"         // _PyUnion_Type
 
@@ -899,6 +900,9 @@ types_exec(PyObject *mod)
         return -1;
     }
     if (PyModule_AddObjectRef(mod, "CapsuleType", (PyObject *)&PyCapsule_Type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(mod, "SimpleNamespace", (PyObject *)&_PyNamespace_Type) < 0) {
         return -1;
     }
 #define ADD_TYPE(name)                                                     \
