@@ -251,7 +251,6 @@ generatorwrapper_new(PyTypeObject *tp, PyObject *args, PyObject *kwds)
     GeneratorWrapper *gw = (GeneratorWrapper *)self;
     gw->isgen = 0;
     gw->wrapped = NULL;
-    PyObject_GC_Track(self);
     return self;
 }
 
@@ -904,7 +903,6 @@ dynamicclassattribute_new(PyTypeObject *tp, PyObject *args, PyObject *kwds)
     dca->doc = NULL;
     dca->overwrite_doc = 0;
     dca->is_abstract_method = 0;
-    PyObject_GC_Track(self);
     return self;
 }
 
