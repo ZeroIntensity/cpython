@@ -1250,7 +1250,7 @@ types_exec(PyObject *mod)
         Py_DECREF(name## Object);                                          \
         return -1;                                                         \
     }                                                                      \
-    state->DynamicClassAttribute = name## Object                           \
+    state->name = name## Object                                            \
 
     ADD_TYPE(DynamicClassAttribute);
     ADD_TYPE(_GeneratorWrapper);
