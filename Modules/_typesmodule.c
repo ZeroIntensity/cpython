@@ -534,11 +534,38 @@ _types_DynamicClassAttribute_deleter_impl(DynamicClassAttribute *self,
                                            self->fset, fdel, self->doc);
 }
 
+/*[clinic input]
+@critical_section
+@getter
+_types.DynamicClassAttribute.overwrite_doc
+[clinic start generated code]*/
+
+static PyObject *
+_types_DynamicClassAttribute_overwrite_doc_get_impl(DynamicClassAttribute *self)
+/*[clinic end generated code: output=cd21b78a0015e444 input=134aa8abbb0d936b]*/
+{
+    return PyBool_FromLong(self->doc == NULL);
+}
+
 static PyMethodDef dynamicclassattribute_methods[] = {
     _TYPES_DYNAMICCLASSATTRIBUTE_GETTER_METHODDEF
     _TYPES_DYNAMICCLASSATTRIBUTE_SETTER_METHODDEF
     _TYPES_DYNAMICCLASSATTRIBUTE_DELETER_METHODDEF
     {NULL, NULL, 0, NULL}
+};
+
+static PyGetSetDef dynamicclassattribute_getset[] = {
+    _TYPES_DYNAMICCLASSATTRIBUTE_OVERWRITE_DOC_GETSETDEF
+    {NULL}
+};
+
+static PyMemberDef dynamicclassattribute_members[] = {
+    {"fget", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fget), NULL},
+    {"fset", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fset), NULL},
+    {"fdel", _Py_T_OBJECT, offsetof(DynamicClassAttribute, fdel), NULL},
+    {"__doc__", _Py_T_OBJECT, offsetof(DynamicClassAttribute, doc), NULL},
+    {"__isabstractmethod__", Py_T_BOOL | Py_READONLY, offsetof(DynamicClassAttribute, is_abstract_method), NULL},
+    {NULL}
 };
 
 static PyType_Slot DynamicClassAttribute_Slots[] = {
@@ -549,6 +576,8 @@ static PyType_Slot DynamicClassAttribute_Slots[] = {
     {Py_tp_descr_get, dynamicclassattribute_descr_get},
     {Py_tp_descr_set, dynamicclassattribute_descr_set},
     {Py_tp_methods, dynamicclassattribute_methods},
+    {Py_tp_members, dynamicclassattribute_members},
+    {Py_tp_getset, dynamicclassattribute_getset},
     {0, NULL}
 };
 

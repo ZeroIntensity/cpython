@@ -371,4 +371,29 @@ _types_DynamicClassAttribute_deleter(DynamicClassAttribute *self, PyObject *cons
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=e1fd8f9332f1bf42 input=a9049054013a1b77]*/
+
+#if !defined(_types_DynamicClassAttribute_overwrite_doc_DOCSTR)
+#  define _types_DynamicClassAttribute_overwrite_doc_DOCSTR NULL
+#endif
+#if defined(_TYPES_DYNAMICCLASSATTRIBUTE_OVERWRITE_DOC_GETSETDEF)
+#  undef _TYPES_DYNAMICCLASSATTRIBUTE_OVERWRITE_DOC_GETSETDEF
+#  define _TYPES_DYNAMICCLASSATTRIBUTE_OVERWRITE_DOC_GETSETDEF {"overwrite_doc", (getter)_types_DynamicClassAttribute_overwrite_doc_get, (setter)_types_DynamicClassAttribute_overwrite_doc_set, _types_DynamicClassAttribute_overwrite_doc_DOCSTR},
+#else
+#  define _TYPES_DYNAMICCLASSATTRIBUTE_OVERWRITE_DOC_GETSETDEF {"overwrite_doc", (getter)_types_DynamicClassAttribute_overwrite_doc_get, NULL, _types_DynamicClassAttribute_overwrite_doc_DOCSTR},
+#endif
+
+static PyObject *
+_types_DynamicClassAttribute_overwrite_doc_get_impl(DynamicClassAttribute *self);
+
+static PyObject *
+_types_DynamicClassAttribute_overwrite_doc_get(DynamicClassAttribute *self, void *Py_UNUSED(context))
+{
+    PyObject *return_value = NULL;
+
+    Py_BEGIN_CRITICAL_SECTION(self);
+    return_value = _types_DynamicClassAttribute_overwrite_doc_get_impl(self);
+    Py_END_CRITICAL_SECTION();
+
+    return return_value;
+}
+/*[clinic end generated code: output=760624a11a9e164e input=a9049054013a1b77]*/
