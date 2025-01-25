@@ -145,6 +145,65 @@ _types_coroutine_impl(PyObject *module, PyObject *func)
     return PyCFunction_New((PyMethodDef *)&wrapped_decorator_md, func);
 }
 
+static int
+resolve_bases_lock_held(PyObject *fast_bases, PyObject *new_bases, PyObject *bases)
+{
+    assert(new_bases != NULL);
+    assert(PyList_CheckExact(new_bases));
+
+    Py_ssize_t shift = 0;
+    Py_ssize_t size = PySequence_Fast_GET_SIZE(fast_bases);
+
+    for (Py_ssize_t index = 0; index < size; ++index) {
+        PyObject *item = PySequence_Fast_GET_ITEM(fast_bases, index);
+        if (item == NULL) {
+            return -1;
+        }
+
+        if (PyType_Check(item)) {
+            continue;
+        }
+
+        PyObject *mro_entries;
+        if (PyObject_GetOptionalAttr(item, &_Py_ID(__mro_entries__), &mro_entries) < 0) {
+            return -1;
+        }
+
+        if (mro_entries == NULL) {
+            continue;
+        }
+
+        PyObject *new_base = PyObject_CallOneArg(mro_entries, bases);
+        Py_DECREF(mro_entries);
+        if (new_base == NULL) {
+            return -1;
+        }
+
+        if (!PyTuple_Check(new_base)) {
+            Py_DECREF(new_base);
+            PyErr_SetString(PyExc_TypeError,
+                            "__mro_entries__ must return a tuple");
+            return -1;
+        }
+
+        assert(new_bases != NULL);
+        if (PyList_SetSlice(new_bases, index + shift, index + shift + 1, new_base) < 0)
+        {
+            Py_DECREF(new_base);
+            return -1;
+        }
+        Py_ssize_t new_base_size = PySequence_Size(new_base);
+        if (new_base_size < 0) {
+            Py_DECREF(new_base);
+            return -1;
+        }
+        shift += new_base_size - 1;
+        Py_DECREF(new_base);
+    }
+
+    return 0;
+}
+
 /*[clinic input]
 _types.resolve_bases
 
@@ -161,93 +220,30 @@ _types_resolve_bases_impl(PyObject *module, PyObject *bases)
         // For new_class(), we need to handle NULL
         return PyTuple_New(0);
     }
-    PyObject *iterator = PyObject_GetIter(bases);
-    if (iterator == NULL) {
+
+    PyObject *new_bases = PyObject_CallOneArg((PyObject *)&PyList_Type, bases);
+    if (new_bases == NULL) {
         return NULL;
     }
-    Py_ssize_t shift = 0;
-    Py_ssize_t index = -1;
-    /* Optimization: lazily initialize the list */
-    PyObject *new_bases = NULL;
 
-    PyObject *item;
-    while (PyIter_NextItem(iterator, &item))
-    {
-        ++index;
-        if (item == NULL)
-        {
-            Py_DECREF(iterator);
-            Py_XDECREF(new_bases);
-            return NULL;
-        }
-
-        if (PyType_Check(item))
-        {
-            continue;
-        }
-
-        PyObject *mro_entries;
-        if (PyObject_GetOptionalAttr(item, &_Py_ID(__mro_entries__), &mro_entries) < 0)
-        {
-            Py_DECREF(iterator);
-            Py_XDECREF(new_bases);
-            return NULL;
-        }
-
-        if (mro_entries == NULL)
-        {
-            continue;
-        }
-
-        PyObject *new_base = PyObject_CallOneArg(mro_entries, bases);
-        Py_DECREF(mro_entries);
-        if (new_base == NULL)
-        {
-            Py_DECREF(iterator);
-            Py_XDECREF(new_bases);
-            return NULL;
-        }
-
-        if (!PyTuple_Check(new_base))
-        {
-            Py_DECREF(iterator);
-            Py_XDECREF(new_bases);
-            Py_DECREF(new_base);
-            PyErr_SetString(PyExc_TypeError,
-                            "__mro_entries__ must return a tuple");
-            return NULL;
-        }
-
-        if (new_bases == NULL)
-        {
-            new_bases = PyObject_CallOneArg((PyObject *)&PyList_Type, bases);
-            if (new_bases == NULL)
-            {
-                Py_DECREF(iterator);
-                Py_DECREF(new_base);
-                return NULL;
-            }
-        }
-
-        assert(new_bases != NULL);
-        if (PyList_SetSlice(new_bases, index + shift, index + shift + 1, new_base) < 0)
-        {
-            Py_DECREF(iterator);
-            Py_DECREF(new_bases);
-            Py_DECREF(new_base);
-            return NULL;
-        }
-        Py_DECREF(new_base);
-    }
-    Py_DECREF(iterator);
-    assert(!PyErr_Occurred());
-
-    if (new_bases == NULL)
-    {
-        return Py_NewRef(bases);
+    PyObject *fast_bases = PySequence_Fast(bases, "bases is not a sequence");
+    if (fast_bases == NULL) {
+        Py_DECREF(new_bases);
+        return NULL;
     }
 
-    return new_bases;
+    int res;
+    Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(fast_bases);
+    res = resolve_bases_lock_held(fast_bases, new_bases, bases);
+    Py_END_CRITICAL_SECTION_SEQUENCE_FAST();
+    if (res < 0) {
+        Py_DECREF(new_bases);
+        return NULL;
+    }
+
+    PyObject *result = PyList_AsTuple(new_bases);
+    Py_DECREF(new_bases);
+    return result;
 }
 
 /*[clinic input]
