@@ -584,7 +584,7 @@ static PyType_Slot DynamicClassAttribute_Slots[] = {
 PyType_Spec DynamicClassAttribute_Spec = {
     .name = "types.DynamicClassAttribute",
     .basicsize = sizeof(DynamicClassAttribute),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE,
     .slots = DynamicClassAttribute_Slots,
 };
 
