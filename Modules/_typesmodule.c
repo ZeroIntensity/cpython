@@ -198,6 +198,8 @@ static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
 {
     assert(dst != NULL);
     assert(src != NULL);
+    assert(name != NULL);
+
     PyObject *attr;
 
     if (PyObject_GetOptionalAttr(src, name, &attr) < 0) {
@@ -220,7 +222,8 @@ static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
 
 static int generatorwrapper_fast_init(PyObject *self, PyObject *wrapped)
 {
-
+    assert(self != NULL);
+    assert(wrapped != NULL);
     if (copy_attribute(self, wrapped, &_Py_ID(__name__)) < 0) {
         return -1;
     }
