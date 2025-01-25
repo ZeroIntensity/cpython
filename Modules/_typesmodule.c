@@ -157,9 +157,12 @@ static PyObject *
 _types_resolve_bases_impl(PyObject *module, PyObject *bases)
 /*[clinic end generated code: output=4f8e2e4bfdaeba2e input=84fbb8401697b712]*/
 {
+    if (bases == NULL) {
+        // For new_class(), we need to handle NULL
+        return PyTuple_New(0);
+    }
     PyObject *iterator = PyObject_GetIter(bases);
-    if (iterator == NULL)
-    {
+    if (iterator == NULL) {
         return NULL;
     }
     Py_ssize_t shift = 0;
@@ -296,6 +299,42 @@ _types_get_original_bases_impl(PyObject *module, PyObject *cls)
     return bases;
 }
 
+static PyObject *
+calculate_meta_lock_held(PyObject *fast_bases, PyObject *meta)
+{
+    PyObject *winner = meta;
+    PyObject **items = PySequence_Fast_ITEMS(fast_bases);
+    Py_ssize_t length = PySequence_Fast_GET_SIZE(fast_bases);
+    for (Py_ssize_t i = 0; i < length; ++i) {
+        PyObject *base = PySequence_Fast_GET_ITEM(fast_bases, i);
+        PyObject *base_meta = (PyObject *)Py_TYPE(base);
+        // XXX Speed this up with PyType_IsSubtype()?
+        int should_continue = PyObject_IsSubclass(winner, base_meta);
+        if (should_continue < 0) {
+            return NULL;
+        }
+        else if (should_continue) {
+            continue;
+        }
+
+        int is_new_winner = PyObject_IsSubclass(base_meta, winner);
+        if (is_new_winner < 0) {
+            return NULL;
+        }
+        else if (is_new_winner) {
+            winner = base_meta;
+            continue;
+        }
+
+        PyErr_SetString(PyExc_TypeError,
+                        "metaclass conflict: the metaclass of a derived "
+                        "class must be a (non-strict) subclass "
+                        "of the metaclass of all its bases");
+        return NULL;
+    }
+
+    return winner;
+}
 
 /*[clinic input]
 _types._calculate_meta
@@ -310,6 +349,21 @@ static PyObject *
 _types__calculate_meta_impl(PyObject *module, PyObject *meta,
                             PyObject *bases)
 /*[clinic end generated code: output=28e8861429963892 input=e9e200da498b891e]*/
+{
+    PyObject *fast_bases = PySequence_Fast(bases, "bases is not a sequence");
+    if (fast_bases == NULL) {
+        return NULL;
+    }
+    PyObject *winner;
+    Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(fast_bases);
+    winner = calculate_meta_lock_held(fast_bases, meta);
+    Py_END_CRITICAL_SECTION_SEQUENCE_FAST();
+    Py_DECREF(fast_bases);
+    if (winner == NULL) {
+        return NULL;
+    }
+    return Py_NewRef(winner);
+}
 
 /*[clinic input]
 _types.prepare_class
@@ -332,6 +386,85 @@ static PyObject *
 _types_prepare_class_impl(PyObject *module, const char *name,
                           PyObject *bases, PyObject *kwds)
 /*[clinic end generated code: output=fd787fbe110b28fd input=360e666a1295e075]*/
+{
+    PyObject *meta = NULL;
+    if (kwds != NULL)
+    {
+        PyObject *kwds = PyDict_Copy(kwds);
+        if (kwds == NULL) {
+            return NULL;
+        }
+        if (PyDict_Pop(kwds, &_Py_ID(metaclass), &meta) < 0) {
+            Py_DECREF(kwds);
+            return NULL;
+        }
+    }
+    if (meta == NULL) {
+        Py_ssize_t bases_length = PySequence_Size(bases);
+        if (bases_length == -1) {
+            Py_XDECREF(kwds);
+            return NULL;
+        }
+        if (bases_length == 0) {
+            // Immortal reference, but treat it as strong
+            meta = (PyObject *)&PyType_Type;
+        }
+        else {
+            PyObject *obj = PySequence_GetItem(bases, 0);
+            if (obj == NULL) {
+                Py_XDECREF(kwds);
+                return NULL;
+            }
+            meta = Py_NewRef(Py_TYPE(obj));
+            Py_DECREF(obj);
+        }
+    }
+    assert(meta != NULL);
+    if (PyType_Check(meta)) {
+        PyObject *new_meta = _types__calculate_meta_impl(module, meta, bases);
+        Py_DECREF(meta);
+        if (new_meta == NULL) {
+            Py_XDECREF(kwds);
+            return NULL;
+        }
+        meta = new_meta;
+    }
+
+    PyObject *prepare;
+    if (PyObject_GetOptionalAttr(meta, &_Py_ID(__prepare__), &prepare) < 0) {
+        Py_DECREF(meta);
+        Py_XDECREF(kwds);
+        return NULL;
+    }
+
+    PyObject *namespace;
+    if (prepare != NULL) {
+        namespace = PyObject_Call(prepare, bases, kwds);
+    }
+    else {
+        namespace = PyDict_New();
+    }
+
+    if (namespace == NULL) {
+        Py_DECREF(meta);
+        Py_XDECREF(kwds);
+        return NULL;
+    }
+
+    PyObject *final_tuple = PyTuple_New(3);
+    if (final_tuple == NULL) {
+        Py_DECREF(meta);
+        Py_XDECREF(kwds);
+        Py_DECREF(namespace);
+        return NULL;
+    }
+
+    // All three of these are stolen by the tuple
+    PyTuple_SET_ITEM(final_tuple, 0, meta);
+    PyTuple_SET_ITEM(final_tuple, 1, namespace);
+    PyTuple_SET_ITEM(final_tuple, 2, kwds);
+    return final_tuple;
+}
 
 /*[clinic input]
 _types.new_class
@@ -348,6 +481,55 @@ static PyObject *
 _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
                       PyObject *kwds, PyObject *exec_body)
 /*[clinic end generated code: output=0d1cb5e70abb6971 input=312127772876125b]*/
+{
+    PyObject *resolved_bases = _types_resolve_bases_impl(module, bases);
+    if (resolved_bases == NULL) {
+        return NULL;
+    }
+    PyObject *prepared_tuple = _types_prepare_class_impl(module, name, resolved_bases, kwds);
+    if (prepared_tuple == NULL) {
+        Py_DECREF(resolved_bases);
+        return NULL;
+    }
+    assert(PyTuple_CheckExact(prepared_tuple));
+    // In theory, no other threads should be able to have this tuple, so
+    // we don't have to worry about thread safety here.
+    PyObject *meta = PyTuple_GET_ITEM(prepared_tuple, 0);
+    PyObject *ns = PyTuple_GET_ITEM(prepared_tuple, 1);
+    PyObject *prep_kwds = PyTuple_GET_ITEM(prepared_tuple, 2);
+
+    if (exec_body != NULL) {
+        PyObject *res = PyObject_CallOneArg(exec_body, ns);
+        Py_DECREF(res);
+        if (res == NULL) {
+            Py_DECREF(resolved_bases);
+            Py_DECREF(prepared_tuple);
+            return NULL;
+        }
+    }
+    if (resolved_bases != bases) {
+        if (PyDict_SetItemString(ns, "__orig_bases__", bases) < 0) {
+            Py_DECREF(resolved_bases);
+            Py_DECREF(prepared_tuple);
+            return NULL;
+        }
+    }
+
+    PyObject *name_str = PyUnicode_FromString(name);
+    if (name_str == NULL) {
+        Py_DECREF(resolved_bases);
+        Py_DECREF(prepared_tuple);
+        return NULL;
+    }
+
+    PyObject *cls = PyObject_Vectorcall(meta,
+                                        (PyObject *[]) { name_str, resolved_bases, ns },
+                                        2, kwds);
+    Py_DECREF(name_str);
+    Py_DECREF(resolved_bases);
+    Py_DECREF(prepared_tuple);
+    return cls;
+}
 
 struct _DynamicClassAttribute {
     PyObject_HEAD;
