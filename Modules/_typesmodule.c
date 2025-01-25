@@ -299,7 +299,6 @@ static PyObject *
 calculate_meta_lock_held(PyObject *fast_bases, PyObject *meta)
 {
     PyObject *winner = meta;
-    PyObject **items = PySequence_Fast_ITEMS(fast_bases);
     Py_ssize_t length = PySequence_Fast_GET_SIZE(fast_bases);
     for (Py_ssize_t i = 0; i < length; ++i) {
         PyObject *base = PySequence_Fast_GET_ITEM(fast_bases, i);
@@ -386,7 +385,7 @@ _types_prepare_class_impl(PyObject *module, const char *name,
     PyObject *meta = NULL;
     if (kwds != NULL)
     {
-        PyObject *kwds = PyDict_Copy(kwds);
+        kwds = PyDict_Copy(kwds);
         if (kwds == NULL) {
             return NULL;
         }
@@ -520,7 +519,7 @@ _types_new_class_impl(PyObject *module, const char *name, PyObject *bases,
 
     PyObject *cls = PyObject_Vectorcall(meta,
                                         (PyObject *[]) { name_str, resolved_bases, ns },
-                                        2, kwds);
+                                        2, prep_kwds);
     Py_DECREF(name_str);
     Py_DECREF(resolved_bases);
     Py_DECREF(prepared_tuple);
