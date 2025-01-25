@@ -1244,10 +1244,10 @@ types_exec(PyObject *mod)
     if (PyModule_AddObjectRef(mod, "MethodType", (PyObject *)&PyMethod_Type) < 0) {
         return -1;
     }
-    if (PyModule_AddObjectRef(mod, "BuiltinFunctionType", (PyObject *)&PyCMethod_Type) < 0) {
+    if (PyModule_AddObjectRef(mod, "BuiltinFunctionType", (PyObject *)&PyCFunction_Type) < 0) {
         return -1;
     }
-    if (PyModule_AddObjectRef(mod, "BuiltinMethodType", (PyObject *)&PyCMethod_Type) < 0) {
+    if (PyModule_AddObjectRef(mod, "BuiltinMethodType", (PyObject *)&PyCFunction_Type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(mod, "WrapperDescriptorType", (PyObject *)&PyWrapperDescr_Type) < 0) {
