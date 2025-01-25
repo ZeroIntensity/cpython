@@ -9,6 +9,82 @@ preserve
 #include "pycore_critical_section.h"// Py_BEGIN_CRITICAL_SECTION()
 #include "pycore_modsupport.h"    // _PyArg_UnpackKeywords()
 
+#if !defined(_types__GeneratorWrapper_gi_code_DOCSTR)
+#  define _types__GeneratorWrapper_gi_code_DOCSTR NULL
+#endif
+#if defined(_TYPES__GENERATORWRAPPER_GI_CODE_GETSETDEF)
+#  undef _TYPES__GENERATORWRAPPER_GI_CODE_GETSETDEF
+#  define _TYPES__GENERATORWRAPPER_GI_CODE_GETSETDEF {"gi_code", (getter)_types__GeneratorWrapper_gi_code_get, (setter)_types__GeneratorWrapper_gi_code_set, _types__GeneratorWrapper_gi_code_DOCSTR},
+#else
+#  define _TYPES__GENERATORWRAPPER_GI_CODE_GETSETDEF {"gi_code", (getter)_types__GeneratorWrapper_gi_code_get, NULL, _types__GeneratorWrapper_gi_code_DOCSTR},
+#endif
+
+static PyObject *
+_types__GeneratorWrapper_gi_code_get_impl(GeneratorWrapper *self);
+
+static PyObject *
+_types__GeneratorWrapper_gi_code_get(GeneratorWrapper *self, void *Py_UNUSED(context))
+{
+    return _types__GeneratorWrapper_gi_code_get_impl(self);
+}
+
+#if !defined(_types__GeneratorWrapper_gi_frame_DOCSTR)
+#  define _types__GeneratorWrapper_gi_frame_DOCSTR NULL
+#endif
+#if defined(_TYPES__GENERATORWRAPPER_GI_FRAME_GETSETDEF)
+#  undef _TYPES__GENERATORWRAPPER_GI_FRAME_GETSETDEF
+#  define _TYPES__GENERATORWRAPPER_GI_FRAME_GETSETDEF {"gi_frame", (getter)_types__GeneratorWrapper_gi_frame_get, (setter)_types__GeneratorWrapper_gi_frame_set, _types__GeneratorWrapper_gi_frame_DOCSTR},
+#else
+#  define _TYPES__GENERATORWRAPPER_GI_FRAME_GETSETDEF {"gi_frame", (getter)_types__GeneratorWrapper_gi_frame_get, NULL, _types__GeneratorWrapper_gi_frame_DOCSTR},
+#endif
+
+static PyObject *
+_types__GeneratorWrapper_gi_frame_get_impl(GeneratorWrapper *self);
+
+static PyObject *
+_types__GeneratorWrapper_gi_frame_get(GeneratorWrapper *self, void *Py_UNUSED(context))
+{
+    return _types__GeneratorWrapper_gi_frame_get_impl(self);
+}
+
+#if !defined(_types__GeneratorWrapper_gi_running_DOCSTR)
+#  define _types__GeneratorWrapper_gi_running_DOCSTR NULL
+#endif
+#if defined(_TYPES__GENERATORWRAPPER_GI_RUNNING_GETSETDEF)
+#  undef _TYPES__GENERATORWRAPPER_GI_RUNNING_GETSETDEF
+#  define _TYPES__GENERATORWRAPPER_GI_RUNNING_GETSETDEF {"gi_running", (getter)_types__GeneratorWrapper_gi_running_get, (setter)_types__GeneratorWrapper_gi_running_set, _types__GeneratorWrapper_gi_running_DOCSTR},
+#else
+#  define _TYPES__GENERATORWRAPPER_GI_RUNNING_GETSETDEF {"gi_running", (getter)_types__GeneratorWrapper_gi_running_get, NULL, _types__GeneratorWrapper_gi_running_DOCSTR},
+#endif
+
+static PyObject *
+_types__GeneratorWrapper_gi_running_get_impl(GeneratorWrapper *self);
+
+static PyObject *
+_types__GeneratorWrapper_gi_running_get(GeneratorWrapper *self, void *Py_UNUSED(context))
+{
+    return _types__GeneratorWrapper_gi_running_get_impl(self);
+}
+
+#if !defined(_types__GeneratorWrapper_gi_yieldfrom_DOCSTR)
+#  define _types__GeneratorWrapper_gi_yieldfrom_DOCSTR NULL
+#endif
+#if defined(_TYPES__GENERATORWRAPPER_GI_YIELDFROM_GETSETDEF)
+#  undef _TYPES__GENERATORWRAPPER_GI_YIELDFROM_GETSETDEF
+#  define _TYPES__GENERATORWRAPPER_GI_YIELDFROM_GETSETDEF {"gi_yieldfrom", (getter)_types__GeneratorWrapper_gi_yieldfrom_get, (setter)_types__GeneratorWrapper_gi_yieldfrom_set, _types__GeneratorWrapper_gi_yieldfrom_DOCSTR},
+#else
+#  define _TYPES__GENERATORWRAPPER_GI_YIELDFROM_GETSETDEF {"gi_yieldfrom", (getter)_types__GeneratorWrapper_gi_yieldfrom_get, NULL, _types__GeneratorWrapper_gi_yieldfrom_DOCSTR},
+#endif
+
+static PyObject *
+_types__GeneratorWrapper_gi_yieldfrom_get_impl(GeneratorWrapper *self);
+
+static PyObject *
+_types__GeneratorWrapper_gi_yieldfrom_get(GeneratorWrapper *self, void *Py_UNUSED(context))
+{
+    return _types__GeneratorWrapper_gi_yieldfrom_get_impl(self);
+}
+
 PyDoc_STRVAR(_types_coroutine__doc__,
 "coroutine($module, /, func)\n"
 "--\n"
@@ -641,4 +717,4 @@ _types_DynamicClassAttribute_overwrite_doc_get(DynamicClassAttribute *self, void
 
     return return_value;
 }
-/*[clinic end generated code: output=e59d5288e8b46874 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=665e89beb951645c input=a9049054013a1b77]*/

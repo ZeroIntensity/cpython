@@ -15,11 +15,13 @@
 /*[clinic input]
 module _types
 class _types.DynamicClassAttribute "DynamicClassAttribute *" ""
+class _types._GeneratorWrapper "GeneratorWrapper *" ""
 [clinic start generated code]*/
-/*[clinic end generated code: output=da39a3ee5e6b4b0d input=4dc7a5af8cc69b62]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=a06e33066648ee59]*/
 
 typedef struct {
     PyObject *DynamicClassAttribute;
+    PyObject *GeneratorWrapper;
 } types_state;
 
 static types_state *
@@ -32,6 +34,7 @@ get_module_state(PyObject *module)
 }
 
 typedef struct _DynamicClassAttribute DynamicClassAttribute;
+typedef struct _GeneratorWrapper GeneratorWrapper;
 
 #include "clinic/_typesmodule.c.h"
 
@@ -108,6 +111,225 @@ wrapped_decorator(PyObject *self, PyObject *args, PyObject *kwargs)
 const PyMethodDef wrapped_decorator_md = {
     .ml_meth = (PyCFunction)wrapped_decorator,
     .ml_flags = METH_VARARGS|METH_KEYWORDS
+};
+
+struct _GeneratorWrapper {
+    PyObject *wrapped;
+    int isgen;
+};
+
+static int copy_attribute(PyObject *dst, PyObject *src, PyObject *name)
+{
+    PyObject *attr;
+
+    if (PyObject_GetOptionalAttr(src, name, &attr) < 0) {
+        return -1;
+    }
+
+    if (PyObject_SetAttr(dst, name, attr) < 0) {
+        Py_DECREF(attr);
+        return -1;
+    }
+
+    Py_DECREF(attr);
+    return 0;
+}
+
+static int generatorwrapper_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *wrapped;
+    if (!PyArg_ParseTuple(args, "O", &wrapped)) {
+        return -1;
+    }
+
+    if (copy_attribute(self, wrapped, &_Py_ID(__name__)) < 0) {
+        return -1;
+    }
+
+    if (copy_attribute(self, wrapped, &_Py_ID(__qualname__)) < 0) {
+        return -1;
+    }
+
+    if (copy_attribute(self, wrapped, &_Py_ID(send)) < 0) {
+        return -1;
+    }
+
+    if (copy_attribute(self, wrapped, &_Py_ID(throw)) < 0) {
+        return -1;
+    }
+
+    if (copy_attribute(self, wrapped, &_Py_ID(close)) < 0) {
+        return -1;
+    }
+
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    gw->wrapped = Py_NewRef(wrapped);
+    gw->isgen = PyGen_CheckExact(wrapped);
+    return 0;
+}
+
+static int
+generatorwrapper_clear(PyObject *self)
+{
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    Py_CLEAR(gw->wrapped);
+    return 0;
+}
+
+static int
+generatorwrapper_traverse(PyObject *self, visitproc visit, void *arg)
+{
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    Py_VISIT(gw->wrapped);
+    return 0;
+}
+
+static void
+generatorwrapper_dealloc(PyObject *self)
+{
+    if (PyObject_CallFinalizerFromDealloc(self) < 0) {
+        return;
+    }
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    PyObject_GC_UnTrack(gw);
+    (void)generatorwrapper_clear(self);
+    PyTypeObject *tp = Py_TYPE(gw);
+    tp->tp_free(gw);
+    Py_DECREF(tp);
+}
+
+static PySendResult
+generatorwrapper_send(PyObject *self, PyObject *arg, PyObject **result)
+{
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    PyAsyncMethods *am = Py_TYPE(gw->wrapped)->tp_as_async;
+    if (am != NULL && am->am_send) {
+        return am->am_send(gw->wrapped, arg, result);
+    }
+    // Slow path: fall back to the send() method
+
+    PyObject *yielded = PyObject_CallMethodOneArg(gw->wrapped, &_Py_ID(send), arg);
+    if (yielded != NULL) {
+        *result = yielded;
+        return PYGEN_NEXT;
+    }
+    assert(PyErr_Occurred());
+    PyObject *err = PyErr_GetRaisedException();
+    assert(err != NULL);
+    if (PyErr_GivenExceptionMatches(err, PyExc_StopIteration)) {
+        // XXX Not thread safe?
+        *result = Py_NewRef(((PyStopIterationObject *)err)->value);
+        Py_DECREF(err);
+        return PYGEN_RETURN;
+    }
+
+    PyErr_SetRaisedException(err);
+    *result = NULL;
+    return PYGEN_ERROR;
+}
+
+static PyObject *
+generatorwrapper_next(PyObject *self)
+{
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    iternextfunc iternext = Py_TYPE(gw->wrapped)->tp_iternext;
+    if (iternext != NULL) {
+        return iternext(gw->wrapped);
+    }
+
+    // Slow path: fall back to __iter__()
+    return PyObject_CallMethodNoArgs(gw->wrapped, &_Py_ID(__iter__));
+}
+
+static PyObject *
+generatorwrapper_iter(PyObject *self)
+{
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    if (gw->isgen) {
+        return Py_NewRef(gw->wrapped);
+    }
+
+    return Py_NewRef(self);
+}
+
+/*[clinic input]
+@getter
+_types._GeneratorWrapper.gi_code
+[clinic start generated code]*/
+
+static PyObject *
+_types__GeneratorWrapper_gi_code_get_impl(GeneratorWrapper *self)
+/*[clinic end generated code: output=2c1b761a19d80282 input=be5ad615362bed63]*/
+{
+    return PyObject_GetAttrString(self->wrapped, "gi_code");
+}
+
+/*[clinic input]
+@getter
+_types._GeneratorWrapper.gi_frame
+[clinic start generated code]*/
+
+static PyObject *
+_types__GeneratorWrapper_gi_frame_get_impl(GeneratorWrapper *self)
+/*[clinic end generated code: output=b162dc70e9d0b41d input=6f0b97a6424fff8f]*/
+{
+    return PyObject_GetAttrString(self->wrapped, "gi_frame");
+}
+
+/*[clinic input]
+@getter
+_types._GeneratorWrapper.gi_running
+[clinic start generated code]*/
+
+static PyObject *
+_types__GeneratorWrapper_gi_running_get_impl(GeneratorWrapper *self)
+/*[clinic end generated code: output=d89bdf92409ca5cf input=8185c689c156d06f]*/
+{
+    return PyObject_GetAttrString(self->wrapped, "gi_running");
+}
+
+/*[clinic input]
+@getter
+_types._GeneratorWrapper.gi_yieldfrom
+[clinic start generated code]*/
+
+static PyObject *
+_types__GeneratorWrapper_gi_yieldfrom_get_impl(GeneratorWrapper *self)
+/*[clinic end generated code: output=37473aae41ca9eb1 input=8c1d1624d55e9d76]*/
+{
+    return PyObject_GetAttrString(self->wrapped, "gi_yieldfrom");
+}
+
+static PyGetSetDef generatorwrapper_getset[] = {
+    _TYPES__GENERATORWRAPPER_GI_CODE_GETSETDEF
+    _TYPES__GENERATORWRAPPER_GI_FRAME_GETSETDEF
+    _TYPES__GENERATORWRAPPER_GI_RUNNING_GETSETDEF
+    _TYPES__GENERATORWRAPPER_GI_YIELDFROM_GETSETDEF
+    {"cr_code", (getter)_types__GeneratorWrapper_gi_code_get},
+    {"cr_frame", (getter)_types__GeneratorWrapper_gi_frame_get},
+    {"cr_running", (getter)_types__GeneratorWrapper_gi_running_get},
+    {"cr_yieldfrom", (getter)_types__GeneratorWrapper_gi_yieldfrom_get},
+    {NULL}
+};
+
+static PyType_Slot GeneratorWrapper_Slots[] = {
+    {Py_tp_init, generatorwrapper_init},
+    {Py_tp_traverse, generatorwrapper_traverse},
+    {Py_tp_clear, generatorwrapper_clear},
+    {Py_tp_dealloc, generatorwrapper_dealloc},
+    {Py_am_send, generatorwrapper_send},
+    {Py_tp_getset, generatorwrapper_getset},
+    {Py_tp_iternext, generatorwrapper_next},
+    {Py_tp_iter, generatorwrapper_iter},
+    {Py_am_await, generatorwrapper_iter},
+    {0, NULL}
+};
+
+PyType_Spec GeneratorWrapper_Spec = {
+    .name = "types._GeneratorWrapper",
+    .basicsize = sizeof(GeneratorWrapper),
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE,
+    .slots = GeneratorWrapper_Slots,
 };
 
 /*[clinic input]
