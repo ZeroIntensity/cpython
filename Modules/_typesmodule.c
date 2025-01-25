@@ -793,13 +793,22 @@ _types_prepare_class_impl(PyObject *module, const char *name,
         return NULL;
     }
 
+    PyObject *name_str = PyUnicode_FromString(name);
+    if (name_str == NULL) {
+        Py_DECREF(meta);
+        Py_XDECREF(kwds);
+        return NULL;
+    }
+
     PyObject *namespace;
     if (prepare != NULL) {
-        namespace = PyObject_Call(prepare, bases, kwds);
+        namespace = PyObject_VectorcallDict(prepare, (PyObject *[]) { name_str, bases }, 2, kwds);
     }
     else {
         namespace = PyDict_New();
     }
+
+    Py_DECREF(name_str);
 
     if (namespace == NULL) {
         Py_DECREF(meta);
