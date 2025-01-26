@@ -440,7 +440,9 @@ generatorwrapper_throw(PyObject *self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    return PyObject_Call(throw, args, kwds);
+    PyObject *res = PyObject_Call(throw, args, kwds);
+    Py_DECREF(throw);
+    return res;
 }
 
 /*[clinic input]

@@ -2157,14 +2157,11 @@ class CoroutineTests(unittest.TestCase):
         gen.reset_mock()
 
         # Test exceptions propagation
-        error = Exception()
+        silly = 'nobody expects the spanish inquisition'
+        error = ZeroDivisionError(silly)
         gen.throw.side_effect = error
-        try:
+        with self.assertRaisesRegex(ZeroDivisionError, silly):
             wrapper.throw(1)
-        except Exception as ex:
-            self.assertIs(ex, error)
-        else:
-            self.fail('wrapper did not propagate an exception')
 
         # Test invalid args
         gen.reset_mock()
