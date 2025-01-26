@@ -646,18 +646,12 @@ func_get_code(PyObject *self, void *Py_UNUSED(ignored))
     return Py_NewRef(op->func_code);
 }
 
-static int
-func_set_code(PyObject *self, PyObject *value, void *Py_UNUSED(ignored))
+int
+_PyFunction_SetCode(PyObject *self, PyObject *value)
 {
+    assert(PyFunction_Check(self));
+    assert(PyCode_Check(value));
     PyFunctionObject *op = _PyFunction_CAST(self);
-
-    /* Not legal to del f.func_code or to set it to anything
-     * other than a code object. */
-    if (value == NULL || !PyCode_Check(value)) {
-        PyErr_SetString(PyExc_TypeError,
-                        "__code__ must be set to a code object");
-        return -1;
-    }
 
     if (PySys_Audit("object.__setattr__", "OsO",
                     op, "__code__", value) < 0) {
@@ -693,6 +687,20 @@ func_set_code(PyObject *self, PyObject *value, void *Py_UNUSED(ignored))
     _PyFunction_ClearVersion(op);
     Py_XSETREF(op->func_code, Py_NewRef(value));
     return 0;
+}
+
+static int
+func_set_code(PyObject *self, PyObject *value, void *Py_UNUSED(ignored))
+{
+    /* Not legal to del f.func_code or to set it to anything
+     * other than a code object. */
+    if (value == NULL || !PyCode_Check(value)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "__code__ must be set to a code object");
+        return -1;
+    }
+
+    return _PyFunction_SetCode(self, value);
 }
 
 static PyObject *

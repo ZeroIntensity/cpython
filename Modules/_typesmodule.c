@@ -7,6 +7,7 @@
 #include "Python.h"
 #include "pycore_critical_section.h"    // _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED
 #include "pycore_descrobject.h"         // _PyMethodWrapper_Type
+#include "pycore_function.h"            // _PyFunction_SetCode
 #include "pycore_genobject.h"           // _PyGen_GetCode
 #include "pycore_namespace.h"           // _PyNamespace_Type
 #include "pycore_object.h"              // _PyNone_Type, _PyNotImplemented_Type
@@ -74,14 +75,12 @@ generator_as_coroutine(PyObject *func, PyCodeObject *code)
         return NULL;
     }
 
-    PyObject *func_copy = PyFunction_New(new_code, PyFunction_GET_GLOBALS(func));
-    Py_DECREF(new_code);
-    if (func_copy == NULL)
-    {
+    if (_PyFunction_SetCode(func, new_code) < 0) {
+        Py_DECREF(new_code);
         return NULL;
     }
 
-    return func_copy;
+    return func;
 }
 
 static int
