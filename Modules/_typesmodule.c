@@ -462,7 +462,7 @@ static PyGetSetDef generatorwrapper_getset[] = {
     {"cr_code", (getter)_types__GeneratorWrapper_gi_code_get},
     {"cr_frame", (getter)_types__GeneratorWrapper_gi_frame_get},
     {"cr_running", (getter)_types__GeneratorWrapper_gi_running_get},
-    {"cr_yieldfrom", (getter)_types__GeneratorWrapper_gi_yieldfrom_get},
+    {"cr_await", (getter)_types__GeneratorWrapper_gi_yieldfrom_get},
     {NULL}
 };
 
