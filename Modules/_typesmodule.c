@@ -79,6 +79,7 @@ generator_as_coroutine(PyObject *func, PyCodeObject *code)
         Py_DECREF(new_code);
         return NULL;
     }
+    Py_DECREF(new_code);
 
     return func;
 }
