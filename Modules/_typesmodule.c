@@ -233,18 +233,6 @@ static int generatorwrapper_fast_init(PyObject *self, PyObject *wrapped)
         return -1;
     }
 
-    if (copy_attribute(self, wrapped, &_Py_ID(send)) < 0) {
-        return -1;
-    }
-
-    if (copy_attribute(self, wrapped, &_Py_ID(throw)) < 0) {
-        return -1;
-    }
-
-    if (copy_attribute(self, wrapped, &_Py_ID(close)) < 0) {
-        return -1;
-    }
-
     GeneratorWrapper *gw = (GeneratorWrapper *)self;
     gw->wrapped = Py_NewRef(wrapped);
     gw->isgen = PyGen_CheckExact(wrapped);
@@ -427,6 +415,45 @@ _types__GeneratorWrapper_gi_yieldfrom_get_impl(GeneratorWrapper *self)
     return PyObject_GetAttrString(self->wrapped, "gi_yieldfrom");
 }
 
+// We could get send(), throw(), and close() to work with copy_attribute() in the
+// constructor, but that screws up usage of dir()
+
+/*[clinic input]
+_types._GeneratorWrapper.send
+
+    val: object
+[clinic start generated code]*/
+
+static PyObject *
+_types__GeneratorWrapper_send_impl(GeneratorWrapper *self, PyObject *val)
+/*[clinic end generated code: output=acb9858877ecf82b input=3c530038fae4f727]*/
+{
+    return PyObject_CallMethodOneArg(self->wrapped, &_Py_ID(send), val);
+}
+
+static PyObject *
+generatorwrapper_throw(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    GeneratorWrapper *gw = (GeneratorWrapper *)self;
+    PyObject *throw = PyObject_GetAttr(gw->wrapped, &_Py_ID(throw));
+    if (throw == NULL) {
+        return NULL;
+    }
+
+    return PyObject_Call(throw, args, kwds);
+}
+
+/*[clinic input]
+_types._GeneratorWrapper.close
+[clinic start generated code]*/
+
+static PyObject *
+_types__GeneratorWrapper_close_impl(GeneratorWrapper *self)
+/*[clinic end generated code: output=c8beba19bb976798 input=3bf594a973c58c7b]*/
+{
+    return PyObject_CallMethodNoArgs(self->wrapped, &_Py_ID(close));
+}
+
 static PyGetSetDef generatorwrapper_getset[] = {
     _TYPES__GENERATORWRAPPER_GI_CODE_GETSETDEF
     _TYPES__GENERATORWRAPPER_GI_FRAME_GETSETDEF
@@ -439,6 +466,13 @@ static PyGetSetDef generatorwrapper_getset[] = {
     {NULL}
 };
 
+static PyMethodDef generatorwrapper_methods[] = {
+    _TYPES__GENERATORWRAPPER_SEND_METHODDEF
+    {"throw", (PyCFunction)generatorwrapper_throw, METH_VARARGS | METH_KEYWORDS, NULL},
+    _TYPES__GENERATORWRAPPER_CLOSE_METHODDEF
+    {NULL}
+};
+
 static PyType_Slot GeneratorWrapper_Slots[] = {
     {Py_tp_init, generatorwrapper_init},
     {Py_tp_traverse, generatorwrapper_traverse},
@@ -446,6 +480,7 @@ static PyType_Slot GeneratorWrapper_Slots[] = {
     {Py_tp_dealloc, generatorwrapper_dealloc},
     {Py_am_send, generatorwrapper_send},
     {Py_tp_getset, generatorwrapper_getset},
+    {Py_tp_methods, generatorwrapper_methods},
     {Py_tp_iternext, generatorwrapper_next},
     {Py_tp_iter, generatorwrapper_iter},
     {Py_am_await, generatorwrapper_iter},

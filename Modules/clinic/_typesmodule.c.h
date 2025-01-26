@@ -85,6 +85,78 @@ _types__GeneratorWrapper_gi_yieldfrom_get(GeneratorWrapper *self, void *Py_UNUSE
     return _types__GeneratorWrapper_gi_yieldfrom_get_impl(self);
 }
 
+PyDoc_STRVAR(_types__GeneratorWrapper_send__doc__,
+"send($self, /, val)\n"
+"--\n"
+"\n");
+
+#define _TYPES__GENERATORWRAPPER_SEND_METHODDEF    \
+    {"send", _PyCFunction_CAST(_types__GeneratorWrapper_send), METH_FASTCALL|METH_KEYWORDS, _types__GeneratorWrapper_send__doc__},
+
+static PyObject *
+_types__GeneratorWrapper_send_impl(GeneratorWrapper *self, PyObject *val);
+
+static PyObject *
+_types__GeneratorWrapper_send(GeneratorWrapper *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    #if defined(Py_BUILD_CORE) && !defined(Py_BUILD_CORE_MODULE)
+
+    #define NUM_KEYWORDS 1
+    static struct {
+        PyGC_Head _this_is_not_used;
+        PyObject_VAR_HEAD
+        PyObject *ob_item[NUM_KEYWORDS];
+    } _kwtuple = {
+        .ob_base = PyVarObject_HEAD_INIT(&PyTuple_Type, NUM_KEYWORDS)
+        .ob_item = { &_Py_ID(val), },
+    };
+    #undef NUM_KEYWORDS
+    #define KWTUPLE (&_kwtuple.ob_base.ob_base)
+
+    #else  // !Py_BUILD_CORE
+    #  define KWTUPLE NULL
+    #endif  // !Py_BUILD_CORE
+
+    static const char * const _keywords[] = {"val", NULL};
+    static _PyArg_Parser _parser = {
+        .keywords = _keywords,
+        .fname = "send",
+        .kwtuple = KWTUPLE,
+    };
+    #undef KWTUPLE
+    PyObject *argsbuf[1];
+    PyObject *val;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser,
+            /*minpos*/ 1, /*maxpos*/ 1, /*minkw*/ 0, /*varpos*/ 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    val = args[0];
+    return_value = _types__GeneratorWrapper_send_impl(self, val);
+
+exit:
+    return return_value;
+}
+
+PyDoc_STRVAR(_types__GeneratorWrapper_close__doc__,
+"close($self, /)\n"
+"--\n"
+"\n");
+
+#define _TYPES__GENERATORWRAPPER_CLOSE_METHODDEF    \
+    {"close", (PyCFunction)_types__GeneratorWrapper_close, METH_NOARGS, _types__GeneratorWrapper_close__doc__},
+
+static PyObject *
+_types__GeneratorWrapper_close_impl(GeneratorWrapper *self);
+
+static PyObject *
+_types__GeneratorWrapper_close(GeneratorWrapper *self, PyObject *Py_UNUSED(ignored))
+{
+    return _types__GeneratorWrapper_close_impl(self);
+}
+
 PyDoc_STRVAR(_types_coroutine__doc__,
 "coroutine($module, /, func)\n"
 "--\n"
@@ -717,4 +789,4 @@ _types_DynamicClassAttribute_overwrite_doc_get(DynamicClassAttribute *self, void
 
     return return_value;
 }
-/*[clinic end generated code: output=665e89beb951645c input=a9049054013a1b77]*/
+/*[clinic end generated code: output=ac4ad57973076006 input=a9049054013a1b77]*/
