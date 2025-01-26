@@ -81,7 +81,7 @@ generator_as_coroutine(PyObject *func, PyCodeObject *code)
     }
     Py_DECREF(new_code);
 
-    return func;
+    return Py_NewRef(func);
 }
 
 static int
