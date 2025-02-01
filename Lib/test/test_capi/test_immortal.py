@@ -51,6 +51,7 @@ class ImmortalUtilities(unittest.TestCase):
 
     def write_for_test(self, msg):
         # Always use the TARGET_FILE from ImmortalUtilities
+        msg = str(msg)
         file = ImmortalUtilities.TARGET_FILE
         if isinstance(file, int):
             os.write(file, msg.encode() + b"\n")
@@ -436,28 +437,44 @@ class TestUserImmortalObjects(ImmortalUtilities):
                 with open(os.devnull, mode) as file:
                     self.immortalize(file)
 
-    @isolate
-    def test_finalizers(self):
-        class Bar:
-            pass
-
-        class SomeType:
-            pass
-
-        # Immortalize while finalizing
-        something = SomeType()
+    @always_isolate(required_stdout="called")
+    def test_immortalize_while_finalizing(self):
         import weakref
-        weakref.finalize(something, lambda: self.immortalize(Bar()))
-        self.immortalize(something)
+        container = self.assert_mortal([])
 
-        def finalize():
-            self.assertIsInstance(something, SomeType)
+        def immortalize_while_finalizing(obj):
+            self.immortalize(obj)
+            self.assert_mortal(container).append(obj)
+            self.write_for_test("called")
 
-        class Whatever:
-            pass
+        mortal = self.mortal()
+        weakref.finalize(mortal, immortalize_while_finalizing, mortal)
+        del mortal
 
-        some_immortal = self.immortalize(Whatever())
-        weakref.finalize(some_immortal, finalize)
+    @always_isolate(required_stdout=["42", "24"])
+    def test_finalizers_with_circular_immortals(self):
+        import weakref
+
+        circle_a = self.mortal()
+        circle_b = self.mortal()
+        circle_a.circle_b = self.immortalize(circle_b)
+        circle_b.circle_a = self.immortalize(circle_a)
+
+        circle_a.value = 42
+        circle_b.value = 24
+
+        def finalize_circle_a(obj_a):
+            self.assertEqual(obj_a.circle_b.value, 24)
+            self.write_for_test(obj_a.value)
+
+        def finalize_circle_b(obj_b):
+            self.assertEqual(obj_b.circle_a.value, 42)
+            self.write_for_test(obj_b.value)
+
+        weakref.finalize(circle_a, finalize_circle_a, circle_a)
+        weakref.finalize(circle_b, finalize_circle_b, circle_b)
+        # Now we can't use them in the finalizer
+        del circle_a, circle_b
 
     @isolate
     def test_zip(self):
