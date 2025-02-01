@@ -311,6 +311,10 @@ corresponding Unix manual entries for more information on calls.");
 #  include <sched.h>
 #endif
 
+#ifdef HAVE_LINUX_SCHED_H
+#  include <linux/sched.h>
+#endif
+
 #if !defined(CPU_ALLOC) && defined(HAVE_SCHED_SETAFFINITY)
 #  undef HAVE_SCHED_SETAFFINITY
 #endif
@@ -602,8 +606,10 @@ run_at_forkers(PyObject *lst, int reverse)
          * one of the callbacks.
          */
         cpy = PyList_GetSlice(lst, 0, PyList_GET_SIZE(lst));
-        if (cpy == NULL)
-            PyErr_WriteUnraisable(lst);
+        if (cpy == NULL) {
+            PyErr_FormatUnraisable("Exception ignored in atfork callback "
+                                   "while copying list %R", lst);
+        }
         else {
             if (reverse)
                 PyList_Reverse(cpy);
@@ -611,10 +617,13 @@ run_at_forkers(PyObject *lst, int reverse)
                 PyObject *func, *res;
                 func = PyList_GET_ITEM(cpy, i);
                 res = _PyObject_CallNoArgs(func);
-                if (res == NULL)
-                    PyErr_WriteUnraisable(func);
-                else
+                if (res == NULL) {
+                    PyErr_FormatUnraisable("Exception ignored "
+                                           "in atfork callback %R", func);
+                }
+                else {
                     Py_DECREF(res);
+                }
             }
             Py_DECREF(cpy);
         }
@@ -3343,7 +3352,7 @@ os_access_impl(PyObject *module, path_t *path, int mode, int dir_fd,
 #endif
 
 
-#ifdef HAVE_TTYNAME
+#ifdef HAVE_TTYNAME_R
 /*[clinic input]
 os.ttyname
 
@@ -9578,42 +9587,33 @@ os_kill_impl(PyObject *module, pid_t pid, Py_ssize_t signal)
 
     Py_RETURN_NONE;
 #else /* !MS_WINDOWS */
-    PyObject *result;
     DWORD sig = (DWORD)signal;
-    DWORD err;
-    HANDLE handle;
 
 #ifdef HAVE_WINDOWS_CONSOLE_IO
     /* Console processes which share a common console can be sent CTRL+C or
        CTRL+BREAK events, provided they handle said events. */
     if (sig == CTRL_C_EVENT || sig == CTRL_BREAK_EVENT) {
         if (GenerateConsoleCtrlEvent(sig, (DWORD)pid) == 0) {
-            err = GetLastError();
-            PyErr_SetFromWindowsErr(err);
+            return PyErr_SetFromWindowsErr(0);
         }
-        else {
-            Py_RETURN_NONE;
-        }
+        Py_RETURN_NONE;
     }
 #endif /* HAVE_WINDOWS_CONSOLE_IO */
 
     /* If the signal is outside of what GenerateConsoleCtrlEvent can use,
        attempt to open and terminate the process. */
-    handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)pid);
+    HANDLE handle = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD)pid);
     if (handle == NULL) {
-        err = GetLastError();
-        return PyErr_SetFromWindowsErr(err);
+        return PyErr_SetFromWindowsErr(0);
     }
 
-    if (TerminateProcess(handle, sig) == 0) {
-        err = GetLastError();
-        result = PyErr_SetFromWindowsErr(err);
-    } else {
-        result = Py_NewRef(Py_None);
-    }
-
+    BOOL res = TerminateProcess(handle, sig);
     CloseHandle(handle);
-    return result;
+    if (res == 0) {
+        return PyErr_SetFromWindowsErr(0);
+    }
+
+    Py_RETURN_NONE;
 #endif /* !MS_WINDOWS */
 }
 #endif /* HAVE_KILL */
@@ -9882,7 +9882,7 @@ wait_helper(PyObject *module, pid_t pid, int status, struct rusage *ru)
         memset(ru, 0, sizeof(*ru));
     }
 
-    struct_rusage = _PyImport_GetModuleAttrString("resource", "struct_rusage");
+    struct_rusage = PyImport_ImportModuleAttrString("resource", "struct_rusage");
     if (struct_rusage == NULL)
         return NULL;
 
@@ -11436,6 +11436,38 @@ os_read_impl(PyObject *module, int fd, Py_ssize_t length)
         _PyBytes_Resize(&buffer, n);
 
     return buffer;
+}
+
+/*[clinic input]
+os.readinto -> Py_ssize_t
+    fd: int
+    buffer: Py_buffer(accept={rwbuffer})
+    /
+
+Read into a buffer object from a file descriptor.
+
+The buffer should be mutable and bytes-like. On success, returns the number of
+bytes read. Less bytes may be read than the size of the buffer. The underlying
+system call will be retried when interrupted by a signal, unless the signal
+handler raises an exception. Other errors will not be retried and an error will
+be raised.
+
+Returns 0 if *fd* is at end of file or if the provided *buffer* has length 0
+(which can be used to check for errors without reading data). Never returns
+negative.
+[clinic start generated code]*/
+
+static Py_ssize_t
+os_readinto_impl(PyObject *module, int fd, Py_buffer *buffer)
+/*[clinic end generated code: output=8091a3513c683a80 input=d40074d0a68de575]*/
+{
+    assert(buffer->len >= 0);
+    Py_ssize_t result = _Py_read(fd, buffer->buf, buffer->len);
+    /* Ensure negative is never returned without an error. Simplifies calling
+        code. _Py_read should succeed, possibly reading 0 bytes, _or_ set an
+        error. */
+    assert(result >= 0 || (result == -1 && PyErr_Occurred()));
+    return result;
 }
 
 #if (defined(HAVE_SENDFILE) && (defined(__FreeBSD__) || defined(__DragonFly__) \
@@ -16303,7 +16335,8 @@ ScandirIterator_finalize(ScandirIterator *iterator)
                                   "unclosed scandir iterator %R", iterator)) {
             /* Spurious errors can appear at shutdown */
             if (PyErr_ExceptionMatches(PyExc_Warning)) {
-                PyErr_WriteUnraisable((PyObject *) iterator);
+                PyErr_FormatUnraisable("Exception ignored while finalizing "
+                                       "scandir iterator %R", iterator);
             }
         }
     }
@@ -16978,6 +17011,7 @@ static PyMethodDef posix_methods[] = {
     OS_LOCKF_METHODDEF
     OS_LSEEK_METHODDEF
     OS_READ_METHODDEF
+    OS_READINTO_METHODDEF
     OS_READV_METHODDEF
     OS_PREAD_METHODDEF
     OS_PREADV_METHODDEF
@@ -17523,8 +17557,14 @@ all_ins(PyObject *m)
 #ifdef SCHED_OTHER
     if (PyModule_AddIntMacro(m, SCHED_OTHER)) return -1;
 #endif
+#ifdef SCHED_DEADLINE
+    if (PyModule_AddIntMacro(m, SCHED_DEADLINE)) return -1;
+#endif
 #ifdef SCHED_FIFO
     if (PyModule_AddIntMacro(m, SCHED_FIFO)) return -1;
+#endif
+#ifdef SCHED_NORMAL
+    if (PyModule_AddIntMacro(m, SCHED_NORMAL)) return -1;
 #endif
 #ifdef SCHED_RR
     if (PyModule_AddIntMacro(m, SCHED_RR)) return -1;

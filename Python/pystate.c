@@ -21,6 +21,7 @@
 #include "pycore_pymem.h"         // _PyMem_SetDefaultAllocator()
 #include "pycore_pystate.h"
 #include "pycore_runtime_init.h"  // _PyRuntimeState_INIT
+#include "pycore_stackref.h"      // Py_STACKREF_DEBUG
 #include "pycore_obmalloc.h"      // _PyMem_obmalloc_state_on_heap()
 #include "pycore_uniqueid.h"      // _PyObject_FinalizePerThreadRefcounts()
 
@@ -658,15 +659,30 @@ init_interpreter(PyInterpreterState *interp,
     }
     interp->sys_profile_initialized = false;
     interp->sys_trace_initialized = false;
-#ifdef _Py_TIER2
-    (void)_Py_SetOptimizer(interp, NULL);
+    interp->jit = false;
     interp->executor_list_head = NULL;
     interp->trace_run_counter = JIT_CLEANUP_THRESHOLD;
-#endif
     if (interp != &runtime->_main_interpreter) {
         /* Fix the self-referential, statically initialized fields. */
         interp->dtoa = (struct _dtoa_state)_dtoa_state_INIT(interp);
     }
+#if !defined(Py_GIL_DISABLED) && defined(Py_STACKREF_DEBUG)
+    interp->next_stackref = 1;
+    _Py_hashtable_allocator_t alloc = {
+        .malloc = malloc,
+        .free = free,
+    };
+    interp->stackref_debug_table = _Py_hashtable_new_full(
+        _Py_hashtable_hash_ptr,
+        _Py_hashtable_compare_direct,
+        NULL,
+        NULL,
+        &alloc
+    );
+    _Py_stackref_associate(interp, Py_None, PyStackRef_None);
+    _Py_stackref_associate(interp, Py_False, PyStackRef_False);
+    _Py_stackref_associate(interp, Py_True, PyStackRef_True);
+#endif
 
     interp->_initialized = 1;
     return _PyStatus_OK();
@@ -1259,7 +1275,7 @@ _PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
     delete_deferred_memory(interp);
 }
 
-/* Find immortal data for an object immortalize by Py_Immortalize()
+/* Find immortal data for an object immortalize by PyUnstable_Immortalize()
  * Returns NULL if not immortal or not found. */
 _Py_immortal *
 _Py_FindUserDefinedImmortal(PyObject *op)
@@ -1275,6 +1291,11 @@ _Py_FindUserDefinedImmortal(PyObject *op)
 
     return (_Py_immortal *)_Py_hashtable_get(interp->runtime_immortals.values, op);
 }
+
+#if !defined(Py_GIL_DISABLED) && defined(Py_STACKREF_DEBUG)
+extern void
+_Py_stackref_report_leaks(PyInterpreterState *interp);
+#endif
 
 static void
 interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
@@ -1313,12 +1334,6 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
         // XXX Eliminate the need to do this.
         tstate->_status.cleared = 0;
     }
-
-#ifdef _Py_TIER2
-    _PyOptimizerObject *old = _Py_SetOptimizer(interp, NULL);
-    assert(old != NULL);
-    Py_DECREF(old);
-#endif
 
     /* It is possible that any of the objects below have a finalizer
        that runs Python code or otherwise relies on a thread state
@@ -1407,6 +1422,12 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     Py_CLEAR(interp->sysdict);
     Py_CLEAR(interp->builtins);
 
+#if !defined(Py_GIL_DISABLED) && defined(Py_STACKREF_DEBUG)
+    _Py_stackref_report_leaks(interp);
+    _Py_hashtable_destroy(interp->stackref_debug_table);
+    interp->stackref_debug_table = NULL;
+#endif
+
     if (tstate->interp == interp) {
         /* We are now safe to fix tstate->_status.cleared. */
         // XXX Do this (much) earlier?
@@ -1445,7 +1466,7 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
 
 int
-Py_Immortalize(PyObject *op)
+PyUnstable_Immortalize(PyObject *op)
 {
     assert(op != NULL);
     if (_Py_IsImmortal(op)) {
@@ -1519,13 +1540,6 @@ Py_Immortalize(PyObject *op)
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
 
     return 1;
-}
-
-int
-Py_IsImmortal(PyObject *op)
-{
-    assert(op != NULL);
-    return _Py_IsImmortal(op);
 }
 
 void
@@ -2109,6 +2123,7 @@ init_threadstate(_PyThreadStateImpl *_tstate,
     tstate->dict_global_version = 0;
 
     _tstate->asyncio_running_loop = NULL;
+    _tstate->asyncio_running_task = NULL;
 
     tstate->delete_later = NULL;
 
@@ -2291,6 +2306,7 @@ PyThreadState_Clear(PyThreadState *tstate)
     Py_CLEAR(tstate->threading_local_sentinel);
 
     Py_CLEAR(((_PyThreadStateImpl *)tstate)->asyncio_running_loop);
+    Py_CLEAR(((_PyThreadStateImpl *)tstate)->asyncio_running_task);
 
     Py_CLEAR(tstate->dict);
     Py_CLEAR(tstate->async_exc);
@@ -3474,24 +3490,9 @@ _PyInterpreterState_GetConfig(PyInterpreterState *interp)
 }
 
 
-int
-_PyInterpreterState_GetConfigCopy(PyConfig *config)
-{
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-
-    PyStatus status = _PyConfig_Copy(config, &interp->config);
-    if (PyStatus_Exception(status)) {
-        _PyErr_SetFromPyStatus(status);
-        return -1;
-    }
-    return 0;
-}
-
-
 const PyConfig*
 _Py_GetConfig(void)
 {
-    assert(PyGILState_Check());
     PyThreadState *tstate = current_fast_get();
     _Py_EnsureTstateNotNULL(tstate);
     return _PyInterpreterState_GetConfig(tstate->interp);

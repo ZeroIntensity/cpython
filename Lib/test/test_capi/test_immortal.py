@@ -10,12 +10,22 @@ _testcapi = import_helper.import_module("_testcapi")
 _testinternalcapi = import_helper.import_module('_testinternalcapi')
 
 
-class TestCAPI(unittest.TestCase):
-    def test_immortal_builtins(self):
-        _testcapi.test_immortal_builtins()
+class TestUnstableCAPI(unittest.TestCase):
+    def test_immortal(self):
+        # Not extensive
+        known_immortals = (True, False, None, 0, ())
+        for immortal in known_immortals:
+            with self.subTest(immortal=immortal):
+                self.assertTrue(_testcapi.is_immortal(immortal))
 
-    def test_immortal_small_ints(self):
-        _testcapi.test_immortal_small_ints()
+        # Some arbitrary mutable objects
+        non_immortals = (object(), self, [object()])
+        for non_immortal in non_immortals:
+            with self.subTest(non_immortal=non_immortal):
+                self.assertFalse(_testcapi.is_immortal(non_immortal))
+
+        # CRASHES _testcapi.is_immortal(NULL)
+
 
 class TestInternalCAPI(unittest.TestCase):
 
@@ -41,19 +51,19 @@ class ImmortalUtilities:
         if loose is None:
             if already is True:
                 self.assertEqual(refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be mortal")
-                self.assertTrue(sys.is_immortal(obj))
+                self.assertTrue(sys._is_immortal(obj))
             else:
                 self.assertNotEqual(refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be immortal")
-                self.assertFalse(sys.is_immortal(obj))
+                self.assertFalse(sys._is_immortal(obj))
 
-        sys.immortalize(obj)
+        sys._immortalize(obj)
         self.assertEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
-        self.assertTrue(sys.is_immortal(obj))
+        self.assertTrue(sys._is_immortal(obj))
 
         # Test that double-immortalization is a no-op
-        self.assertEqual(sys.immortalize(obj), 0)
+        self.assertEqual(sys._immortalize(obj), 0)
         self.assertEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT)
-        self.assertTrue(sys.is_immortal(obj))
+        self.assertTrue(sys._is_immortal(obj))
 
         return obj
 
@@ -577,15 +587,16 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
         blacklisted = {"antigravity", "this"}
 
         def immortalize_everything(mod):
-            sys.immortalize(mod)
+            sys._immortalize(mod)
 
             for i in dir(mod):
                 attr = getattr(mod, i)
-                sys.immortalize(attr)
+                sys._immortalize(attr)
+                self.assertTu
 
                 for x in dir(attr):
                     with contextlib.suppress(Exception):
-                        sys.immortalize(getattr(attr, x))
+                        sys._immortalize(getattr(attr, x))
 
 
         for i in sys.stdlib_module_names:

@@ -373,6 +373,36 @@ exit:
     return return_value;
 }
 
+PyDoc_STRVAR(sys__is_immortal__doc__,
+"_is_immortal($module, op, /)\n"
+"--\n"
+"\n"
+"Return True if the given object is \"immortal\" per PEP 683.\n"
+"\n"
+"This function should be used for specialized purposes only.");
+
+#define SYS__IS_IMMORTAL_METHODDEF    \
+    {"_is_immortal", (PyCFunction)sys__is_immortal, METH_O, sys__is_immortal__doc__},
+
+static int
+sys__is_immortal_impl(PyObject *module, PyObject *op);
+
+static PyObject *
+sys__is_immortal(PyObject *module, PyObject *op)
+{
+    PyObject *return_value = NULL;
+    int _return_value;
+
+    _return_value = sys__is_immortal_impl(module, op);
+    if ((_return_value == -1) && PyErr_Occurred()) {
+        goto exit;
+    }
+    return_value = PyBool_FromLong((long)_return_value);
+
+exit:
+    return return_value;
+}
+
 PyDoc_STRVAR(sys_settrace__doc__,
 "settrace($module, function, /)\n"
 "--\n"
@@ -1681,42 +1711,14 @@ exit:
     return return_value;
 }
 
-PyDoc_STRVAR(sys_immortalize__doc__,
-"immortalize($module, object, /)\n"
+PyDoc_STRVAR(sys__immortalize__doc__,
+"_immortalize($module, object, /)\n"
 "--\n"
 "\n"
 "Make the object immortal.");
 
-#define SYS_IMMORTALIZE_METHODDEF    \
-    {"immortalize", (PyCFunction)sys_immortalize, METH_O, sys_immortalize__doc__},
-
-PyDoc_STRVAR(sys_is_immortal__doc__,
-"is_immortal($module, object, /)\n"
-"--\n"
-"\n"
-"Is the object immortal?");
-
-#define SYS_IS_IMMORTAL_METHODDEF    \
-    {"is_immortal", (PyCFunction)sys_is_immortal, METH_O, sys_is_immortal__doc__},
-
-static int
-sys_is_immortal_impl(PyObject *module, PyObject *object);
-
-static PyObject *
-sys_is_immortal(PyObject *module, PyObject *object)
-{
-    PyObject *return_value = NULL;
-    int _return_value;
-
-    _return_value = sys_is_immortal_impl(module, object);
-    if ((_return_value == -1) && PyErr_Occurred()) {
-        goto exit;
-    }
-    return_value = PyLong_FromLong((long)_return_value);
-
-exit:
-    return return_value;
-}
+#define SYS__IMMORTALIZE_METHODDEF    \
+    {"_immortalize", (PyCFunction)sys__immortalize, METH_O, sys__immortalize__doc__},
 
 #ifndef SYS_GETWINDOWSVERSION_METHODDEF
     #define SYS_GETWINDOWSVERSION_METHODDEF
@@ -1761,4 +1763,4 @@ exit:
 #ifndef SYS_GETANDROIDAPILEVEL_METHODDEF
     #define SYS_GETANDROIDAPILEVEL_METHODDEF
 #endif /* !defined(SYS_GETANDROIDAPILEVEL_METHODDEF) */
-/*[clinic end generated code: output=2222f9c11a0f72f2 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=99bfae5967550f05 input=a9049054013a1b77]*/

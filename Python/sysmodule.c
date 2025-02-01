@@ -972,6 +972,23 @@ sys__is_interned_impl(PyObject *module, PyObject *string)
     return PyUnicode_CHECK_INTERNED(string);
 }
 
+/*[clinic input]
+sys._is_immortal -> bool
+
+  op: object
+  /
+
+Return True if the given object is "immortal" per PEP 683.
+
+This function should be used for specialized purposes only.
+[clinic start generated code]*/
+
+static int
+sys__is_immortal_impl(PyObject *module, PyObject *op)
+/*[clinic end generated code: output=c2f5d6a80efb8d1a input=4609c9bf5481db76]*/
+{
+    return PyUnstable_IsImmortal(op);
+}
 
 /*
  * Cached interned string objects used for calling the profile and
@@ -2265,9 +2282,7 @@ sys_activate_stack_trampoline_impl(PyObject *module, const char *backend)
 {
 #ifdef PY_HAVE_PERF_TRAMPOLINE
 #ifdef _Py_JIT
-    _PyOptimizerObject* optimizer = _Py_GetOptimizer();
-    if (optimizer != NULL) {
-        Py_DECREF(optimizer);
+    if (_PyInterpreterState_GET()->jit) {
         PyErr_SetString(PyExc_ValueError, "Cannot activate the perf trampoline if the JIT is active");
         return NULL;
     }
@@ -2356,7 +2371,7 @@ static PyObject *
 sys__dump_tracelets_impl(PyObject *module, PyObject *outpath)
 /*[clinic end generated code: output=a7fe265e2bc3b674 input=5bff6880cd28ffd1]*/
 {
-    FILE *out = _Py_fopen_obj(outpath, "wb");
+    FILE *out = Py_fopen(outpath, "wb");
     if (out == NULL) {
         return NULL;
     }
@@ -2557,7 +2572,7 @@ close_and_release:
 }
 
 /*[clinic input]
-sys.immortalize
+sys._immortalize
 
     object:  object
     /
@@ -2566,32 +2581,16 @@ Make the object immortal.
 [clinic start generated code]*/
 
 static PyObject *
-sys_immortalize(PyObject *module, PyObject *object)
-/*[clinic end generated code: output=d5a3fdec54342de1 input=fb95877c9b815c82]*/
+sys__immortalize(PyObject *module, PyObject *object)
+/*[clinic end generated code: output=8fcf66c1dcf312cf input=9c09b9551182c8aa]*/
 {
-    int result = Py_Immortalize(object);
+    int result = PyUnstable_Immortalize(object);
     if (result < 0)
     {
         return NULL;
     }
     assert(_Py_IsImmortal(object));
     return PyLong_FromLong(result);
-}
-
-/*[clinic input]
-sys.is_immortal -> int
-
-    object:  object
-    /
-
-Is the object immortal?
-[clinic start generated code]*/
-
-static int
-sys_is_immortal_impl(PyObject *module, PyObject *object)
-/*[clinic end generated code: output=ba76f7fdcec1c2c1 input=d55aaf342e7b74ec]*/
-{
-    return Py_IsImmortal(object);
 }
 
 static PyMethodDef sys_methods[] = {
@@ -2627,6 +2626,7 @@ static PyMethodDef sys_methods[] = {
     SYS__GETFRAMEMODULENAME_METHODDEF
     SYS_GETWINDOWSVERSION_METHODDEF
     SYS__ENABLELEGACYWINDOWSFSENCODING_METHODDEF
+    SYS__IS_IMMORTAL_METHODDEF
     SYS_INTERN_METHODDEF
     SYS__IS_INTERNED_METHODDEF
     SYS_IS_FINALIZING_METHODDEF
@@ -2664,9 +2664,8 @@ static PyMethodDef sys_methods[] = {
 #endif
     SYS__GET_CPU_COUNT_CONFIG_METHODDEF
     SYS__IS_GIL_ENABLED_METHODDEF
-    SYS_IMMORTALIZE_METHODDEF
+    SYS__IMMORTALIZE_METHODDEF
     SYS__DUMP_TRACELETS_METHODDEF
-    SYS_IS_IMMORTAL_METHODDEF
     {NULL, NULL}  // sentinel
 };
 
@@ -2888,6 +2887,7 @@ PySys_ResetWarnOptions(void)
 static int
 _PySys_AddWarnOptionWithError(PyThreadState *tstate, PyObject *option)
 {
+    assert(tstate != NULL);
     PyObject *warnoptions = get_warnoptions(tstate);
     if (warnoptions == NULL) {
         return -1;
@@ -2903,11 +2903,11 @@ PyAPI_FUNC(void)
 PySys_AddWarnOptionUnicode(PyObject *option)
 {
     PyThreadState *tstate = _PyThreadState_GET();
+    _Py_EnsureTstateNotNULL(tstate);
+    assert(!_PyErr_Occurred(tstate));
     if (_PySys_AddWarnOptionWithError(tstate, option) < 0) {
         /* No return value, therefore clear error state if possible */
-        if (tstate) {
-            _PyErr_Clear(tstate);
-        }
+        _PyErr_Clear(tstate);
     }
 }
 
