@@ -5,7 +5,6 @@ from test.support import import_helper
 import sys
 import functools
 import inspect
-import gc
 import io
 import os
 
@@ -220,7 +219,12 @@ def _isolate_subinterpreter(test_method, _interpreters, required_stdout=None):
     if err is not None:
         raise RuntimeError(f"Error in interpreter: {err.formatted}")
     if required_stdout is not None:
+        # Hack: if stdout was empty, we're about to get an error
+        # anyway. os.read() will hang if we call it with an empty pipe, so
+        # just stick something in there to prevent that.
+        os.write(write, b".")
         captured = os.read(read, 256)
+        captured = captured[:-1]  # Remove that dummy character
         _compare_stdout(required_stdout, captured)
 
     os.close(read)
@@ -649,14 +653,17 @@ class TestUserImmortalObjects(ImmortalUtilities):
                 self.immortalize(parent.instance)
                 self.immortalize(parent.static, loose=True)
 
-    @isolate
+    @always_isolate(required_stdout="called")
     def test_builtins_shenanigans(self):
         # builtins is cleared very late during finalization
         import builtins
+        import weakref
 
         def foo():
             # Use another builtin
-            exec("10 ** 10")
+            exec("10 + 10")
+            self.assertEqual(circular.builtins.eval("41 + 1"), 42)
+            self.write_for_test("called")
 
         class Circular:
             def __init__(self):
@@ -664,6 +671,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
         builtins.foo = self.immortalize(foo)
         builtins.circular = self.immortalize(Circular())
+        weakref.finalize(compile, foo)
 
     @always_isolate(
         required_stdout=["on_exit_immortal called", "on_exit_circular called"],
