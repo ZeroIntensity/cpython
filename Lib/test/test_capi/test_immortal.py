@@ -5,6 +5,9 @@ from test.support import import_helper
 import sys
 import functools
 import inspect
+import gc
+import io
+import os
 
 _testcapi = import_helper.import_module("_testcapi")
 _testinternalcapi = import_helper.import_module('_testinternalcapi')
@@ -43,7 +46,17 @@ class TestInternalCAPI(unittest.TestCase):
             self.assertFalse(_testinternalcapi.is_static_immortal(obj))
 
 
-class ImmortalUtilities:
+class ImmortalUtilities(unittest.TestCase):
+    TARGET_FILE = sys.stdout.fileno()
+
+    def write_for_test(self, msg):
+        # Always use the TARGET_FILE from ImmortalUtilities
+        file = ImmortalUtilities.TARGET_FILE
+        if isinstance(file, int):
+            os.write(file, msg.encode() + b"\n")
+        else:
+            file.write(msg + "\n")
+
     def immortalize(self, obj, *, already=False, loose=None):
         _IMMORTAL_REFCNT = sys.getrefcount(None)
         refcnt = sys.getrefcount(obj)
@@ -116,7 +129,7 @@ class ImmortalUtilities:
             self.immortalize(constructor((test, self.mortal_int())))
 
 
-def _gen_isolated_source(test_method):
+def _gen_isolated_source(test_method, pipefd):
     utilities = inspect.getsource(ImmortalUtilities)
     meth_source = inspect.getsource(test_method)
 
@@ -125,18 +138,23 @@ import traceback
 import sys
 import unittest
 import types
+import os
 
 support = types.SimpleNamespace(Py_GIL_DISABLED={support.Py_GIL_DISABLED})
 
-def isolate(test_method):
-    return test_method
+def _passthrough_decorator(test_method=None, *args, **kwargs):
+    if test_method is None:
+        return lambda method: method
+    else:
+        return test_method
 
-def always_isolate(test_method):
-    return test_method
+always_isolate = isolate = _passthrough_decorator
 
 {utilities}
 
-class IsolatedTest(unittest.TestCase, ImmortalUtilities):
+ImmortalUtilities.TARGET_FILE = {pipefd}
+
+class IsolatedTest(ImmortalUtilities):
 {meth_source}
 
 IsolatedTest.Py_GIL_DISABLED = {support.Py_GIL_DISABLED}
@@ -149,57 +167,113 @@ except BaseException:
 """
     return source
 
+def _compare_stdout_str(needed, found):
+    if isinstance(found, bytes):
+        found = found.decode("utf-8")
 
-def _isolate_subprocess(test_method, subprocess):
-    source = _gen_isolated_source(test_method)
+    if found == '':
+        raise RuntimeError(f"stdout was empty, but expected a required string {needed!r}")
+
+    if needed not in found:
+        raise RuntimeError(f"stdout {found!r} did not contain required string {needed!r}")
+
+def _compare_stdout(needed, found):
+    if isinstance(needed, str):
+        _compare_stdout_str(needed, found)
+    elif isinstance(needed, list):
+        for required in needed:
+            _compare_stdout_str(required, found)
+    else:
+        raise TypeError(f"unexpected type for needed: {needed!r}")
+
+
+def _capture_in_process(test_method, required_stdout=None):
+    @functools.wraps(test_method)
+    def decorator(*args, **kwargs):
+        buffer = io.StringIO()
+        ImmortalUtilities.TARGET_FILE = buffer
+        test_method(*args, **kwargs)
+
+        if required_stdout is not None:
+            _compare_stdout(required_stdout, buffer.getvalue())
+
+    return decorator
+
+
+def _isolate_subprocess(test_method, subprocess, required_stdout=None):
+    source = _gen_isolated_source(test_method, sys.stdout.fileno())
     output = subprocess.run([sys.executable, "-c", source], capture_output=True)
     if output.stderr != b"":
         raise RuntimeError(f"Error in subprocess: {output.stderr.decode('utf-8')}")
+    if required_stdout is not None:
+        _compare_stdout(required_stdout, output.stdout)
 
 
-def _isolate_subinterpreter(test_method, _interpreters):
-    source = _gen_isolated_source(test_method)
+def _isolate_subinterpreter(test_method, _interpreters, required_stdout=None):
+    read, write = os.pipe()
+    source = _gen_isolated_source(test_method, write)
     interp = _interpreters.create()
     err = _interpreters.run_string(interp, source)
+    _interpreters.destroy(interp)
+
     if err is not None:
         raise RuntimeError(f"Error in interpreter: {err.formatted}")
+    if required_stdout is not None:
+        captured = os.read(read, 256)
+        _compare_stdout(required_stdout, captured)
+
+    os.close(read)
+    os.close(write)
 
 
-def always_isolate(test_method, *, via_subprocess=None):
+def _get_isolator_and_module():
+    # Assume _interpreters by default, fall back to subprocess otherwise
     try:
-        if via_subprocess is True:
-            raise ImportError("fallthrough")
+        import _interpreters as mod
+        func = _isolate_subinterpreter
+    except ImportError:
+        # Skip entire test if neither are available
+        mod = import_helper.import_module("subprocess")
+        func = _isolate_subprocess
 
-        import _interpreters
+    return func, mod
 
+
+def always_isolate(raw_test_method=None, *, via_subprocess=None, required_stdout=None):
+    if via_subprocess is True:
+        func = _isolate_subprocess
+        mod = import_helper.import_module("subprocess")
+    elif via_subprocess is False:
+        func = _isolate_subinterpreter
+        mod = import_helper.import_module("_interpreters")
+    else:
+        func, mod = _get_isolator_and_module()
+
+    def decorator(test_method):
         @functools.wraps(test_method)
-        def isolated_test(self):
-            _isolate_subinterpreter(test_method, _interpreters)
+        def isolated_test(*args, **kwargs):
+            return func(test_method, mod,
+                        required_stdout=required_stdout)
 
         return isolated_test
-    except ImportError:
-        if via_subprocess is False:
-            raise unittest.SkipTest("_interpreters must be available")
-        # _interpreters not available
-        try:
-            import subprocess
 
-            @functools.wraps(test_method)
-            def isolated_test(self):
-                _isolate_subprocess(test_method, subprocess)
+    if raw_test_method is None:
+        return decorator
+    else:
+        return decorator(raw_test_method)
 
-            return isolated_test
-        except ImportError:
-            raise unittest.SkipTest("_interpreters and subprocess are not available")
 
-def isolate(raw_test_method=None, *, via_subprocess=None):
-    # For debugging and performance, don't isolate
-    # the tests when executing this module directly
+def isolate(raw_test_method=None, *, via_subprocess=None, required_stdout=None):
     def decorator(test_method):
+        # For debugging and performance, don't isolate
+        # the tests when executing this module directly
         if __name__ == "__main__":
-            return test_method
+            return _capture_in_process(test_method,
+                                       required_stdout=required_stdout)
 
-        return always_isolate(test_method, via_subprocess=via_subprocess)
+        return always_isolate(test_method,
+                              via_subprocess=via_subprocess,
+                              required_stdout=required_stdout)
 
     if raw_test_method is None:
         return decorator
@@ -207,7 +281,7 @@ def isolate(raw_test_method=None, *, via_subprocess=None):
     return decorator(raw_test_method)
 
 
-class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
+class TestUserImmortalObjects(ImmortalUtilities):
     Py_GIL_DISABLED = support.Py_GIL_DISABLED
 
     @isolate
@@ -250,9 +324,9 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
         ba = self.immortalize(bytearray(self.mortal_str(), 'utf-8'))
         ba = bytearray(self.mortal_str(), "utf-8")
 
-        # Trigger some weird things with finalization
-        # In my prior implementations of AOI, this caused an
-        # unraisable SystemError during finalization
+        # Trigger some weird things with finalization.
+        # In prior implementationss of AOI, this caused an
+        # unraisable SystemError during finalization.
         memoryview(ba)
 
         self.immortalize(memoryview(ba))
@@ -478,6 +552,7 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
                 return self.assert_mortal(e)
 
         exc = get_exc()
+        self.assertIsNotNone(exc)
 
         with self.subTest(exc=exc):
             # Both immortal
@@ -489,15 +564,15 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
             # Mortal exception, immortal traceback
             self.immortalize(exc.__traceback__)
 
-    @isolate
+    # Frame finalizers might not be ran until interpreter shutdown, so
+    # we always need to isolate it for the required stdout string.
+    @always_isolate(required_stdout="finalized")
     def test_frames(self):
         import inspect
         import weakref
-        import os
-        import contextlib
 
         # Wrap it in a function for another frame to get pushed
-        def inner():
+        def frame_finalizers():
             class Foo:
                 pass
 
@@ -505,10 +580,7 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
             some_other_var = self.mortal_int()
 
             def exotic_finalizer():
-                with contextlib.suppress(NameError):
-                    hello.something()
-                    # We shouldn't get here
-                    os.abort()
+                self.write_for_test("finalized")
 
             weakref.finalize(self.immortalize(Foo()), exotic_finalizer)
             frame = inspect.currentframe()
@@ -522,7 +594,22 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
             # will live until finalization.
             del hello
 
-        inner()
+        def frame_locals():
+            class Foo2:
+                pass
+
+            frame = inspect.currentframe()
+            self.assertIsNotNone(frame)
+            self.assert_mortal(frame)
+            instance = self.immortalize(Foo2())
+            del Foo2
+            self.assert_mortal(type(instance))
+            self.assertTrue(sys._is_immortal(frame.f_locals["instance"]))
+
+            del frame
+
+        frame_finalizers()
+        frame_locals()
 
     @isolate
     def test_descriptors(self):
@@ -551,12 +638,20 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
         import builtins
 
         def foo():
+            # Use another builtin
             exec("10 ** 10")
 
-        builtins.foo = foo
-        self.immortalize(foo)
+        class Circular:
+            def __init__(self):
+                self.builtins = builtins
 
-    @isolate
+        builtins.foo = self.immortalize(foo)
+        builtins.circular = self.immortalize(Circular())
+
+    @always_isolate(
+        required_stdout=["on_exit_immortal called", "on_exit_circular called"],
+        via_subprocess=True
+    )
     def test_atexit(self):
         import atexit
 
@@ -565,16 +660,26 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
             self.assert_mortal(on_exit)
             self.immortalize(atexit)
 
-        mortal = [42]
+        mortal_int = self.mortable_type(int)(42)
+        mortal = [mortal_int]
 
         @atexit.register
         def on_exit_immortal():
             self.immortalize(on_exit_immortal, already=True)
             self.assert_mortal(mortal)
             self.assertEqual(mortal[0], 42)
+            self.write_for_test("on_exit_immortal called")
 
         self.immortalize(on_exit_immortal)
 
+        @atexit.register
+        def on_exit_circular():
+            self.immortalize(on_exit_circular)
+            self.write_for_test("on_exit_circular called")
+
+        on_exit_circular.circle = on_exit_circular
+
+    @unittest.skipIf(True, "slow for free-threading")
     @unittest.skipIf(support.Py_GIL_DISABLED, "slow for free-threading")
     @always_isolate
     def test_the_party_pack(self):
@@ -587,16 +692,15 @@ class TestUserImmortalObjects(unittest.TestCase, ImmortalUtilities):
         blacklisted = {"antigravity", "this"}
 
         def immortalize_everything(mod):
-            sys._immortalize(mod)
+            self.immortalize(mod, loose=True)
 
             for i in dir(mod):
                 attr = getattr(mod, i)
-                sys._immortalize(attr)
-                self.assertTu
+                self.immortalize(attr, loose=True)
 
                 for x in dir(attr):
                     with contextlib.suppress(Exception):
-                        sys._immortalize(getattr(attr, x))
+                        self.immortalize(getattr(attr, x), loose=True)
 
 
         for i in sys.stdlib_module_names:
