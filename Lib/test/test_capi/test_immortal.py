@@ -9,7 +9,7 @@ import io
 import os
 
 _testcapi = import_helper.import_module("_testcapi")
-_testinternalcapi = import_helper.import_module('_testinternalcapi')
+_testinternalcapi = import_helper.import_module("_testinternalcapi")
 
 
 class TestUnstableCAPI(unittest.TestCase):
@@ -63,10 +63,14 @@ class ImmortalUtilities(unittest.TestCase):
 
         if loose is None:
             if already is True:
-                self.assertEqual(refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be mortal")
+                self.assertEqual(
+                    refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be mortal"
+                )
                 self.assertTrue(sys._is_immortal(obj))
             else:
-                self.assertNotEqual(refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be immortal")
+                self.assertNotEqual(
+                    refcnt, _IMMORTAL_REFCNT, msg=f"{obj!r} should not be immortal"
+                )
                 self.assertFalse(sys._is_immortal(obj))
 
         sys._immortalize(obj)
@@ -109,7 +113,9 @@ class ImmortalUtilities(unittest.TestCase):
 
     def assert_mortal(self, obj):
         _IMMORTAL_REFCNT = sys.getrefcount(None)
-        self.assertNotEqual(sys.getrefcount(obj), _IMMORTAL_REFCNT, f"{obj!r} is immortal somehow")
+        self.assertNotEqual(
+            sys.getrefcount(obj), _IMMORTAL_REFCNT, f"{obj!r} is immortal somehow"
+        )
         return obj
 
     def sequence(self, constructor):
@@ -117,8 +123,22 @@ class ImmortalUtilities(unittest.TestCase):
             self.immortalize(constructor((1, 2, 3, False)), loose=True)
             self.immortalize(constructor((1, 2, 3, self.mortal_int())))
             self.immortalize(constructor((self.mortal_str(), sys.intern("world"))))
-            self.immortalize(constructor((self.mortal_str(), sys.intern("hello"), None, True)))
-            self.immortalize(constructor((self.mortal_str(), self.mortal(), 1, self.mortal_int(), 3, b"a", "")))
+            self.immortalize(
+                constructor((self.mortal_str(), sys.intern("hello"), None, True))
+            )
+            self.immortalize(
+                constructor(
+                    (
+                        self.mortal_str(),
+                        self.mortal(),
+                        1,
+                        self.mortal_int(),
+                        3,
+                        b"a",
+                        "",
+                    )
+                )
+            )
 
             # Some random types
             self.immortalize(constructor((self.mortable_type(int), range)))
@@ -167,15 +187,21 @@ except BaseException:
 """
     return source
 
+
 def _compare_stdout_str(needed, found):
     if isinstance(found, bytes):
         found = found.decode("utf-8")
 
-    if found == '':
-        raise RuntimeError(f"stdout was empty, but expected a required string {needed!r}")
+    if found == "":
+        raise RuntimeError(
+            f"stdout was empty, but expected a required string {needed!r}"
+        )
 
     if needed not in found:
-        raise RuntimeError(f"stdout {found!r} did not contain required string {needed!r}")
+        raise RuntimeError(
+            f"stdout {found!r} did not contain required string {needed!r}"
+        )
+
 
 def _compare_stdout(needed, found):
     if isinstance(needed, str):
@@ -235,6 +261,7 @@ def _get_isolator_and_module():
     # Assume _interpreters by default, fall back to subprocess otherwise
     try:
         import _interpreters as mod
+
         func = _isolate_subinterpreter
     except ImportError:
         # Skip entire test if neither are available
@@ -257,8 +284,7 @@ def always_isolate(raw_test_method=None, *, via_subprocess=None, required_stdout
     def decorator(test_method):
         @functools.wraps(test_method)
         def isolated_test(*args, **kwargs):
-            return func(test_method, mod,
-                        required_stdout=required_stdout)
+            return func(test_method, mod, required_stdout=required_stdout)
 
         return isolated_test
 
@@ -273,12 +299,11 @@ def isolate(raw_test_method=None, *, via_subprocess=None, required_stdout=None):
         # For debugging and performance, don't isolate
         # the tests when executing this module directly
         if __name__ == "__main__":
-            return _capture_in_process(test_method,
-                                       required_stdout=required_stdout)
+            return _capture_in_process(test_method, required_stdout=required_stdout)
 
-        return always_isolate(test_method,
-                              via_subprocess=via_subprocess,
-                              required_stdout=required_stdout)
+        return always_isolate(
+            test_method, via_subprocess=via_subprocess, required_stdout=required_stdout
+        )
 
     if raw_test_method is None:
         return decorator
@@ -325,8 +350,10 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
     @isolate
     def test_memoryview(self):
-        self.immortalize(memoryview(self.assert_mortal(bytearray(self.mortal_str(), "utf-8"))))
-        ba = self.immortalize(bytearray(self.mortal_str(), 'utf-8'))
+        self.immortalize(
+            memoryview(self.assert_mortal(bytearray(self.mortal_str(), "utf-8")))
+        )
+        ba = self.immortalize(bytearray(self.mortal_str(), "utf-8"))
         ba = bytearray(self.mortal_str(), "utf-8")
 
         # Trigger some weird things with finalization.
@@ -436,6 +463,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
     @isolate
     def test_files(self):
         import os
+
         for mode in ("w", "a", "r", "r+", "w+"):
             with self.subTest(mode=mode):
                 with open(os.devnull, mode) as file:
@@ -444,6 +472,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
     @always_isolate(required_stdout="called")
     def test_immortalize_while_finalizing(self):
         import weakref
+
         container = self.assert_mortal([])
 
         def immortalize_while_finalizing(obj):
@@ -485,7 +514,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
         # Immortal iterator, mortal contents
         zip_iter = zip(
             [self.mortal_int(), self.mortal_int(), self.mortal_int()],
-            [self.mortal(), self.mortal_bytes(), self.mortal_str()]
+            [self.mortal(), self.mortal_bytes(), self.mortal_str()],
         )
         self.immortalize(zip_iter)
         for a, b in zip_iter:
@@ -503,10 +532,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
         # Mortal iterator, immortal contents with circular reference
         mortal_zip = self.assert_mortal(
-            zip(
-                [self.immortal(), self.immortal()],
-                [self.immortal(), self.immortal()]
-            )
+            zip([self.immortal(), self.immortal()], [self.immortal(), self.immortal()])
         )
         for a, b in mortal_zip:
             self.immortalize(a, already=True)
@@ -518,15 +544,20 @@ class TestUserImmortalObjects(ImmortalUtilities):
     def test_iter(self):
         # Immortal iterator, mortal contents
         for i in self.immortalize(
-            iter([self.mortal_str(), self.mortal_bytes(), self.mortal_int(), self.mortal()])
+            iter(
+                [
+                    self.mortal_str(),
+                    self.mortal_bytes(),
+                    self.mortal_int(),
+                    self.mortal(),
+                ]
+            )
         ):
             with self.subTest(i=i):
                 self.assert_mortal(i)
 
         # Mortal iterator, immortal contents
-        mortal_iterator = self.assert_mortal(
-            iter([self.immortal(), self.immortal()])
-        )
+        mortal_iterator = self.assert_mortal(iter([self.immortal(), self.immortal()]))
         for _ in mortal_iterator:
             self.assert_mortal(mortal_iterator)
 
@@ -537,7 +568,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
             pass
 
     @isolate
-    def test_freelist(self):
+    def test_freelists(self):
         # I remember _asyncio.FutureIter was doing
         # some exotic things with freelists (GH-122695)
         import asyncio
@@ -675,7 +706,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
     @always_isolate(
         required_stdout=["on_exit_immortal called", "on_exit_circular called"],
-        via_subprocess=True
+        via_subprocess=True,
     )
     def test_atexit(self):
         import atexit
@@ -726,7 +757,6 @@ class TestUserImmortalObjects(ImmortalUtilities):
                 for x in dir(attr):
                     with contextlib.suppress(Exception):
                         self.immortalize(getattr(attr, x), loose=True)
-
 
         for i in sys.stdlib_module_names:
             if i in blacklisted:
