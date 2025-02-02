@@ -1513,16 +1513,13 @@ PyUnstable_Immortalize(PyObject *op)
         _PyObject_GC_UNTRACK(op);
     }
 
+    // Stop the world so reference counts aren't prone
+    // to races.
     _PyEval_StopTheWorld(interp);
 
 #ifdef Py_GIL_DISABLED
     // Disable deferred reference counting
-    if (_PyObject_HasDeferredRefcount(op))
-    {
-        op->ob_gc_bits &= ~_PyGC_BITS_DEFERRED;
-        op->ob_ref_shared -= _Py_REF_SHARED(_Py_REF_DEFERRED, 0);
-    }
-    _PyObject_DisablePerThreadRefcounting(op);
+    _PyGC_DisableDeferredRefcount(op);
 #endif
 
 #ifdef Py_REF_DEBUG

@@ -735,8 +735,6 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
         on_exit_circular.circle = on_exit_circular
 
-    @unittest.skipIf(True, "slow for free-threading")
-    @unittest.skipIf(support.Py_GIL_DISABLED, "slow for free-threading")
     @always_isolate
     def test_the_party_pack(self):
         import contextlib
