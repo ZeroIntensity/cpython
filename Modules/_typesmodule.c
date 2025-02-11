@@ -494,7 +494,8 @@ PyType_Spec _GeneratorWrapper_Spec = {
     .name = "types._GeneratorWrapper",
     .basicsize = sizeof(GeneratorWrapper),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-             Py_TPFLAGS_BASETYPE | Py_TPFLAGS_MANAGED_DICT,
+             Py_TPFLAGS_BASETYPE | Py_TPFLAGS_MANAGED_DICT |
+             Py_TPFLAGS_MANAGED_DICT | Py_TPFLAGS_MANAGED_WEAKREF,
     .slots = GeneratorWrapper_Slots,
 };
 

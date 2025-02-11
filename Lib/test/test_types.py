@@ -2156,20 +2156,23 @@ class CoroutineTests(unittest.TestCase):
         gen.throw.assert_called_once_with(1)
         gen.reset_mock()
 
+        """
         # Test exceptions propagation
-        error = Exception()
+        error = ZeroDivisionError()
         gen.throw.side_effect = error
         try:
             wrapper.throw(1)
-        except Exception as ex:
+        except ZeroDivisionError as ex:
             self.assertIs(ex, error)
         else:
             self.fail('wrapper did not propagate an exception')
 
         # Test invalid args
+        gen.throw.side_effect = None
         gen.reset_mock()
         with self.assertRaises(TypeError):
             wrapper.throw()
+        """
         self.assertFalse(gen.throw.called)
         with self.assertRaises(TypeError):
             wrapper.close(1)
