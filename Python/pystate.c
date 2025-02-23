@@ -1464,17 +1464,19 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     // if it held more than just the initial thread state.
 }
 
-
 int
 PyUnstable_Immortalize(PyObject *op)
 {
     assert(op != NULL);
+    PyThreadState *tstate = _PyThreadState_GET();
+    _Py_EnsureTstateNotNULL(tstate);
+
     if (_Py_IsImmortal(op)) {
         // We don't want to track objects that are already immortal
         return 0;
     }
 
-    PyInterpreterState *interp = _PyInterpreterState_GET();
+    PyInterpreterState *interp = tstate->interp;
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     _Py_hashtable_t *immortals;
     if (imm_state->values == NULL)
@@ -1502,8 +1504,13 @@ PyUnstable_Immortalize(PyObject *op)
     entry->object = op;
     entry->gc_tracked = PyObject_GC_IsTracked(op);
 
+    /* Stop the world so reference counts aren't prone to races. */
+    _PyEval_StopTheWorld(interp);
+
+    // We'll just use the stop-the-world as a makeshift lock
     if (_Py_hashtable_set(imm_state->values, op, entry) < 0)
     {
+        _PyEval_StartTheWorld(interp);
         PyMem_RawFree(entry);
         PyErr_NoMemory();
         return -1;
@@ -1513,18 +1520,14 @@ PyUnstable_Immortalize(PyObject *op)
         _PyObject_GC_UNTRACK(op);
     }
 
-    // Stop the world so reference counts aren't prone
-    // to races.
-    _PyEval_StopTheWorld(interp);
-
 #ifdef Py_GIL_DISABLED
-    // Disable deferred reference counting
+    _PyObject_MergePerThreadRefcounts((_PyThreadStateImpl *)tstate);
     _PyGC_DisableDeferredRefcount(op);
+    _PyObject_ASSERT(op, !_PyObject_HasDeferredRefcount(op));
 #endif
 
 #ifdef Py_REF_DEBUG
-    // Removal the old references, so the reftotal
-    // isn't affected.
+    /* Remove the old references, so the reftotal isn't affected. */
     Py_ssize_t refcnt = Py_REFCNT(op) - 1;
     for (Py_ssize_t i = 0; i < refcnt; ++i)
     {
