@@ -961,6 +961,7 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
     assert(immortal != NULL);
     PyObject *op = immortal->object;
     assert(op != NULL);
+    _PyObject_ASSERT(op, _Py_IsImmortal(op));
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
 
     if (immortal->gc_tracked && !_PyObject_GC_IS_TRACKED(op)) {
