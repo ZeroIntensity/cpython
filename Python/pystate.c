@@ -1262,7 +1262,7 @@ _PyInterpreterState_DeleteImmortals(PyInterpreterState *interp)
     imm_state->values = NULL;
 
     // Alas, we've made it! The immortals shall now
-    // officially get freed bby clearing the deferred memory bank.
+    // officially get freed by clearing the deferred memory bank.
     delete_deferred_memory(interp);
 }
 
