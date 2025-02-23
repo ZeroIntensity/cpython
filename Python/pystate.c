@@ -922,22 +922,10 @@ delete_deferred_memory(PyInterpreterState *interp)
     delete_deferred_memory_common(PYMEM_DOMAIN_MEM, &imm_state->trashcan.memory, PyMem_Free);
 }
 
-static int
+static inline int
 _Py_IsRuntimeImmortal(PyObject *op)
 {
-    if (!_Py_IsImmortal(op))
-    {
-        // Not immortal
-        return 0;
-    }
-
-    if (_Py_FindUserDefinedImmortal(op) == NULL)
-    {
-        // Interpreter-defined immortal
-        return 0;
-    }
-
-    return 1;
+    return _Py_FindUserDefinedImmortal(op) != NULL;
 }
 
 #ifndef NDEBUG
