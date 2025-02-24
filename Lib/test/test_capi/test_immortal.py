@@ -2,6 +2,7 @@ import unittest
 
 from test import support
 from test.support import import_helper
+from test.support import threading_helper
 import sys
 import functools
 import inspect
@@ -376,9 +377,11 @@ class TestUserImmortalObjects(ImmortalUtilities):
                 self.immortalize(i, already=True)
 
         self.immortalize(self.mortal_int())
-        self.immortalize(10**1000, loose=self.Py_GIL_DISABLED)  # Really big number
+        self.immortalize(10 ** 1000, loose=self.Py_GIL_DISABLED)  # Really big number
         self.immortalize(self.mortable_type(complex)(100j))
         self.immortalize(self.mortable_type(float)(0.0))
+        self.immortalize(self.mortable_type(float)('nan'))
+        self.immortalize(self.mortable_type(float)('inf'))
 
     @isolate
     def test_lists(self):
@@ -664,6 +667,31 @@ class TestUserImmortalObjects(ImmortalUtilities):
         frame_locals()
 
     @isolate
+    def test_function_code(self):
+        def func(value):
+            return value * 2
+
+        # Some arbitrary code objects
+        code_objects = [func.__code__, self.test_function_code.__code__]
+        for code in code_objects:
+            with self.subTest(code=code):
+                self.immortalize(code)
+
+        # Make sure we can still use the function
+        self.assertEqual(func(21), 42)
+
+    @isolate
+    def test_compiled_code(self):
+        code = self.immortalize(compile("a = 1; b = 0; a / b", "<test>", "exec"))
+        # Ensure that an immortal code object can be exec'd
+        with self.assertRaises(ZeroDivisionError):
+            exec(code)
+
+        # Ensure that an immortal code object can be eval'd
+        other_code = self.immortalize(compile("a * b", "<test>", "eval"))
+        self.assertEqual(eval(other_code, locals={"a": 21, "b": 2}), 42)
+
+    @isolate
     def test_descriptors(self):
         class Test:
             @staticmethod
@@ -735,6 +763,27 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
         on_exit_circular.circle = on_exit_circular
 
+    @unittest.skipUnless(support.Py_GIL_DISABLED, "only meaningful under free-threading")
+    @threading_helper.requires_working_threading()
+    def test_immortalize_concurrently(self):
+        import threading
+        mortal = self.mortal()
+        num_threads = 4
+        barrier = threading.Barrier(num_threads)
+        results = []
+
+        def race() -> None:
+            barrier.wait()
+            results.append(self.immortalize(mortal, loose=True))
+
+        with threading_helper.start_threads((threading.Thread(target=race) for _ in range(num_threads))):
+            pass
+
+        self.assertEqual(len(results), num_threads)
+        self.assertEqual(results.count(1), 1)
+        self.assertEqual(results.count(0), num_threads - 1)
+
+    @support.requires_resource("cpu")
     @always_isolate
     def test_the_party_pack(self):
         import contextlib
