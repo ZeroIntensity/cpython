@@ -952,6 +952,20 @@ is_finalized(PyObject *op)
 }
 #endif
 
+static void
+reimmortalize_if_mortal(PyInterpreterState *interp, PyObject *op)
+{
+    /* Sanity check for finalization: if the object somehow became mortal
+     * again, then we should re-immortalize it. It's not particularly important
+     * because the object doesn't actually care if it's considered "immortal" or not
+     * at this point, but we might as well be consistent. */
+    if (!_Py_IsImmortal(op)) {
+        _PyEval_StopTheWorld(interp);
+        _Py_SetImmortalKnown(op);
+        _PyEval_StartTheWorld(interp);
+    }
+}
+
 /*
  * Run the finalizer for an immortal object, but *not*
  * the deallocator. This assumes that deferred memory
@@ -963,6 +977,7 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
     assert(immortal != NULL);
     PyObject *op = immortal->object;
     assert(op != NULL);
+    reimmortalize_if_mortal(interp, op);
     _PyObject_ASSERT(op, _Py_IsImmortal(op));
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
 
