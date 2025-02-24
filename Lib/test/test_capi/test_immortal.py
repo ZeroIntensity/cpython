@@ -774,7 +774,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
         def race() -> None:
             barrier.wait()
-            results.append(self.immortalize(mortal, loose=True))
+            results.append(sys._immortalize(mortal))
 
         with threading_helper.start_threads((threading.Thread(target=race) for _ in range(num_threads))):
             pass
