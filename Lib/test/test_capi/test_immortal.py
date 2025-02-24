@@ -160,8 +160,7 @@ import sys
 import unittest
 import types
 import os
-
-support = types.SimpleNamespace(Py_GIL_DISABLED={support.Py_GIL_DISABLED})
+from test import support
 
 def _passthrough_decorator(test_method=None, *args, **kwargs):
     if test_method is None:
