@@ -161,6 +161,7 @@ import unittest
 import types
 import os
 from test import support
+from test.support import threading_helper
 
 def _passthrough_decorator(test_method=None, *args, **kwargs):
     if test_method is None:
@@ -764,6 +765,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
     @unittest.skipUnless(support.Py_GIL_DISABLED, "only meaningful under free-threading")
     @threading_helper.requires_working_threading()
+    @isolate
     def test_immortalize_concurrently(self):
         import threading
         mortal = self.mortal()
@@ -771,7 +773,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
         barrier = threading.Barrier(num_threads)
         results = []
 
-        def race() -> None:
+        def race():
             barrier.wait()
             results.append(sys._immortalize(mortal))
 
@@ -781,6 +783,25 @@ class TestUserImmortalObjects(ImmortalUtilities):
         self.assertEqual(len(results), num_threads)
         self.assertEqual(results.count(1), 1)
         self.assertEqual(results.count(0), num_threads - 1)
+
+    @threading_helper.requires_working_threading()
+    @isolate
+    def test_lingering_immortal_in_daemon_thread(self):
+        import threading
+
+        immortal = self.immortal()
+        event = threading.Event()
+
+        def linger():
+            other = self.immortal()
+            other.cycle = immortal
+            immortal.cycle = other
+            event.set()
+
+        thread = threading.Thread(target=linger, daemon=True)
+        thread.start()
+        event.wait()
+        self.assertTrue(hasattr(immortal, "cycle"))
 
     @support.requires_resource("cpu")
     @always_isolate
