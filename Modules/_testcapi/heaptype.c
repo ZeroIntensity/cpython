@@ -23,7 +23,7 @@ static PyObject *pytype_fromspec_meta(PyObject* self, PyObject *meta)
         "_testcapi.HeapCTypeViaMetaclass",
         sizeof(PyObject),
         0,
-        Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+        _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
         HeapCTypeViaMetaclass_slots
     };
 
@@ -39,14 +39,14 @@ static PyType_Slot empty_type_slots[] = {
 static PyType_Spec MinimalMetaclass_spec = {
     .name = "_testcapi.MinimalMetaclass",
     .basicsize = sizeof(PyHeapTypeObject),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     .slots = empty_type_slots,
 };
 
 static PyType_Spec MinimalType_spec = {
     .name = "_testcapi.MinimalSpecType",
     .basicsize = 0,  // Updated later
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = _Py_TPFLAGS_CPYTHON,
     .slots = empty_type_slots,
 };
 
@@ -243,7 +243,7 @@ test_type_from_ephemeral_spec(PyObject *self, PyObject *Py_UNUSED(ignored))
     spec->name = name;
     spec->basicsize = sizeof(PyObject);
     spec->itemsize = 0;
-    spec->flags = Py_TPFLAGS_DEFAULT;
+    spec->flags = _Py_TPFLAGS_CPYTHON;
     slots = PyMem_New(PyType_Slot, 3);
     if (slots == NULL) {
         PyErr_NoMemory();
@@ -380,7 +380,7 @@ make_immutable_type_with_base(PyObject *self, PyObject *base)
         .name = "ImmutableSubclass",
         .basicsize = (int)((PyTypeObject*)base)->tp_basicsize,
         .slots = empty_type_slots,
-        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE,
+        .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE,
     };
     return PyType_FromSpecWithBases(&ImmutableSubclass_spec, base);
 }
@@ -393,7 +393,7 @@ make_type_with_base(PyObject *self, PyObject *base)
         .name = "_testcapi.Subclass",
         .basicsize = (int)((PyTypeObject*)base)->tp_basicsize,
         .slots = empty_type_slots,
-        .flags = Py_TPFLAGS_DEFAULT,
+        .flags = _Py_TPFLAGS_CPYTHON,
     };
     return PyType_FromSpecWithBases(&ImmutableSubclass_spec, base);
 }
@@ -427,7 +427,7 @@ create_type_with_token(PyObject *module, PyObject *args)
         };
         static PyType_Spec spec = {
             .name = "_testcapi.DefaultTokenTest",
-            .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+            .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
             .slots = slots,
         };
         PyObject *type = PyType_FromMetaclass(NULL, NULL, &spec, NULL);
@@ -450,7 +450,7 @@ create_type_with_token(PyObject *module, PyObject *args)
     };
     PyType_Spec spec = {
         .name = name,
-        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+        .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
         .slots = slots,
     };
     return PyType_FromMetaclass(NULL, module, &spec, NULL);
@@ -561,7 +561,7 @@ static PyType_Spec HeapDocCType_spec = {
     "_testcapi.HeapDocCType",
     sizeof(HeapDocCTypeObject),
     0,
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     HeapDocCType_slots
 };
 
@@ -578,7 +578,7 @@ static PyType_Spec NullTpDocType_spec = {
     "_testcapi.NullTpDocType",
     sizeof(NullTpDocTypeObject),
     0,
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     NullTpDocType_slots
 };
 
@@ -633,7 +633,7 @@ static PyType_Spec HeapGcCType_spec = {
     "_testcapi.HeapGcCType",
     sizeof(HeapCTypeObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     HeapGcCType_slots
 };
 
@@ -661,7 +661,7 @@ static PyType_Spec HeapCType_spec = {
     "_testcapi.HeapCType",
     sizeof(HeapCTypeObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCType_slots
 };
 
@@ -702,7 +702,7 @@ static PyType_Spec HeapCTypeSubclass_spec = {
     "_testcapi.HeapCTypeSubclass",
     sizeof(HeapCTypeSubclassObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeSubclass_slots
 };
 
@@ -743,7 +743,7 @@ static PyType_Spec HeapCTypeWithBuffer_spec = {
     "_testcapi.HeapCTypeWithBuffer",
     sizeof(HeapCTypeWithBufferObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeWithBuffer_slots
 };
 
@@ -825,7 +825,7 @@ static PyType_Spec HeapCTypeSubclassWithFinalizer_spec = {
     "_testcapi.HeapCTypeSubclassWithFinalizer",
     sizeof(HeapCTypeSubclassObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_FINALIZE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_FINALIZE,
     HeapCTypeSubclassWithFinalizer_slots
 };
 
@@ -837,7 +837,7 @@ static PyType_Spec HeapCTypeMetaclass_spec = {
     "_testcapi.HeapCTypeMetaclass",
     sizeof(PyHeapTypeObject),
     sizeof(PyMemberDef),
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     HeapCTypeMetaclass_slots
 };
 
@@ -856,13 +856,13 @@ static PyType_Spec HeapCTypeMetaclassCustomNew_spec = {
     "_testcapi.HeapCTypeMetaclassCustomNew",
     sizeof(PyHeapTypeObject),
     sizeof(PyMemberDef),
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     HeapCTypeMetaclassCustomNew_slots
 };
 
 static PyType_Spec HeapCTypeMetaclassNullNew_spec = {
     .name = "_testcapi.HeapCTypeMetaclassNullNew",
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
+    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     .slots = empty_type_slots
 };
 
@@ -904,7 +904,7 @@ static PyType_Spec HeapCTypeWithDict_spec = {
     "_testcapi.HeapCTypeWithDict",
     sizeof(HeapCTypeWithDictObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeWithDict_slots
 };
 
@@ -912,7 +912,7 @@ static PyType_Spec HeapCTypeWithDict2_spec = {
     "_testcapi.HeapCTypeWithDict2",
     sizeof(HeapCTypeWithDictObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeWithDict_slots
 };
 
@@ -952,7 +952,7 @@ static PyType_Spec  HeapCTypeWithManagedDict_spec = {
     "_testcapi.HeapCTypeWithManagedDict",
     sizeof(PyObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_MANAGED_DICT,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_MANAGED_DICT,
     HeapCTypeWithManagedDict_slots
 };
 
@@ -978,7 +978,7 @@ static PyType_Spec  HeapCTypeWithManagedWeakref_spec = {
     "_testcapi.HeapCTypeWithManagedWeakref",
     sizeof(PyObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_MANAGED_WEAKREF,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_MANAGED_WEAKREF,
     HeapCTypeWithManagedWeakref_slots
 };
 
@@ -999,7 +999,7 @@ static PyType_Spec HeapCTypeWithNegativeDict_spec = {
     "_testcapi.HeapCTypeWithNegativeDict",
     sizeof(HeapCTypeWithDictObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeWithNegativeDict_slots
 };
 
@@ -1037,7 +1037,7 @@ static PyType_Spec HeapCTypeWithWeakref_spec = {
     "_testcapi.HeapCTypeWithWeakref",
     sizeof(HeapCTypeWithWeakrefObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeWithWeakref_slots
 };
 
@@ -1045,7 +1045,7 @@ static PyType_Spec HeapCTypeWithWeakref2_spec = {
     "_testcapi.HeapCTypeWithWeakref2",
     sizeof(HeapCTypeWithWeakrefObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeWithWeakref_slots
 };
 
@@ -1119,7 +1119,7 @@ static PyType_Spec HeapCTypeSetattr_spec = {
     "_testcapi.HeapCTypeSetattr",
     sizeof(HeapCTypeSetattrObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     HeapCTypeSetattr_slots
 };
 
@@ -1202,7 +1202,7 @@ static PyType_Spec HeapCTypeVectorcall_spec = {
     "_testcapi.HeapCTypeVectorcall",
     sizeof(HeapCTypeVectorcallObject),
     0,
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     HeapCTypeVectorcall_slots
 };
 
@@ -1308,7 +1308,7 @@ static PyType_Spec HeapCCollection_spec = {
     .name = "_testcapi.HeapCCollection",
     .basicsize = sizeof(PyVarObject),
     .itemsize = sizeof(PyObject*),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_ITEMS_AT_END),
     .slots = HeapCCollection_slots,
 };

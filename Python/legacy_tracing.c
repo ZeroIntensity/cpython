@@ -397,7 +397,7 @@ PyTypeObject _PyLegacyEventHandler_Type = {
     sizeof(_PyLegacyEventHandler),
     .tp_dealloc = (destructor)PyObject_Free,
     .tp_vectorcall_offset = offsetof(_PyLegacyEventHandler, vectorcall),
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
         Py_TPFLAGS_HAVE_VECTORCALL | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     .tp_call = PyVectorcall_Call,
 };

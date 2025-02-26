@@ -2682,7 +2682,7 @@ static PyType_Slot channelid_typeslots[] = {
 static PyType_Spec channelid_typespec = {
     .name = MODULE_NAME_STR ".ChannelID",
     .basicsize = sizeof(channelid),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = channelid_typeslots,
 };

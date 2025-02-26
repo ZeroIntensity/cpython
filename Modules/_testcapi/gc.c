@@ -309,7 +309,7 @@ static PyType_Slot ObjExtraData_Slots[] = {
 static PyType_Spec ObjExtraData_TypeSpec = {
     .name = "_testcapi.ObjExtraData",
     .basicsize = sizeof(ObjExtraData),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     .slots = ObjExtraData_Slots,
 };
 

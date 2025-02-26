@@ -2989,7 +2989,7 @@ static PyType_Slot array_slots[] = {
 static PyType_Spec array_spec = {
     .name = "array.array",
     .basicsize = sizeof(arrayobject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_SEQUENCE),
     .slots = array_slots,
@@ -3140,7 +3140,7 @@ static PyType_Slot arrayiter_slots[] = {
 static PyType_Spec arrayiter_spec = {
     .name = "array.arrayiterator",
     .basicsize = sizeof(arrayiterobject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = arrayiter_slots,
 };

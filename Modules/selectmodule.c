@@ -1191,7 +1191,7 @@ static PyType_Spec devpoll_Type_spec = {
     "select.devpoll",
     sizeof(devpollObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     devpoll_Type_slots
 };
 
@@ -1973,7 +1973,7 @@ static PyType_Spec kqueue_event_Type_spec = {
     "select.kevent",
     sizeof(kqueue_event_Object),
     0,
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     kqueue_event_Type_slots
 };
 
@@ -2467,7 +2467,7 @@ static PyType_Slot poll_Type_slots[] = {
 static PyType_Spec poll_Type_spec = {
     .name = "select.poll",
     .basicsize = sizeof(pollObject),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
+    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     .slots = poll_Type_slots,
 };
 
@@ -2516,7 +2516,7 @@ static PyType_Spec pyEpoll_Type_spec = {
     "select.epoll",
     sizeof(pyEpoll_Object),
     0,
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     pyEpoll_Type_slots
 };
 
@@ -2545,7 +2545,7 @@ static PyType_Spec kqueue_queue_Type_spec = {
     "select.kqueue",
     sizeof(kqueue_queue_Object),
     0,
-    Py_TPFLAGS_DEFAULT,
+    _Py_TPFLAGS_CPYTHON,
     kqueue_queue_Type_slots
 };
 

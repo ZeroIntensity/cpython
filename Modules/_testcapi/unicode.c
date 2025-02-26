@@ -535,7 +535,7 @@ static PyType_Slot Writer_Type_slots[] = {
 static PyType_Spec Writer_spec = {
     .name = "_testcapi.PyUnicodeWriter",
     .basicsize = sizeof(WriterObject),
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = _Py_TPFLAGS_CPYTHON,
     .slots = Writer_Type_slots,
 };
 

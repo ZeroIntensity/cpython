@@ -613,7 +613,7 @@ static PyType_Slot carg_slots[] = {
 PyType_Spec carg_spec = {
     .name = "_ctypes.CArgObject",
     .basicsize = sizeof(PyCArgObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = carg_slots,
 };

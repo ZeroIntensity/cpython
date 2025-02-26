@@ -135,7 +135,7 @@ static PyType_Spec Xxo_Type_spec = {
     "xxlimited_35.Xxo",
     sizeof(XxoObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
     Xxo_Type_slots
 };
 
@@ -199,7 +199,7 @@ static PyType_Spec Str_Type_spec = {
     "xxlimited_35.Str",
     0,
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     Str_Type_slots
 };
 
@@ -222,7 +222,7 @@ static PyType_Spec Null_Type_spec = {
     "xxlimited_35.Null",
     0,               /* basicsize */
     0,               /* itemsize */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     Null_Type_slots
 };
 

@@ -782,7 +782,7 @@ static PyType_Slot _PyMp_SemLockType_slots[] = {
 PyType_Spec _PyMp_SemLockType_spec = {
     .name = "_multiprocessing.SemLock",
     .basicsize = sizeof(SemLockObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = _PyMp_SemLockType_slots,
 };

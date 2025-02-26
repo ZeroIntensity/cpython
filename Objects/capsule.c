@@ -354,7 +354,7 @@ Python import mechanism to link to one another.\n\
 PyTypeObject PyCapsule_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
     .tp_name = "PyCapsule",
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
     .tp_basicsize = sizeof(PyCapsule),
     .tp_dealloc = capsule_dealloc,
     .tp_repr = capsule_repr,

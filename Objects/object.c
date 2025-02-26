@@ -2195,7 +2195,7 @@ PyTypeObject _PyNone_Type = {
     0,                  /*tp_getattro */
     0,                  /*tp_setattro */
     0,                  /*tp_as_buffer */
-    Py_TPFLAGS_DEFAULT, /*tp_flags */
+    _Py_TPFLAGS_CPYTHON, /*tp_flags */
     none_doc,           /*tp_doc */
     0,                  /*tp_traverse */
     0,                  /*tp_clear */
@@ -2295,7 +2295,7 @@ PyTypeObject _PyNotImplemented_Type = {
     0,                  /*tp_getattro */
     0,                  /*tp_setattro */
     0,                  /*tp_as_buffer */
-    Py_TPFLAGS_DEFAULT, /*tp_flags */
+    _Py_TPFLAGS_CPYTHON, /*tp_flags */
     notimplemented_doc, /*tp_doc */
     0,                  /*tp_traverse */
     0,                  /*tp_clear */

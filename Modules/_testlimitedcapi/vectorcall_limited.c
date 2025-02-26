@@ -171,7 +171,7 @@ static PyType_Slot LimitedVectorallClass_slots[] = {
 static PyType_Spec LimitedVectorCallClass_spec = {
     .name = "_testlimitedcapi.LimitedVectorCallClass",
     .basicsize = (int)(sizeof(PyObject) + sizeof(vectorcallfunc)),
-    .flags = Py_TPFLAGS_DEFAULT
+    .flags = _Py_TPFLAGS_CPYTHON
         | Py_TPFLAGS_HAVE_VECTORCALL
         | Py_TPFLAGS_BASETYPE,
     .slots = LimitedVectorallClass_slots,
@@ -197,7 +197,7 @@ LimitedRelativeVectorCallClass_new(PyTypeObject *tp, PyTypeObject *a, PyTypeObje
 static PyType_Spec LimitedRelativeVectorCallClass_spec = {
     .name = "_testlimitedcapi.LimitedRelativeVectorCallClass",
     .basicsize = -(int)sizeof(LimitedRelativeVectorCallStruct),
-    .flags = Py_TPFLAGS_DEFAULT
+    .flags = _Py_TPFLAGS_CPYTHON
         | Py_TPFLAGS_HAVE_VECTORCALL,
     .slots = (PyType_Slot[]) {
         {Py_tp_new, LimitedRelativeVectorCallClass_new},

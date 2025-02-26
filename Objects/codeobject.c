@@ -1371,7 +1371,7 @@ PyTypeObject _PyLineIterator = {
     0,                                  /* tp_getattro */
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,       /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,       /* tp_flags */
     0,                                  /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
@@ -1464,7 +1464,7 @@ PyTypeObject _PyPositionsIterator = {
     0,                                  /* tp_getattro */
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,       /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,       /* tp_flags */
     0,                                  /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
@@ -2379,9 +2379,9 @@ PyTypeObject PyCode_Type = {
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
 #ifdef Py_GIL_DISABLED
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC, /* tp_flags */
 #else
-    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    _Py_TPFLAGS_CPYTHON,                 /* tp_flags */
 #endif
     code_new__doc__,                    /* tp_doc */
 #ifdef Py_GIL_DISABLED

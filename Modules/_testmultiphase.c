@@ -119,7 +119,7 @@ static PyType_Spec Example_Type_spec = {
     "_testimportexec.Example",
     sizeof(ExampleObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
     Example_Type_slots
 };
 
@@ -289,7 +289,7 @@ static PyType_Spec StateAccessType_spec = {
     "_testimportexec.StateAccessType",
     sizeof(StateAccessTypeObject),
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_FINALIZE | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_FINALIZE | Py_TPFLAGS_BASETYPE,
     StateAccessType_Type_slots
 };
 
@@ -361,7 +361,7 @@ static PyType_Spec Str_Type_spec = {
     "_testimportexec.Str",
     0,
     0,
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     Str_Type_slots
 };
 

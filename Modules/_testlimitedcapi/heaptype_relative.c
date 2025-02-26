@@ -32,13 +32,13 @@ make_sized_heaptypes(PyObject *module, PyObject *args)
     PyType_Spec base_spec = {
         .name = "_testcapi.Base",
         .basicsize = sizeof(PyObject) + extra_base_size,
-        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+        .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
         .slots = empty_slots,
     };
     PyType_Spec sub_spec = {
         .name = "_testcapi.Sub",
         .basicsize = basicsize,
-        .flags = Py_TPFLAGS_DEFAULT,
+        .flags = _Py_TPFLAGS_CPYTHON,
         .slots = empty_slots,
     };
 
@@ -137,7 +137,7 @@ subclass_var_heaptype(PyObject *module, PyObject *args)
         .name = "_testcapi.Sub",
         .basicsize = basicsize,
         .itemsize = itemsize,
-        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_ITEMS_AT_END,
+        .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_ITEMS_AT_END,
         .slots = slots,
     };
 
@@ -168,7 +168,7 @@ subclass_heaptype(PyObject *module, PyObject *args)
         .name = "_testcapi.Sub",
         .basicsize = basicsize,
         .itemsize = itemsize,
-        .flags = Py_TPFLAGS_DEFAULT,
+        .flags = _Py_TPFLAGS_CPYTHON,
         .slots = slots,
     };
 
@@ -267,7 +267,7 @@ heapctypewithrelativedict_dealloc(PyObject* self)
 static PyType_Spec HeapCTypeWithRelativeDict_spec = {
     .name = "_testcapi.HeapCTypeWithRelativeDict",
     .basicsize = -(int)sizeof(HeapCTypeWithDictStruct),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     .slots = (PyType_Slot[]) {
         {Py_tp_dealloc, heapctypewithrelativedict_dealloc},
         {Py_tp_getset, (PyGetSetDef[]) {
@@ -308,7 +308,7 @@ heapctypewithrelativeweakref_dealloc(PyObject* self)
 static PyType_Spec HeapCTypeWithRelativeWeakref_spec = {
     .name = "_testcapi.HeapCTypeWithRelativeWeakref",
     .basicsize = -(int)sizeof(HeapCTypeWithWeakrefStruct),
-    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     .slots = (PyType_Slot[]) {
         {Py_tp_dealloc, heapctypewithrelativeweakref_dealloc},
         {Py_tp_members, (PyMemberDef[]) {
@@ -361,7 +361,7 @@ make_heaptype_with_member_impl(PyObject *module, int extra_base_size,
     PyType_Spec base_spec = {
         .name = "_testcapi.Base",
         .basicsize = sizeof(PyObject) + extra_base_size,
-        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+        .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
         .slots = empty_slots,
     };
     base = PyType_FromMetaclass(NULL, module, &base_spec, NULL);
@@ -383,7 +383,7 @@ make_heaptype_with_member_impl(PyObject *module, int extra_base_size,
     PyType_Spec sub_spec = {
         .name = "_testcapi.Sub",
         .basicsize = basicsize,
-        .flags = Py_TPFLAGS_DEFAULT,
+        .flags = _Py_TPFLAGS_CPYTHON,
         .slots = slots,
     };
 

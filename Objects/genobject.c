@@ -871,7 +871,7 @@ PyTypeObject PyGen_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     gen_traverse,                               /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1230,7 +1230,7 @@ PyTypeObject PyCoro_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     gen_traverse,                               /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1334,7 +1334,7 @@ PyTypeObject _PyCoroWrapper_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     "A wrapper object implementing __await__ for coroutines.",
     coro_wrapper_traverse,                      /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1661,7 +1661,7 @@ PyTypeObject PyAsyncGen_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     async_gen_traverse,                         /* tp_traverse */
     0,                                          /* tp_clear */
@@ -1925,7 +1925,7 @@ PyTypeObject _PyAsyncGenASend_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     async_gen_asend_traverse,                   /* tp_traverse */
     0,                                          /* tp_clear */
@@ -2011,7 +2011,7 @@ PyTypeObject _PyAsyncGenWrappedValue_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     async_gen_wrapped_val_traverse,             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -2367,7 +2367,7 @@ PyTypeObject _PyAsyncGenAThrow_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     async_gen_athrow_traverse,                  /* tp_traverse */
     0,                                          /* tp_clear */

@@ -1776,7 +1776,7 @@ static PyType_Slot Future_slots[] = {
 static PyType_Spec Future_spec = {
     .name = "_asyncio.Future",
     .basicsize = sizeof(FutureObj),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_MANAGED_DICT |
               Py_TPFLAGS_MANAGED_WEAKREF),
     .slots = Future_slots,
@@ -2017,7 +2017,7 @@ static PyType_Slot FutureIter_slots[] = {
 static PyType_Spec FutureIter_spec = {
     .name = "_asyncio.FutureIter",
     .basicsize = sizeof(futureiterobject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = FutureIter_slots,
 };
@@ -2134,7 +2134,7 @@ static PyType_Slot TaskStepMethWrapper_slots[] = {
 static PyType_Spec TaskStepMethWrapper_spec = {
     .name = "_asyncio.TaskStepMethWrapper",
     .basicsize = sizeof(TaskStepMethWrapper),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = TaskStepMethWrapper_slots,
 };
@@ -2964,7 +2964,7 @@ static PyType_Slot Task_slots[] = {
 static PyType_Spec Task_spec = {
     .name = "_asyncio.Task",
     .basicsize = sizeof(TaskObj),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_MANAGED_DICT |
               Py_TPFLAGS_MANAGED_WEAKREF),
     .slots = Task_slots,

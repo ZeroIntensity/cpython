@@ -3093,7 +3093,7 @@ static PyTypeObject PyDateTime_DeltaType = {
     PyObject_GenericGetAttr,                            /* tp_getattro */
     0,                                                  /* tp_setattro */
     0,                                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,           /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,           /* tp_flags */
     delta_doc,                                          /* tp_doc */
     0,                                                  /* tp_traverse */
     0,                                                  /* tp_clear */
@@ -3718,7 +3718,7 @@ static PyType_Slot isocal_slots[] = {
 static PyType_Spec isocal_spec = {
     .name = "datetime.IsoCalendarDate",
     .basicsize = sizeof(PyDateTime_IsoCalendarDate),
-    .flags = (Py_TPFLAGS_DEFAULT |
+    .flags = (_Py_TPFLAGS_CPYTHON |
               Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = isocal_slots,
@@ -3993,7 +3993,7 @@ static PyTypeObject PyDateTime_DateType = {
     PyObject_GenericGetAttr,                            /* tp_getattro */
     0,                                                  /* tp_setattro */
     0,                                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,           /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,           /* tp_flags */
     date_doc,                                           /* tp_doc */
     0,                                                  /* tp_traverse */
     0,                                                  /* tp_clear */
@@ -4219,7 +4219,7 @@ static PyTypeObject PyDateTime_TZInfoType = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,   /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,   /* tp_flags */
     tzinfo_doc,                                 /* tp_doc */
     0,                                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -4463,7 +4463,7 @@ static PyTypeObject PyDateTime_TimeZoneType = {
     0,                                /* tp_getattro */
     0,                                /* tp_setattro */
     0,                                /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,               /* tp_flags */
+    _Py_TPFLAGS_CPYTHON,               /* tp_flags */
     timezone_doc,                     /* tp_doc */
     0,                                /* tp_traverse */
     0,                                /* tp_clear */
@@ -5199,7 +5199,7 @@ static PyTypeObject PyDateTime_TimeType = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE, /* tp_flags */
     time_doc,                                   /* tp_doc */
     0,                                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -7118,7 +7118,7 @@ static PyTypeObject PyDateTime_DateTimeType = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE, /* tp_flags */
     datetime_doc,                               /* tp_doc */
     0,                                          /* tp_traverse */
     0,                                          /* tp_clear */

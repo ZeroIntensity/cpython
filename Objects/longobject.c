@@ -6658,7 +6658,7 @@ PyTypeObject PyLong_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
         Py_TPFLAGS_LONG_SUBCLASS |
         _Py_TPFLAGS_MATCH_SELF,               /* tp_flags */
     long_doc,                                   /* tp_doc */

@@ -142,7 +142,7 @@ static PyTypeObject DocStringNoSignatureTest = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_testcapi.DocStringNoSignatureTest",
     .tp_basicsize = sizeof(PyObject),
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
     .tp_methods = DocStringNoSignatureTest_methods,
     .tp_new = PyType_GenericNew,
 };
@@ -183,7 +183,7 @@ static PyTypeObject DocStringUnrepresentableSignatureTest = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_testcapi.DocStringUnrepresentableSignatureTest",
     .tp_basicsize = sizeof(PyObject),
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
     .tp_methods = DocStringUnrepresentableSignatureTest_methods,
     .tp_new = PyType_GenericNew,
 };

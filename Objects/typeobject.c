@@ -3941,7 +3941,7 @@ type_new_alloc(type_new_ctx *ctx)
     // Initialize tp_flags.
     // All heap types need GC, since we can create a reference cycle by storing
     // an instance on one of its parents.
-    type->tp_flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE |
+    type->tp_flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HEAPTYPE |
                       Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC);
 
     // Initialize essential fields
@@ -6455,7 +6455,7 @@ PyTypeObject PyType_Type = {
     _Py_type_getattro,                          /* tp_getattro */
     type_setattro,                              /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
     Py_TPFLAGS_BASETYPE | Py_TPFLAGS_TYPE_SUBCLASS |
     Py_TPFLAGS_HAVE_VECTORCALL |
     Py_TPFLAGS_ITEMS_AT_END,                    /* tp_flags */
@@ -7703,7 +7703,7 @@ PyTypeObject PyBaseObject_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     PyObject_GenericSetAttr,                    /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,   /* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,   /* tp_flags */
     object_doc,                                 /* tp_doc */
     0,                                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -10395,7 +10395,7 @@ PyTypeObject _PyBufferWrapper_Type = {
     .tp_free = PyObject_GC_Del,
     .tp_traverse = (traverseproc)bufferwrapper_traverse,
     .tp_dealloc = bufferwrapper_dealloc,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
     .tp_as_buffer = &bufferwrapper_as_buffer,
 };
 
@@ -12012,7 +12012,7 @@ PyTypeObject PySuper_Type = {
     super_getattro,                             /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASETYPE,                    /* tp_flags */
     super_doc,                                  /* tp_doc */
     super_traverse,                             /* tp_traverse */

@@ -444,7 +444,7 @@ static PyType_Spec pdata_spec = {
     .name = "_pickle.Pdata",
     .basicsize = sizeof(Pdata),
     .itemsize = sizeof(PyObject *),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pdata_slots,
 };
@@ -5028,7 +5028,7 @@ static PyType_Slot memoproxy_slots[] = {
 static PyType_Spec memoproxy_spec = {
     .name = "_pickle.PicklerMemoProxy",
     .basicsize = sizeof(PicklerMemoProxyObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = memoproxy_slots,
 };
@@ -5180,7 +5180,7 @@ static PyType_Slot pickler_type_slots[] = {
 static PyType_Spec pickler_type_spec = {
     .name = "_pickle.Pickler",
     .basicsize = sizeof(PicklerObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pickler_type_slots,
 };
@@ -7522,7 +7522,7 @@ static PyType_Slot unpickler_memoproxy_slots[] = {
 static PyType_Spec unpickler_memoproxy_spec = {
     .name = "_pickle.UnpicklerMemoProxy",
     .basicsize = sizeof(UnpicklerMemoProxyObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = unpickler_memoproxy_slots,
 };
@@ -7682,7 +7682,7 @@ static PyType_Slot unpickler_type_slots[] = {
 static PyType_Spec unpickler_type_spec = {
     .name = "_pickle.Unpickler",
     .basicsize = sizeof(UnpicklerObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = unpickler_type_slots,
 };

@@ -34,7 +34,7 @@ static PyTypeObject SubListType = {
     .tp_doc = PyDoc_STR("SubList objects"),
     .tp_basicsize = sizeof(SubListObject),
     .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
     .tp_init = (initproc) SubList_init,
     .tp_methods = SubList_methods,
 };

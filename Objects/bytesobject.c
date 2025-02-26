@@ -3080,7 +3080,7 @@ PyTypeObject PyBytes_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     &bytes_as_buffer,                           /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
         Py_TPFLAGS_BYTES_SUBCLASS |
         _Py_TPFLAGS_MATCH_SELF,               /* tp_flags */
     bytes_doc,                                  /* tp_doc */
@@ -3365,7 +3365,7 @@ PyTypeObject PyBytesIter_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
     striter_traverse,                           /* tp_traverse */
     0,                                          /* tp_clear */

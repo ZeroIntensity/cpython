@@ -605,7 +605,7 @@ static PyType_Slot blob_slots[] = {
 static PyType_Spec blob_spec = {
     .name = MODULE_NAME ".Blob",
     .basicsize = sizeof(pysqlite_Blob),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = blob_slots,
 };

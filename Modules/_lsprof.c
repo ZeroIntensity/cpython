@@ -1017,7 +1017,7 @@ static PyType_Slot _lsprof_profiler_type_spec_slots[] = {
 static PyType_Spec _lsprof_profiler_type_spec = {
     .name = "_lsprof.Profiler",
     .basicsize = sizeof(ProfilerObject),
-    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = _lsprof_profiler_type_spec_slots,
 };

@@ -1635,7 +1635,7 @@ static PyTypeObject TestClass = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_testclinic.TestClass",
     .tp_basicsize = sizeof(PyObject),
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
     .tp_new = PyType_GenericNew,
     .tp_methods = test_class_methods,
 };
@@ -1699,7 +1699,7 @@ static PyTypeObject DeprStarNew = {
     .tp_name = "_testclinic.DeprStarNew",
     .tp_basicsize = sizeof(PyObject),
     .tp_new = depr_star_new,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
     .tp_methods = depr_star_new_methods,
 };
 
@@ -1741,7 +1741,7 @@ static PyTypeObject DeprStarInit = {
     .tp_basicsize = sizeof(PyObject),
     .tp_new = PyType_GenericNew,
     .tp_init = depr_star_init,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
     .tp_methods = depr_star_init_methods,
 };
 
@@ -1772,7 +1772,7 @@ static PyTypeObject DeprStarInitNoInline = {
     .tp_basicsize = sizeof(PyObject),
     .tp_new = PyType_GenericNew,
     .tp_init = depr_star_init_noinline,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
 };
 
 
@@ -1797,7 +1797,7 @@ static PyTypeObject DeprKwdNew = {
     .tp_name = "_testclinic.DeprKwdNew",
     .tp_basicsize = sizeof(PyObject),
     .tp_new = depr_kwd_new,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
 };
 
 
@@ -1822,7 +1822,7 @@ static PyTypeObject DeprKwdInit = {
     .tp_basicsize = sizeof(PyObject),
     .tp_new = PyType_GenericNew,
     .tp_init = depr_kwd_init,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
 };
 
 
@@ -1852,7 +1852,7 @@ static PyTypeObject DeprKwdInitNoInline = {
     .tp_basicsize = sizeof(PyObject),
     .tp_new = PyType_GenericNew,
     .tp_init = depr_kwd_init_noinline,
-    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_flags = _Py_TPFLAGS_CPYTHON,
 };
 
 
