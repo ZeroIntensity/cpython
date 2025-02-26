@@ -966,6 +966,13 @@ reimmortalize_if_mortal(PyInterpreterState *interp, PyObject *op)
     }
 }
 
+static int
+type_can_immortalize(PyObject *op)
+{
+    return PyType_HasFeature(Py_TYPE(op),
+                             PyUnstable_TPFLAGS_CAN_IMMORTALIZE);
+}
+
 /*
  * Run the finalizer for an immortal object, but *not*
  * the deallocator. This assumes that deferred memory
@@ -1013,7 +1020,8 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
         while (entry != NULL) {                                                    \
             PyObject *op = (PyObject *)entry->key;                                 \
             _Py_immortal *immortal = (_Py_immortal *)entry->value;                 \
-            assert(immortal->object == op);
+            assert(immortal->object == op);                                        \
+            assert(type_can_immortalize(op));
 
 #define _Py_END_ITER_IMMORTALS() entry = _Py_hashtable_ENTRY_NEXT(entry); }}
 
@@ -1480,6 +1488,13 @@ PyUnstable_Immortalize(PyObject *op)
     if (_Py_IsImmortal(op)) {
         // We don't want to track objects that are already immortal
         return 0;
+    }
+
+    if (!type_can_immortalize(op)) {
+        PyErr_Format(PyExc_TypeError,
+                     "%R objects do not support immortalization",
+                     Py_TYPE(op));
+        return -1;
     }
 
     PyInterpreterState *interp = tstate->interp;

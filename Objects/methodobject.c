@@ -381,6 +381,7 @@ PyTypeObject PyCMethod_Type = {
     .tp_name = "builtin_method",
     .tp_basicsize = sizeof(PyCMethodObject),
     .tp_base = &PyCFunction_Type,
+    .tp_flags = _Py_TPFLAGS_CPYTHON
 };
 
 /* Vectorcall functions for each of the PyCFunction calling conventions,

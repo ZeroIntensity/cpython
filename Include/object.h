@@ -613,7 +613,7 @@ given type object has a specified feature.
  * These are all best practices in the C API, but it's not *guaranteed* that a type follows it.
  * In practice, there are very few types that don't support the immortalization contract.
  */
-#define PyUnstable_TPFLAGS_CAN_IMMORTALIZE (1UL << 32)
+#define PyUnstable_TPFLAGS_CAN_IMMORTALIZE (1UL << 16)
 
 /* All types in CPython can immortalize. */
 #define _Py_TPFLAGS_CPYTHON Py_TPFLAGS_DEFAULT | PyUnstable_TPFLAGS_CAN_IMMORTALIZE
