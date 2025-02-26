@@ -586,8 +586,9 @@ class TestUserImmortalObjects(ImmortalUtilities):
     # single-phase init modules
     @isolate(via_subprocess=True)
     def test_modules(self):
-        import io
         import _io
+        import _testcapi
+        import io
         import traceback
 
         self.immortalize(_io)  # Multi-phase init
@@ -765,7 +766,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
 
     @unittest.skipUnless(support.Py_GIL_DISABLED, "only meaningful under free-threading")
     @threading_helper.requires_working_threading()
-    @isolate
+    @isolate(via_subprocess=True)
     def test_immortalize_concurrently(self):
         import threading
         mortal = self.mortal()
@@ -785,7 +786,7 @@ class TestUserImmortalObjects(ImmortalUtilities):
         self.assertEqual(results.count(0), num_threads - 1)
 
     @threading_helper.requires_working_threading()
-    @isolate
+    @isolate(via_subprocess=True)
     def test_lingering_immortal_in_daemon_thread(self):
         import threading
 
