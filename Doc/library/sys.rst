@@ -1149,10 +1149,6 @@ always available. Unless explicitly noted otherwise, all variables are read-only
 
    .. impl-detail:: This function is specific to CPython.
 
-   .. seealso::
-
-      :c:func:`PyUnstable_Immortalize`
-
    .. versionadded:: next
 
 .. data:: implementation

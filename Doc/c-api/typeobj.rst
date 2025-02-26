@@ -1345,6 +1345,26 @@ and :c:data:`PyType_Type` effectively act as defaults.)
          This flag is present in header files, but is not be used.
          It will be removed in a future version of CPython
 
+   .. c:macro:: PyUnstable_TPFLAGS_CAN_IMMORTALIZE
+
+      This bit indicates that instances of the class may be made :term:`immortal`
+      via :c:func:`PyUnstable_Immortalize` or :func:`sys._immortalize`.
+
+      In order for instances to safely be made immortal, the class must follow a set of rules:
+
+      * It must use either the "object" or "memory" allocator domains.
+        See :ref:`Allocator Domains <allocator-domains>` for more information.
+      * It must not rely on specific :term:`reference count` values in methods
+        (via :c:macro:`Py_REFCNT`).
+      * All :term:`strong references <strong reference>` released in the object's
+        :c:member:`~PyTypeObject.tp_dealloc` slot must also be traversed by the
+        object's :c:member:`~PyTypeObject.tp_traverse` slot, if the type can
+        contain circular references.
+      * All finalization must be done in :c:member:`~PyTypeObject.tp_finalize`
+        alongside :c:func:`!PyObject_CallFinalizerFromDealloc`. This does *not*
+        include finalizers triggered by :c:macro:`Py_DECREF`; as long as they also
+        follow this contract, it is safe to release references in a destructor.
+
 
 .. c:member:: const char* PyTypeObject.tp_doc
 
