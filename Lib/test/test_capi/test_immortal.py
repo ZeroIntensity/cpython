@@ -357,9 +357,9 @@ class TestUserImmortalObjects(ImmortalUtilities):
         ba = self.immortalize(bytearray(self.mortal_str(), "utf-8"))
         ba = bytearray(self.mortal_str(), "utf-8")
 
-        # Trigger some weird things with finalization.
         # In prior implementationss of AOI, this caused an
-        # unraisable SystemError during finalization.
+        # unraisable SystemError during finalization, because
+        # the bytearray was counted as an export.
         memoryview(ba)
 
         self.immortalize(memoryview(ba))
