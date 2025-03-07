@@ -1049,7 +1049,7 @@ increment_static_type_version(PyTypeObject *tp)
             return 0;
         }
         if (nonzero_tag && _Py_atomic_load_uint32_relaxed(&tp->tp_version_tag) == 0) {
-            /* The version was cleared, don't store another.. */
+            /* The version was cleared, don't store another. */
             return 0;
         }
     } while (_Py_atomic_compare_exchange_uint(&NEXT_GLOBAL_VERSION_TAG,
