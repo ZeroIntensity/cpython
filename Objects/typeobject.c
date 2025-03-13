@@ -1077,14 +1077,11 @@ clear_static_type_version(PyInterpreterState *interp, PyTypeObject *tp)
     assert(tp != NULL);
     assert(interp != NULL);
     assert(_Py_IsImmortal(tp));
-#ifndef Py_GIL_DISABLED
     unsigned int old_version = _Py_atomic_exchange_uint(&tp->tp_version_tag, 0);
     if (old_version != 0) {
+        _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
         clear_version_slot(interp, old_version);
     }
-#else
-    _Py_atomic_store_uint_relaxed(&tp->tp_version_tag, 0);
-#endif
 }
 
 static void
@@ -1093,13 +1090,12 @@ clear_heap_type_version(PyInterpreterState *interp, PyTypeObject *tp)
     assert(interp != NULL);
     assert(tp != NULL);
     ASSERT_TYPE_LOCK_HELD();
+    unsigned int old_version = tp->tp_version_tag;
+    FT_ATOMIC_STORE_UINT_RELAXED(tp->tp_version_tag, 0);
+    clear_version_slot(interp, old_version);
 #ifdef Py_GIL_DISABLED
-    _Py_atomic_store_uint_relaxed(&tp->tp_version_tag, 0);
     _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
 #else
-    unsigned int old_version = tp->tp_version_tag;
-    tp->tp_version_tag = 0;
-    clear_version_slot(interp, old_version);
     tp->tp_versions_used++;
 #endif
 }
@@ -1149,7 +1145,7 @@ type_modified_unlocked(PyTypeObject *type)
        needed.
      */
     ASSERT_TYPE_LOCK_HELD();
-    if (type->tp_version_tag == 0) {
+    if (FT_ATOMIC_LOAD_UINT_RELAXED(type->tp_version_tag) == 0) {
         return;
     }
     // Cannot modify static builtin types.
