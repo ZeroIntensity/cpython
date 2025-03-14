@@ -1102,11 +1102,6 @@ clear_heap_type_version(PyInterpreterState *interp, PyTypeObject *tp)
     unsigned int old_version = tp->tp_version_tag;
     FT_ATOMIC_STORE_UINT_RELAXED(tp->tp_version_tag, 0);
     clear_version_slot(interp, old_version);
-#ifdef Py_GIL_DISABLED
-    _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
-#else
-    tp->tp_versions_used++;
-#endif
 }
 
 static int
@@ -1127,12 +1122,18 @@ set_heap_type_version(PyTypeObject *tp, unsigned int version)
 {
     ASSERT_TYPE_LOCK_HELD();
     assert((tp->tp_flags & _Py_TPFLAGS_STATIC_BUILTIN) == 0);
+    assert(!_Py_IsImmortal(tp));
     if (version == 0) {
         clear_heap_type_version(_PyInterpreterState_GET(), tp);
     }
     else {
-        set_heap_type_version(tp, version);
+        FT_ATOMIC_STORE_UINT_RELAXED(tp->tp_version_tag, version);
     }
+#ifdef Py_GIL_DISABLED
+    _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
+#else
+    tp->tp_versions_used++;
+#endif
 }
 
 static void
