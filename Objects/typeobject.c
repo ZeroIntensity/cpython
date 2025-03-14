@@ -1053,8 +1053,8 @@ set_static_type_version_from_global(PyTypeObject *tp)
         }
     } while (_Py_atomic_compare_exchange_uint(&NEXT_GLOBAL_VERSION_TAG,
                                               &expected_next, expected_next + 1) == 0);
-    uint32_t expected_tag = 0;
-    if (_Py_atomic_compare_exchange_uint32(&tp->tp_version_tag, &expected_tag, expected_tag + 1) == 0) {
+    unsigned int expected_tag = 0;
+    if (_Py_atomic_compare_exchange_uint(&tp->tp_version_tag, &expected_tag, expected_tag + 1) == 0) {
         /* Someone else beat us to the version tag!
            Bail out and undo our modifications to the global version tag. */
         _Py_atomic_add_uint(&NEXT_GLOBAL_VERSION_TAG, -1);
@@ -1087,7 +1087,7 @@ clear_static_type_version(PyInterpreterState *interp, PyTypeObject *tp)
     if (old_version != 0) {
         _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
         BEGIN_TYPE_LOCK()
-        assert(_Py_atomic_load_uint32_relaxed(&tp->tp_version_tag) == 0);
+        assert(_Py_atomic_load_uint_relaxed(&tp->tp_version_tag) == 0);
         clear_version_slot(interp, old_version);
         END_TYPE_LOCK()
     }
