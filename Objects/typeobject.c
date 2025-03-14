@@ -1054,7 +1054,7 @@ set_static_type_version_from_global(PyTypeObject *tp)
     } while (_Py_atomic_compare_exchange_uint(&NEXT_GLOBAL_VERSION_TAG,
                                               &expected_next, expected_next + 1) == 0);
     unsigned int expected_tag = 0;
-    if (_Py_atomic_compare_exchange_uint(&tp->tp_version_tag, &expected_tag, expected_tag + 1) == 0) {
+    if (_Py_atomic_compare_exchange_uint(&tp->tp_version_tag, &expected_tag, expected_next + 1) == 0) {
         /* Someone else beat us to the version tag!
            Bail out and undo our modifications to the global version tag. */
         _Py_atomic_add_uint(&NEXT_GLOBAL_VERSION_TAG, -1);
@@ -8862,7 +8862,7 @@ init_static_type(PyInterpreterState *interp, PyTypeObject *self,
     else {
         assert(!initial);
         assert(self->tp_flags & _Py_TPFLAGS_STATIC_BUILTIN);
-        assert(self->tp_version_tag != 0);
+        assert(_Py_atomic_load_uint_relaxed(&self->tp_version_tag) != 0);
     }
 
     managed_static_type_state_init(interp, self, isbuiltin, initial);
