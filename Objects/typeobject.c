@@ -1030,30 +1030,36 @@ PyType_Unwatch(int watcher_id, PyObject* obj)
  * and since the type lock is per-interpreter, it's unsafe to rely on it
  * for synchronization.
  *
+ * Same goes for NEXT_GLOBAL_VERSION_TAG--it must be accessed atomically, even
+ * on GILful builds.
+ *
  * For heap types, it's safe to rely on the type lock on the default build,
- * but atomics are still needed on the free-threaded build.
+ * but (generally relaxed) atomics are still used on the free-threaded build.
+ * Same goes for NEXT_VERSION_TAG.
 */
 
+
 static int
-increment_static_type_version(PyTypeObject *tp)
+set_static_type_version_from_global(PyTypeObject *tp)
 {
     assert(tp != NULL);
     assert(_Py_IsImmortal(tp));
-    int nonzero_tag = _Py_atomic_load_uint32(&tp->tp_version_tag) != 0;
-    unsigned int expected = 0;
-    int res;
+    uint32_t expected_next = 0;
     do {
-        expected = _Py_atomic_load_uint32_relaxed(&NEXT_GLOBAL_VERSION_TAG);
-        if (expected == _Py_MAX_GLOBAL_TYPE_VERSION_TAG) {
+        expected_next = _Py_atomic_load_uint32_relaxed(&NEXT_GLOBAL_VERSION_TAG);
+        if (expected_next == _Py_MAX_GLOBAL_TYPE_VERSION_TAG) {
             /* We have run out of version numbers */
             return 0;
         }
-        if (nonzero_tag && _Py_atomic_load_uint32_relaxed(&tp->tp_version_tag) == 0) {
-            /* The version was cleared, don't store another. */
-            return 0;
-        }
     } while (_Py_atomic_compare_exchange_uint(&NEXT_GLOBAL_VERSION_TAG,
-                                              &expected, expected + 1) == 0);
+                                              &expected_next, expected_next + 1) == 0);
+    uint32_t expected_tag = 0;
+    if (_Py_atomic_compare_exchange_uint32(&tp->tp_version_tag, &expected_tag, expected_tag + 1) == 0) {
+        /* Someone else beat us to the version tag!
+           Bail out and undo our modifications to the global version tag. */
+        _Py_atomic_add_uint(&NEXT_GLOBAL_VERSION_TAG, -1);
+        return 0;
+    }
     _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
     return 1;
 }
@@ -1061,8 +1067,8 @@ increment_static_type_version(PyTypeObject *tp)
 static void
 clear_version_slot(PyInterpreterState *interp, unsigned int version)
 {
-#ifndef Py_GIL_DISABLED
     assert(interp != NULL);
+#ifndef Py_GIL_DISABLED
     ASSERT_TYPE_LOCK_HELD();
     PyTypeObject **slot =
         interp->types.type_version_cache
@@ -1080,7 +1086,10 @@ clear_static_type_version(PyInterpreterState *interp, PyTypeObject *tp)
     unsigned int old_version = _Py_atomic_exchange_uint(&tp->tp_version_tag, 0);
     if (old_version != 0) {
         _Py_atomic_add_uint16(&tp->tp_versions_used, 1);
+        BEGIN_TYPE_LOCK()
+        assert(_Py_atomic_load_uint32_relaxed(&tp->tp_version_tag) == 0);
         clear_version_slot(interp, old_version);
+        END_TYPE_LOCK()
     }
 }
 
@@ -1360,7 +1369,7 @@ assign_version_tag(PyInterpreterState *interp, PyTypeObject *type)
     }
     if (type->tp_flags & Py_TPFLAGS_IMMUTABLETYPE) {
         /* static types */
-        increment_static_type_version(type);
+        set_static_type_version_from_global(type);
         assert (_Py_atomic_load_uint32_relaxed(&type->tp_version_tag) <= _Py_MAX_GLOBAL_TYPE_VERSION_TAG);
     }
     else {
@@ -8846,7 +8855,7 @@ init_static_type(PyInterpreterState *interp, PyTypeObject *self,
         type_add_flags(self, Py_TPFLAGS_IMMUTABLETYPE);
 
         if (_Py_atomic_load_uint_relaxed(&self->tp_version_tag) == 0) {
-            increment_static_type_version(self);
+            set_static_type_version_from_global(self);
         }
     }
     else {
