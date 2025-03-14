@@ -1043,7 +1043,7 @@ static int
 set_static_type_version_from_global(PyTypeObject *tp)
 {
     assert(tp != NULL);
-    assert(_Py_IsImmortal(tp));
+    _PyObject_Dump((PyObject *)tp);
     uint32_t expected_next = 0;
     do {
         expected_next = _Py_atomic_load_uint32_relaxed(&NEXT_GLOBAL_VERSION_TAG);
@@ -1370,8 +1370,9 @@ assign_version_tag(PyInterpreterState *interp, PyTypeObject *type)
     }
     if (type->tp_flags & Py_TPFLAGS_IMMUTABLETYPE) {
         /* static types */
-        set_static_type_version_from_global(type);
+        int res = set_static_type_version_from_global(type);
         assert (_Py_atomic_load_uint32_relaxed(&type->tp_version_tag) <= _Py_MAX_GLOBAL_TYPE_VERSION_TAG);
+        return res;
     }
     else {
         /* heap types */
