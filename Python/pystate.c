@@ -816,15 +816,13 @@ static void
 deferred_free_common(_Py_immortal_trashcan *deferred_trash, void *ptr)
 {
     deferred_trash->garbage[deferred_trash->length++] = ptr;
-    if (deferred_trash->length == deferred_trash->capacity)
-    {
+    if (deferred_trash->length == deferred_trash->capacity) {
         deferred_trash->capacity *= 2;
         deferred_trash->garbage = PyMem_RawRealloc(
             deferred_trash->garbage,
             deferred_trash->capacity * sizeof(void *)
         );
-        if (deferred_trash->garbage == NULL)
-        {
+        if (deferred_trash->garbage == NULL) {
             Py_FatalError("not enough memory to safely free immortals");
         }
     }
@@ -849,11 +847,9 @@ defer_memory_for_allocator(PyMemAllocatorDomain domain,
 {
     PyMemAllocatorEx alloc;
 
-    if (deferred_trash->garbage == NULL)
-    {
+    if (deferred_trash->garbage == NULL) {
         deferred_trash->garbage = PyMem_RawCalloc(16, sizeof(void *));
-        if (deferred_trash->garbage == NULL)
-        {
+        if (deferred_trash->garbage == NULL) {
             Py_FatalError("not enough memory to safely free immortals");
         }
         deferred_trash->capacity = 16;
@@ -886,8 +882,7 @@ delete_deferred_memory_common(PyMemAllocatorDomain domain,
     for (Py_ssize_t i = 0; i < deferred_trash->length; ++i)
     {
         void *trash = deferred_trash->garbage[i];
-        if (trash == NULL)
-        {
+        if (trash == NULL) {
             continue;
         }
         domain_free(trash);
@@ -906,8 +901,7 @@ defer_memory(PyInterpreterState *interp)
     defer_memory_for_allocator(PYMEM_DOMAIN_OBJ, &imm_state->trashcan.objects, deferred_free_obj);
     defer_memory_for_allocator(PYMEM_DOMAIN_MEM, &imm_state->trashcan.memory, deferred_free_mem);
     // Cache the size and pointer for when we re-enable freelists later.
-    for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
-    {
+    for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i) {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
         imm_state->trashcan.freelist_caches[i] = freelists[i];
         freelists[i].freelist = NULL;
@@ -950,13 +944,11 @@ _Py_IsRuntimeImmortal(PyObject *op)
 static int
 is_finalized(PyObject *op)
 {
-    if (_PyObject_IsFinalized(op))
-    {
+    if (_PyObject_IsFinalized(op)) {
         return 1;
     }
 
-    if (Py_TYPE(op)->tp_finalize == NULL)
-    {
+    if (Py_TYPE(op)->tp_finalize == NULL) {
         // PyObject_CallFinalizer will do nothing because
         // this object has no finalizer. For our purposes, let's
         // just pretend its finalized.
@@ -1023,8 +1015,7 @@ run_immortal_finalizer(PyInterpreterState *interp, _Py_immortal *immortal)
     // Resurrect the reference.
     _Py_SetImmortalKnown(op);
 
-    if (PyObject_GC_IsTracked(op))
-    {
+    if (PyObject_GC_IsTracked(op)) {
         _PyObject_GC_UNTRACK(op);
     }
 }
@@ -1051,22 +1042,19 @@ visit_finalize(PyObject *op, void *parent)
 {
     _Py_hashtable_t *traversing = (_Py_hashtable_t *)parent;
 
-    if (is_object_being_traversed(op, traversing))
-    {
+    if (is_object_being_traversed(op, traversing)) {
         // Prevent the circular lookup
         return 0;
     }
 
-    if (_Py_hashtable_set(traversing, op, NULL) < 0)
-    {
+    if (_Py_hashtable_set(traversing, op, NULL) < 0) {
         return -1;
     }
 
     int result = _PyObject_MaybeCallFinalizer(op);
     _PyObject_ASSERT(op, is_finalized(op));
 
-    if (_PyObject_IS_GC(op) && Py_TYPE(op)->tp_traverse != NULL)
-    {
+    if (_PyObject_IS_GC(op) && Py_TYPE(op)->tp_traverse != NULL) {
         if (Py_EnterRecursiveCall(" while finalizing immortal objects") < 0)
         {
             PyErr_WriteUnraisable(op);
@@ -1087,17 +1075,14 @@ synchronize_finalization(struct _Py_runtime_immortals *imm_state)
        It just acts as a set for O(1) lookups. */
     _Py_hashtable_t *traversing = _Py_hashtable_new(_Py_hashtable_hash_ptr,
                                                     _Py_hashtable_compare_direct);
-    if (traversing == NULL)
-    {
+    if (traversing == NULL) {
         return -1;
     }
 
     _Py_ITER_IMMORTALS(imm_state, immortal, op)
-        if (Py_TYPE(op)->tp_traverse != NULL && immortal->gc_tracked)
-        {
+        if (Py_TYPE(op)->tp_traverse != NULL && immortal->gc_tracked) {
             PyObject_GC_Track(op);
-            if (Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing) < 0)
-            {
+            if (Py_TYPE(op)->tp_traverse(op, visit_finalize, traversing) < 0) {
                 return -1;
             }
             PyObject_GC_UnTrack(op);
@@ -1125,11 +1110,9 @@ _PyInterpreterState_FinalizeImmortalReferents(PyThreadState *tstate)
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
 
-    while (true)
-    {
+    while (true) {
         int result = synchronize_finalization(imm_state);
-        if (result == 1)
-        {
+        if (result == 1) {
             /* We called some finalizers.
                That means those finalizers could have affected the
                referents. So, keep doing this until no finalizers are ran with
@@ -1137,8 +1120,7 @@ _PyInterpreterState_FinalizeImmortalReferents(PyThreadState *tstate)
             continue;
         }
 
-        if (result < 0)
-        {
+        if (result < 0) {
             return -1;
         }
 
@@ -1182,13 +1164,11 @@ run_immortal_clear(_Py_immortal *immortal)
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
     _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
 
-    if (immortal->gc_tracked)
-    {
+    if (immortal->gc_tracked) {
         PyObject_GC_Track(op);
     }
 
-    if (immortal->gc_tracked && Py_TYPE(op)->tp_clear != NULL)
-    {
+    if (immortal->gc_tracked && Py_TYPE(op)->tp_clear != NULL) {
         Py_TYPE(op)->tp_clear(op);
         // Edge case: it's possible for a clear function
         // to untrack the object, so if we ever need it to be
@@ -1213,8 +1193,7 @@ run_immortal_destructor(_Py_immortal *immortal)
     _PyObject_ASSERT(op, _Py_IsRuntimeImmortal(op));
     _PyObject_ASSERT(op, !PyObject_GC_IsTracked(op));
 
-    if (immortal->gc_tracked)
-    {
+    if (immortal->gc_tracked) {
         PyObject_GC_Track(op);
     }
 
@@ -1251,8 +1230,7 @@ _PyInterpreterState_DestructImmortals(PyThreadState *tstate)
     PyInterpreterState *interp = tstate->interp;
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     assert(imm_state->values != NULL);
-    if (_PyInterpreterState_FinalizeImmortalReferents(tstate) < 0)
-    {
+    if (_PyInterpreterState_FinalizeImmortalReferents(tstate) < 0) {
         Py_FatalError("failed to finalize immortal objects");
     }
 
@@ -1519,25 +1497,22 @@ PyUnstable_Immortalize(PyObject *op)
     PyInterpreterState *interp = tstate->interp;
     struct _Py_runtime_immortals *imm_state = &interp->runtime_immortals;
     _Py_hashtable_t *immortals;
-    if (imm_state->values == NULL)
-    {
+    if (imm_state->values == NULL) {
         // The immortals dictionary hasn't been allocated yet!
         immortals = _Py_hashtable_new(_Py_hashtable_hash_ptr, _Py_hashtable_compare_direct);
-        if (immortals == NULL)
-        {
+        if (immortals == NULL) {
             PyErr_NoMemory();
             return -1;
         }
         imm_state->values = immortals;
-    } else
-    {
+    }
+    else {
         immortals = imm_state->values;
     }
     assert(immortals != NULL);
 
     _Py_immortal *entry = PyMem_RawMalloc(sizeof(_Py_immortal));
-    if (entry == NULL)
-    {
+    if (entry == NULL) {
         PyErr_NoMemory();
         return -1;
     }
@@ -1548,8 +1523,7 @@ PyUnstable_Immortalize(PyObject *op)
     _PyEval_StopTheWorld(interp);
 
     // We'll just use the stop-the-world as a makeshift lock
-    if (_Py_hashtable_set(imm_state->values, op, entry) < 0)
-    {
+    if (_Py_hashtable_set(imm_state->values, op, entry) < 0) {
         _PyEval_StartTheWorld(interp);
         PyMem_RawFree(entry);
         PyErr_NoMemory();

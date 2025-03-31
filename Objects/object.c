@@ -2610,8 +2610,7 @@ void
 _Py_SetImmortalUntracked(PyObject *op)
 {
     _Py_immortal *user_immortal = _Py_FindUserDefinedImmortal(op);
-    if (user_immortal != NULL)
-    {
+    if (user_immortal != NULL) {
         // This object is being tracked by user immortals.
         // We don't want to do that anymore, and let the interpreter do it instead.
         PyInterpreterState *interp = _PyInterpreterState_GET();
