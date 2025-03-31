@@ -8,28 +8,7 @@ extern "C" {
 #  error "this header requires Py_BUILD_CORE define"
 #endif
 
-#include <stdbool.h>               // bool
 #include "pycore_interp_structs.h" // PyInterpreterState
-
-
-/* User-defined immortal objects */
-typedef struct _Py_immortal {
-    PyObject *object;
-    int gc_tracked;
-    int finalized;
-} _Py_immortal;
-
-
-_Py_immortal *
-_Py_FindUserDefinedImmortal(PyObject *op);
-
-
-typedef struct {
-    void **garbage;
-    Py_ssize_t length;
-    Py_ssize_t capacity;
-    void (*save_free)(void *, void *);
-} _Py_immortal_trashcan;
 
 /* interpreter state */
 
