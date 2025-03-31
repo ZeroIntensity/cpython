@@ -1224,7 +1224,7 @@ run_immortal_destructor(_Py_immortal *immortal)
     // we'll store it in the deferred memory bank.
     Py_DECREF(op);
 
-    // The object should still be alive, despite our
+    // The object should still be in valid memory, despite our
     // ruthless attempts to destroy it.
     assert(!_PyObject_IsFreed(op));
     _Py_SetImmortalKnown(op);
