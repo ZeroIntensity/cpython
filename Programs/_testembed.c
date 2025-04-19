@@ -2365,9 +2365,10 @@ static int
 test_non_daemon_c_thread(void)
 {
     _testembed_Py_InitializeFromConfig();
-    PyThread_ident_t thread;
+    PyThread_handle_t thread;
+    PyThread_ident_t ident;
     thread_data tdata = {0};
-    if (PyThread_start_joinable_thread(non_daemon_c_thread, &tdata, &thread, NULL) < 0) {
+    if (PyThread_start_joinable_thread(non_daemon_c_thread, &tdata, &ident, &thread) < 0) {
         return -1;
     }
     PyEvent_Wait(&tdata.started);
