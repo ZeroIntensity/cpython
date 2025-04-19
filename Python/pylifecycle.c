@@ -3465,13 +3465,15 @@ static void
 wait_for_native_shutdown(PyInterpreterState *interp)
 {
     assert(interp != NULL);
+    PyMutex_Lock(&interp->threads.shutdown.lock);
     assert(interp->threads.shutdown.native_remaining >= 0);
     if (interp->threads.shutdown.native_remaining == 0) {
         /* Nothing to wait for. */
+        PyMutex_Unlock(&interp->threads.shutdown.lock);
         return;
     }
+    PyMutex_Unlock(&interp->threads.shutdown.lock);
     PyEvent_Wait(&interp->threads.shutdown.native_finished);
-    assert(interp->threads.shutdown.native_remaining == 0);
     if (PyErr_Occurred() || PyErr_CheckSignals()) {
         PyErr_FormatUnraisable("Exception ignored on native thread shutdown");
     }

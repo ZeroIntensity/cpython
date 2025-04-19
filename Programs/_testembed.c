@@ -2341,6 +2341,42 @@ test_get_incomplete_frame(void)
     return result;
 }
 
+typedef struct {
+    PyEvent started;
+    PyEvent finalizing;
+    int finished;
+} thread_data;
+
+static void
+non_daemon_c_thread(void *data)
+{
+    PyGILState_STATE gilstate = PyGILState_Ensure();
+    (void)PyThreadState_PreventShutdown();
+    thread_data *tdata = (thread_data *)data;
+    _PyEvent_Notify(&tdata->started);
+    PyEvent_Wait(&tdata->finalizing);
+    Py_BEGIN_ALLOW_THREADS;
+    tdata->finished = 1;
+    Py_END_ALLOW_THREADS;
+    PyGILState_Release(gilstate);
+}
+
+static int
+test_non_daemon_c_thread(void)
+{
+    _testembed_Py_InitializeFromConfig();
+    PyThread_ident_t thread;
+    thread_data tdata = {0};
+    if (PyThread_start_joinable_thread(non_daemon_c_thread, &tdata, &thread, NULL) < 0) {
+        return -1;
+    }
+    PyEvent_Wait(&tdata.started);
+    _PyEvent_Notify(&tdata.finalizing);
+    Py_Finalize();
+    assert(tdata.finished == 1);
+    return PyThread_join_thread(thread);
+}
+
 
 /* *********************************************************
  * List of test cases and the function that implements it.
@@ -2431,6 +2467,7 @@ static struct TestCase TestCases[] = {
     {"test_frozenmain", test_frozenmain},
 #endif
     {"test_get_incomplete_frame", test_get_incomplete_frame},
+    {"test_non_daemon_c_thread", test_non_daemon_c_thread},
 
     {NULL, NULL}
 };

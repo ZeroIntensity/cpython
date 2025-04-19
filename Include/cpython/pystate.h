@@ -267,3 +267,7 @@ PyAPI_FUNC(_PyFrameEvalFunction) _PyInterpreterState_GetEvalFrameFunc(
 PyAPI_FUNC(void) _PyInterpreterState_SetEvalFrameFunc(
     PyInterpreterState *interp,
     _PyFrameEvalFunction eval_frame);
+
+/* Mark the current C thread as preventing shutdown of the interpreter.
+   The current thread must not be the main thread. */
+PyAPI_FUNC(int) PyThreadState_PreventShutdown(void);

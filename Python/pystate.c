@@ -3227,6 +3227,9 @@ PyThreadState_PreventShutdown(void)
     PyThreadState *tstate = current_fast_get();
     _Py_EnsureTstateNotNULL(tstate);
     PyInterpreterState *interp = tstate->interp;
+    if (tstate == (PyThreadState *)&interp->_initial_thread) {
+        Py_FatalError("The main thread cannot be marked as preventing shutdown");
+    }
 
     PyMutex_Lock(&interp->threads.shutdown.lock);
     int res = thread_prevent_shutdown_lock_held(tstate);
