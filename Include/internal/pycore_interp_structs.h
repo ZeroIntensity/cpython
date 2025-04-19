@@ -792,6 +792,12 @@ struct _is {
            or the size specified by the THREAD_STACK_SIZE macro. */
         /* Used in Python/thread.c. */
         size_t stacksize;
+
+        struct {
+            Py_ssize_t native_remaining;
+            PyEvent native_finished;
+            PyMutex lock;
+        } shutdown;
     } threads;
 
     /* Reference to the _PyRuntime global variable. This field exists

@@ -210,6 +210,8 @@ struct _ts {
     */
     PyObject *threading_local_sentinel;
     _PyRemoteDebuggerSupport remote_debugger_support;
+
+    uint8_t prevents_shutdown;
 };
 
 # define Py_C_RECURSION_LIMIT 5000

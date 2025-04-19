@@ -1682,6 +1682,19 @@ clear_datastack(PyThreadState *tstate)
     }
 }
 
+static void
+mark_thread_completed(PyThreadState *tstate)
+{
+    assert(tstate != NULL);
+    assert(tstate->prevents_shutdown == 1);
+    PyInterpreterState *interp = tstate->interp;
+    PyMutex_Lock(&interp->threads.shutdown.lock);
+    if (--interp->threads.shutdown.native_remaining == 0) {
+        _PyEvent_Notify(&interp->threads.shutdown.native_finished);
+    }
+    PyMutex_Unlock(&interp->threads.shutdown.lock);
+}
+
 void
 PyThreadState_Clear(PyThreadState *tstate)
 {
@@ -1870,6 +1883,11 @@ tstate_delete_common(PyThreadState *tstate, int release_gil)
 #ifdef Py_GIL_DISABLED
     _Py_qsbr_unregister(tstate);
 #endif
+
+    if (tstate->prevents_shutdown == 1) {
+        // This is a non-daemon C thread
+        mark_thread_completed(tstate);
+    }
 
     tstate->_status.finalized = 1;
 }
@@ -3184,4 +3202,34 @@ _Py_GetMainConfig(void)
         return NULL;
     }
     return _PyInterpreterState_GetConfig(interp);
+}
+
+
+static int
+thread_prevent_shutdown_lock_held(PyThreadState *tstate)
+{
+    assert(tstate != NULL);
+    PyInterpreterState *interp = tstate->interp;
+    assert(PyMutex_IsLocked(&interp->threads.shutdown.lock));
+
+    if (_PyEvent_IsSet(&interp->threads.shutdown.native_finished)) {
+        /* Threads have already shut down */
+        return -1;
+    }
+    tstate->prevents_shutdown = 1;
+    ++interp->threads.shutdown.native_remaining;
+    return 0;
+}
+
+int
+PyThreadState_PreventShutdown(void)
+{
+    PyThreadState *tstate = current_fast_get();
+    _Py_EnsureTstateNotNULL(tstate);
+    PyInterpreterState *interp = tstate->interp;
+
+    PyMutex_Lock(&interp->threads.shutdown.lock);
+    int res = thread_prevent_shutdown_lock_held(tstate);
+    PyMutex_Unlock(&interp->threads.shutdown.lock);
+    return res;
 }

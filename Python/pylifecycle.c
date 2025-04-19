@@ -96,6 +96,7 @@ static PyStatus init_android_streams(PyThreadState *tstate);
 static PyStatus init_apple_streams(PyThreadState *tstate);
 #endif
 static void wait_for_thread_shutdown(PyThreadState *tstate);
+static void wait_for_native_shutdown(PyInterpreterState *interp);
 static void finalize_subinterpreters(void);
 static void call_ll_exitfuncs(_PyRuntimeState *runtime);
 
@@ -2012,6 +2013,9 @@ _Py_Finalize(_PyRuntimeState *runtime)
     // Wrap up existing "threading"-module-created, non-daemon threads.
     wait_for_thread_shutdown(tstate);
 
+    // Wait for non-daemon C threads to finish
+    wait_for_native_shutdown(tstate->interp);
+
     // Make any remaining pending calls.
     _Py_FinishPendingCalls(tstate);
 
@@ -2427,6 +2431,9 @@ Py_EndInterpreter(PyThreadState *tstate)
 
     // Wrap up existing "threading"-module-created, non-daemon threads.
     wait_for_thread_shutdown(tstate);
+
+    // Wrap up C threads
+    wait_for_native_shutdown(tstate->interp);
 
     // Make any remaining pending calls.
     _Py_FinishPendingCalls(tstate);
@@ -3452,6 +3459,22 @@ wait_for_thread_shutdown(PyThreadState *tstate)
         Py_DECREF(result);
     }
     Py_DECREF(threading);
+}
+
+static void
+wait_for_native_shutdown(PyInterpreterState *interp)
+{
+    assert(interp != NULL);
+    assert(interp->threads.shutdown.native_remaining >= 0);
+    if (interp->threads.shutdown.native_remaining == 0) {
+        /* Nothing to wait for. */
+        return;
+    }
+    PyEvent_Wait(&interp->threads.shutdown.native_finished);
+    assert(interp->threads.shutdown.native_remaining == 0);
+    if (PyErr_Occurred() || PyErr_CheckSignals()) {
+        PyErr_FormatUnraisable("Exception ignored on native thread shutdown");
+    }
 }
 
 int Py_AtExit(void (*func)(void))
