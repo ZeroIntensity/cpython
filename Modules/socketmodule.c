@@ -5826,7 +5826,7 @@ static PyType_Slot sock_slots[] = {
 static PyType_Spec sock_spec = {
     .name = "_socket.socket",
     .basicsize = sizeof(PySocketSockObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = sock_slots,
 };

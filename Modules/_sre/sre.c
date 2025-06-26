@@ -3214,7 +3214,7 @@ static PyType_Spec pattern_spec = {
     .name = "re.Pattern",
     .basicsize = sizeof(PatternObject),
     .itemsize = sizeof(SRE_CODE),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_HAVE_GC),
     .slots = pattern_slots,
 };
@@ -3282,7 +3282,7 @@ static PyType_Spec match_spec = {
     .name = "re.Match",
     .basicsize = sizeof(MatchObject),
     .itemsize = sizeof(Py_ssize_t),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_HAVE_GC),
     .slots = match_slots,
 };
@@ -3311,7 +3311,7 @@ static PyType_Slot scanner_slots[] = {
 static PyType_Spec scanner_spec = {
     .name = "_sre.SRE_Scanner",
     .basicsize = sizeof(ScannerObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_HAVE_GC),
     .slots = scanner_slots,
 };
@@ -3327,7 +3327,7 @@ static PyType_Spec template_spec = {
     .name = "_sre.SRE_Template",
     .basicsize = sizeof(TemplateObject),
     .itemsize = sizeof(((TemplateObject *)0)->items[0]),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_HAVE_GC),
     .slots = template_slots,
 };

@@ -209,7 +209,7 @@ static PyType_Slot dictremover_slots[] = {
 static PyType_Spec dictremover_spec = {
     .name = "_ctypes.DictRemover",
     .basicsize = sizeof(DictRemoverObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = dictremover_slots,
 };
@@ -450,7 +450,7 @@ static PyType_Slot structparam_slots[] = {
 static PyType_Spec structparam_spec = {
     .name = "_ctypes.StructParam_Type",
     .basicsize = sizeof(StructParamObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = structparam_slots,
 };
@@ -663,7 +663,7 @@ static PyType_Slot ctype_type_slots[] = {
 PyType_Spec pyctype_type_spec = {
     .name = "_ctypes.CType_Type",
     .basicsize = -(Py_ssize_t)sizeof(StgInfo),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE |
               Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_BASETYPE ),
     .slots = ctype_type_slots,
@@ -1212,7 +1212,7 @@ static PyType_Slot pycstruct_type_slots[] = {
 
 static PyType_Spec pycstruct_type_spec = {
     .name = "_ctypes.PyCStructType",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycstruct_type_slots,
 };
@@ -1227,7 +1227,7 @@ static PyType_Slot union_type_slots[] = {
 
 static PyType_Spec union_type_spec = {
     .name = "_ctypes.UnionType",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = union_type_slots,
 };
@@ -1482,7 +1482,7 @@ static PyType_Slot pycpointer_type_slots[] = {
 
 static PyType_Spec pycpointer_type_spec = {
     .name = "_ctypes.PyCPointerType",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycpointer_type_slots,
 };
@@ -1870,7 +1870,7 @@ static PyType_Slot pycarray_type_slots[] = {
 
 static PyType_Spec pycarray_type_spec = {
     .name = "_ctypes.PyCArrayType",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycarray_type_slots,
 };
@@ -2623,7 +2623,7 @@ static PyType_Slot pycsimple_type_slots[] = {
 
 static PyType_Spec pycsimple_type_spec = {
     .name = "_ctypes.PyCSimpleType",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycsimple_type_slots,
 };
@@ -2881,7 +2881,7 @@ static PyType_Slot pycfuncptr_type_slots[] = {
 
 static PyType_Spec pycfuncptr_type_spec = {
     .name = "_ctypes.PyCFuncPtrType",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycfuncptr_type_slots,
 };
@@ -3252,7 +3252,7 @@ static PyType_Slot pycdata_slots[] = {
 static PyType_Spec pycdata_spec = {
     .name = "_ctypes._CData",
     .basicsize = sizeof(CDataObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = pycdata_slots,
 };
@@ -4804,7 +4804,7 @@ static PyType_Slot pycfuncptr_slots[] = {
 static PyType_Spec pycfuncptr_spec = {
     .name = "_ctypes.CFuncPtr",
     .basicsize = sizeof(PyCFuncPtrObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycfuncptr_slots,
 };
@@ -4941,7 +4941,7 @@ static PyType_Slot pycstruct_slots[] = {
 
 static PyType_Spec pycstruct_spec = {
     .name = "_ctypes.Structure",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycstruct_slots,
 };
@@ -4956,7 +4956,7 @@ static PyType_Slot pycunion_slots[] = {
 
 static PyType_Spec pycunion_spec = {
     .name = "_ctypes.Union",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycunion_slots,
 };
@@ -5310,7 +5310,7 @@ static PyType_Slot pycarray_slots[] = {
 
 static PyType_Spec pycarray_spec = {
     .name = "_ctypes.Array",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycarray_slots,
 };
@@ -5530,7 +5530,7 @@ static PyType_Slot pycsimple_slots[] = {
 
 static PyType_Spec pycsimple_spec = {
     .name = "_ctypes._SimpleCData",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycsimple_slots,
 };
@@ -5973,7 +5973,7 @@ static PyType_Slot pycpointer_slots[] = {
 
 static PyType_Spec pycpointer_spec = {
     .name = "_ctypes._Pointer",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pycpointer_slots,
 };
@@ -6061,7 +6061,7 @@ static PyType_Slot comerror_slots[] = {
 static PyType_Spec comerror_spec = {
     .name = "_ctypes.COMError",
     .basicsize = sizeof(PyBaseExceptionObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = comerror_slots,
 };

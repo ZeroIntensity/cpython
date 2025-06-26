@@ -12,7 +12,7 @@ static PyTypeObject CustomType = {
     .tp_doc = PyDoc_STR("Custom objects"),
     .tp_basicsize = sizeof(CustomObject),
     .tp_itemsize = 0,
-    .tp_flags = _Py_TPFLAGS_CPYTHON,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_new = PyType_GenericNew,
 };
 

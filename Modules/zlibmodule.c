@@ -2029,7 +2029,7 @@ static PyType_Slot Comptype_slots[] = {
 static PyType_Spec Comptype_spec = {
     .name = "zlib.Compress",
     .basicsize = sizeof(compobject),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     .slots= Comptype_slots,
 };
 
@@ -2043,7 +2043,7 @@ static PyType_Slot Decomptype_slots[] = {
 static PyType_Spec Decomptype_spec = {
     .name = "zlib.Decompress",
     .basicsize = sizeof(compobject),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     .slots = Decomptype_slots,
 };
 
@@ -2063,7 +2063,7 @@ static PyType_Spec ZlibDecompressor_type_spec = {
     // ZlibDecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
     // which prevents to create a subclass.
     // So calling PyType_GetModuleState() in this file is always safe.
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE),
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = ZlibDecompressor_type_slots,
 };
 

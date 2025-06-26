@@ -1415,7 +1415,7 @@ PyTypeObject PyModule_Type = {
     _Py_module_getattro,                        /* tp_getattro */
     PyObject_GenericSetAttr,                    /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASETYPE,                    /* tp_flags */
     module___init____doc__,                     /* tp_doc */
     module_traverse,                            /* tp_traverse */

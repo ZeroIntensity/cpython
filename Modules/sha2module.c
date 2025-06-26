@@ -536,7 +536,7 @@ static PyType_Slot sha512_type_slots[] = {
 static PyType_Spec sha224_type_spec = {
     .name = "_sha2.SHA224Type",
     .basicsize = sizeof(SHA256object),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC),
     .slots = sha256_types_slots
 };
@@ -544,7 +544,7 @@ static PyType_Spec sha224_type_spec = {
 static PyType_Spec sha256_type_spec = {
     .name = "_sha2.SHA256Type",
     .basicsize = sizeof(SHA256object),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC),
     .slots = sha256_types_slots
 };
@@ -552,7 +552,7 @@ static PyType_Spec sha256_type_spec = {
 static PyType_Spec sha384_type_spec = {
     .name = "_sha2.SHA384Type",
     .basicsize =  sizeof(SHA512object),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC),
     .slots = sha512_type_slots
 };
@@ -560,7 +560,7 @@ static PyType_Spec sha384_type_spec = {
 static PyType_Spec sha512_type_spec = {
     .name = "_sha2.SHA512Type",
     .basicsize =  sizeof(SHA512object),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC),
     .slots = sha512_type_slots
 };

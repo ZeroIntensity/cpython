@@ -1881,7 +1881,7 @@ static PyType_Slot deque_slots[] = {
 static PyType_Spec deque_spec = {
     .name = "collections.deque",
     .basicsize = sizeof(dequeobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_SEQUENCE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = deque_slots,
@@ -2073,7 +2073,7 @@ static PyType_Slot dequeiter_slots[] = {
 static PyType_Spec dequeiter_spec = {
     .name = "collections._deque_iterator",
     .basicsize = sizeof(dequeiterobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = dequeiter_slots,
 };
@@ -2191,7 +2191,7 @@ static PyType_Slot dequereviter_slots[] = {
 static PyType_Spec dequereviter_spec = {
     .name = "collections._deque_reverse_iterator",
     .basicsize = sizeof(dequeiterobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = dequereviter_slots,
 };
@@ -2501,7 +2501,7 @@ static PyType_Slot defdict_slots[] = {
 static PyType_Spec defdict_spec = {
     .name = "collections.defaultdict",
     .basicsize = sizeof(defdictobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = defdict_slots,
 };
@@ -2773,7 +2773,7 @@ static PyType_Slot tuplegetter_slots[] = {
 static PyType_Spec tuplegetter_spec = {
     .name = "collections._tuplegetter",
     .basicsize = sizeof(_tuplegetterobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = tuplegetter_slots,
 };

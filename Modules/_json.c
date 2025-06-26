@@ -1212,7 +1212,7 @@ static PyType_Spec PyScannerType_spec = {
     .name = "_json.Scanner",
     .basicsize = sizeof(PyScannerObject),
     .itemsize = 0,
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = PyScannerType_slots,
 };
 
@@ -1875,7 +1875,7 @@ static PyType_Spec PyEncoderType_spec = {
     .name = "_json.Encoder",
     .basicsize = sizeof(PyEncoderObject),
     .itemsize = 0,
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = PyEncoderType_slots
 };
 

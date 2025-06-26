@@ -654,7 +654,7 @@ static PyType_Slot PyCursesPanel_Type_slots[] = {
 static PyType_Spec PyCursesPanel_Type_spec = {
     .name = "_curses_panel.panel",
     .basicsize = sizeof(PyCursesPanelObject),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION,
     .slots = PyCursesPanel_Type_slots
 };
 

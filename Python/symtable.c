@@ -228,7 +228,7 @@ PyTypeObject PySTEntry_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON,                         /* tp_flags */
+    Py_TPFLAGS_DEFAULT,                         /* tp_flags */
     0,                                          /* tp_doc */
     0,                                          /* tp_traverse */
     0,                                          /* tp_clear */

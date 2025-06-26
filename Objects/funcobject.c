@@ -1218,7 +1218,7 @@ PyTypeObject PyFunction_Type = {
     0,                                          /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
     Py_TPFLAGS_HAVE_VECTORCALL |
     Py_TPFLAGS_METHOD_DESCRIPTOR,               /* tp_flags */
     func_new__doc__,                            /* tp_doc */
@@ -1599,7 +1599,7 @@ PyTypeObject PyClassMethod_Type = {
     0,                                          /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     classmethod_doc,                            /* tp_doc */
     cm_traverse,                                /* tp_traverse */
     cm_clear,                                   /* tp_clear */
@@ -1834,7 +1834,7 @@ PyTypeObject PyStaticMethod_Type = {
     0,                                          /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     staticmethod_doc,                           /* tp_doc */
     sm_traverse,                                /* tp_traverse */
     sm_clear,                                   /* tp_clear */

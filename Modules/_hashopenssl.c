@@ -900,7 +900,7 @@ static PyType_Spec HASHobject_type_spec = {
     .name = "_hashlib.HASH",
     .basicsize = sizeof(HASHobject),
     .flags = (
-        _Py_TPFLAGS_CPYTHON
+        Py_TPFLAGS_DEFAULT
         | Py_TPFLAGS_BASETYPE
         | Py_TPFLAGS_DISALLOW_INSTANTIATION
         | Py_TPFLAGS_IMMUTABLETYPE
@@ -1071,7 +1071,7 @@ static PyType_Spec HASHXOFobject_type_spec = {
     .name = "_hashlib.HASHXOF",
     .basicsize = sizeof(HASHobject),
     .flags = (
-        _Py_TPFLAGS_CPYTHON
+        Py_TPFLAGS_DEFAULT
         | Py_TPFLAGS_BASETYPE
         | Py_TPFLAGS_DISALLOW_INSTANTIATION
         | Py_TPFLAGS_IMMUTABLETYPE
@@ -2060,7 +2060,7 @@ static PyType_Slot HMACtype_slots[] = {
 PyType_Spec HMACtype_spec = {
     "_hashlib.HMAC",    /* name */
     sizeof(HMACobject),     /* basicsize */
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE,
     .slots = HMACtype_slots,
 };
 

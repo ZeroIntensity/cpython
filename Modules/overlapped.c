@@ -2001,7 +2001,7 @@ static PyType_Slot overlapped_type_slots[] = {
 static PyType_Spec overlapped_type_spec = {
     .name = "_overlapped.Overlapped",
     .basicsize = sizeof(OverlappedObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE),
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = overlapped_type_slots
 };
 

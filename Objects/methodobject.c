@@ -374,7 +374,7 @@ PyTypeObject PyCFunction_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
     Py_TPFLAGS_HAVE_VECTORCALL,                 /* tp_flags */
     0,                                          /* tp_doc */
     meth_traverse,                /* tp_traverse */
@@ -395,7 +395,7 @@ PyTypeObject PyCMethod_Type = {
     .tp_name = "builtin_method",
     .tp_basicsize = sizeof(PyCMethodObject),
     .tp_base = &PyCFunction_Type,
-    .tp_flags = _Py_TPFLAGS_CPYTHON
+    .tp_flags = Py_TPFLAGS_DEFAULT
 };
 
 /* Vectorcall functions for each of the PyCFunction calling conventions,

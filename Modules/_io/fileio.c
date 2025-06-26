@@ -1334,7 +1334,7 @@ static PyType_Slot fileio_slots[] = {
 PyType_Spec fileio_spec = {
     .name = "_io.FileIO",
     .basicsize = sizeof(fileio),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = fileio_slots,
 };

@@ -281,7 +281,7 @@ PyTypeObject _PyNamespace_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     PyObject_GenericSetAttr,                    /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASETYPE,                    /* tp_flags */
     namespace_doc,                              /* tp_doc */
     namespace_traverse,                         /* tp_traverse */

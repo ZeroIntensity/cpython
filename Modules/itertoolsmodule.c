@@ -264,7 +264,7 @@ static PyType_Slot batched_slots[] = {
 static PyType_Spec batched_spec = {
     .name = "itertools.batched",
     .basicsize = sizeof(batchedobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = batched_slots,
 };
@@ -417,7 +417,7 @@ static PyType_Slot pairwise_slots[] = {
 static PyType_Spec pairwise_spec = {
     .name = "itertools.pairwise",
     .basicsize = sizeof(pairwiseobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = pairwise_slots,
 };
@@ -583,7 +583,7 @@ static PyType_Slot groupby_slots[] = {
 static PyType_Spec groupby_spec = {
     .name = "itertools.groupby",
     .basicsize= sizeof(groupbyobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = groupby_slots,
 };
@@ -694,7 +694,7 @@ static PyType_Slot _grouper_slots[] = {
 static PyType_Spec _grouper_spec = {
     .name = "itertools._grouper",
     .basicsize = sizeof(_grouperobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = _grouper_slots,
 };
@@ -905,7 +905,7 @@ static PyType_Slot teedataobject_slots[] = {
 static PyType_Spec teedataobject_spec = {
     .name = "itertools._tee_dataobject",
     .basicsize = sizeof(teedataobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = teedataobject_slots,
 };
@@ -1061,7 +1061,7 @@ static PyType_Slot tee_slots[] = {
 static PyType_Spec tee_spec = {
     .name = "itertools._tee",
     .basicsize = sizeof(teeobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = tee_slots,
 };
@@ -1244,7 +1244,7 @@ static PyType_Slot cycle_slots[] = {
 static PyType_Spec cycle_spec = {
     .name = "itertools.cycle",
     .basicsize = sizeof(cycleobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = cycle_slots,
 };
@@ -1368,7 +1368,7 @@ static PyType_Slot dropwhile_slots[] = {
 static PyType_Spec dropwhile_spec = {
     .name = "itertools.dropwhile",
     .basicsize = sizeof(dropwhileobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = dropwhile_slots,
 };
@@ -1486,7 +1486,7 @@ static PyType_Slot takewhile_slots[] = {
 static PyType_Spec takewhile_spec = {
     .name = "itertools.takewhile",
     .basicsize = sizeof(takewhileobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = takewhile_slots,
 };
@@ -1678,7 +1678,7 @@ static PyType_Slot islice_slots[] = {
 static PyType_Spec islice_spec = {
     .name = "itertools.islice",
     .basicsize = sizeof(isliceobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = islice_slots,
 };
@@ -1787,7 +1787,7 @@ static PyType_Slot starmap_slots[] = {
 static PyType_Spec starmap_spec = {
     .name = "itertools.starmap",
     .basicsize = sizeof(starmapobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = starmap_slots,
 };
@@ -1950,7 +1950,7 @@ static PyType_Slot chain_slots[] = {
 static PyType_Spec chain_spec = {
     .name = "itertools.chain",
     .basicsize = sizeof(chainobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = chain_slots,
 };
@@ -2208,7 +2208,7 @@ static PyType_Slot product_slots[] = {
 static PyType_Spec product_spec = {
     .name = "itertools.product",
     .basicsize = sizeof(productobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = product_slots,
 };
@@ -2425,7 +2425,7 @@ static PyType_Slot combinations_slots[] = {
 static PyType_Spec combinations_spec = {
     .name = "itertools.combinations",
     .basicsize = sizeof(combinationsobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = combinations_slots,
 };
@@ -2663,7 +2663,7 @@ static PyType_Slot cwr_slots[] = {
 static PyType_Spec cwr_spec = {
     .name = "itertools.combinations_with_replacement",
     .basicsize = sizeof(cwrobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = cwr_slots,
 };
@@ -2933,7 +2933,7 @@ static PyType_Slot permutations_slots[] = {
 static PyType_Spec permutations_spec = {
     .name = "itertools.permutations",
     .basicsize = sizeof(permutationsobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = permutations_slots,
 };
@@ -3066,7 +3066,7 @@ static PyType_Slot accumulate_slots[] = {
 static PyType_Spec accumulate_spec = {
     .name = "itertools.accumulate",
     .basicsize = sizeof(accumulateobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = accumulate_slots,
 };
@@ -3202,7 +3202,7 @@ static PyType_Slot compress_slots[] = {
 static PyType_Spec compress_spec = {
     .name = "itertools.compress",
     .basicsize = sizeof(compressobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = compress_slots,
 };
@@ -3325,7 +3325,7 @@ static PyType_Slot filterfalse_slots[] = {
 static PyType_Spec filterfalse_spec = {
     .name = "itertools.filterfalse",
     .basicsize = sizeof(filterfalseobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = filterfalse_slots,
 };
@@ -3567,7 +3567,7 @@ static PyType_Slot count_slots[] = {
 static PyType_Spec count_spec = {
     .name = "itertools.count",
     .basicsize = sizeof(countobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = count_slots,
 };
@@ -3697,7 +3697,7 @@ static PyType_Slot repeat_slots[] = {
 static PyType_Spec repeat_spec = {
     .name = "itertools.repeat",
     .basicsize = sizeof(repeatobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = repeat_slots,
 };
@@ -3907,7 +3907,7 @@ static PyType_Slot ziplongest_slots[] = {
 static PyType_Spec ziplongest_spec = {
     .name = "itertools.zip_longest",
     .basicsize = sizeof(ziplongestobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = ziplongest_slots,
 };

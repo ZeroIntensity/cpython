@@ -4943,7 +4943,7 @@ PyTypeObject PyDict_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASETYPE | Py_TPFLAGS_DICT_SUBCLASS |
         _Py_TPFLAGS_MATCH_SELF | Py_TPFLAGS_MAPPING,  /* tp_flags */
     dictionary_doc,                             /* tp_doc */
@@ -5266,7 +5266,7 @@ PyTypeObject PyDictIterKey_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
     dictiter_traverse,                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -5389,7 +5389,7 @@ PyTypeObject PyDictIterValue_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,    /* tp_flags */
     0,                                          /* tp_doc */
     dictiter_traverse,                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -5698,7 +5698,7 @@ PyTypeObject PyDictIterItem_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
     dictiter_traverse,                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -5830,7 +5830,7 @@ PyTypeObject PyDictRevIterKey_Type = {
     "dict_reversekeyiterator",
     sizeof(dictiterobject),
     .tp_dealloc = dictiter_dealloc,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = dictiter_traverse,
     .tp_iter = PyObject_SelfIter,
     .tp_iternext = dictreviter_iternext,
@@ -5872,7 +5872,7 @@ PyTypeObject PyDictRevIterItem_Type = {
     "dict_reverseitemiterator",
     sizeof(dictiterobject),
     .tp_dealloc = dictiter_dealloc,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = dictiter_traverse,
     .tp_iter = PyObject_SelfIter,
     .tp_iternext = dictreviter_iternext,
@@ -5884,7 +5884,7 @@ PyTypeObject PyDictRevIterValue_Type = {
     "dict_reversevalueiterator",
     sizeof(dictiterobject),
     .tp_dealloc = dictiter_dealloc,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = dictiter_traverse,
     .tp_iter = PyObject_SelfIter,
     .tp_iternext = dictreviter_iternext,
@@ -6481,7 +6481,7 @@ PyTypeObject PyDictKeys_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
     dictview_traverse,                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -6593,7 +6593,7 @@ PyTypeObject PyDictItems_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
     dictview_traverse,                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -6683,7 +6683,7 @@ PyTypeObject PyDictValues_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                                          /* tp_doc */
     dictview_traverse,                          /* tp_traverse */
     0,                                          /* tp_clear */

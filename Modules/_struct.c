@@ -2029,7 +2029,7 @@ static PyType_Spec unpackiter_type_spec = {
     "_struct.unpack_iterator",
     sizeof(unpackiterobject),
     0,
-    (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
      Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     unpackiter_type_slots
 };
@@ -2418,7 +2418,7 @@ static PyType_Spec PyStructType_spec = {
     "_struct.Struct",
     sizeof(PyStructObject),
     0,
-    (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
      Py_TPFLAGS_BASETYPE | Py_TPFLAGS_IMMUTABLETYPE),
     PyStructType_slots
 };

@@ -2506,7 +2506,7 @@ hamt_baseiter_new(PyTypeObject *type, binaryfunc yield, PyHamtObject *o)
     .tp_as_mapping = &PyHamtIterator_as_mapping,                \
     .tp_dealloc = hamt_baseiter_tp_dealloc,                     \
     .tp_getattro = PyObject_GenericGetAttr,                     \
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,        \
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,        \
     .tp_traverse = hamt_baseiter_tp_traverse,                   \
     .tp_clear = hamt_baseiter_tp_clear,                         \
     .tp_iter = PyObject_SelfIter,                               \
@@ -2815,7 +2815,7 @@ PyTypeObject _PyHamt_Type = {
     .tp_iter = hamt_tp_iter,
     .tp_dealloc = hamt_tp_dealloc,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_richcompare = hamt_tp_richcompare,
     .tp_traverse = hamt_tp_traverse,
     .tp_clear = hamt_tp_clear,
@@ -2835,7 +2835,7 @@ PyTypeObject _PyHamt_ArrayNode_Type = {
     0,
     .tp_dealloc = hamt_node_array_dealloc,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = hamt_node_array_traverse,
     .tp_free = PyObject_GC_Del,
     .tp_hash = PyObject_HashNotImplemented,
@@ -2848,7 +2848,7 @@ PyTypeObject _PyHamt_BitmapNode_Type = {
     sizeof(PyObject *),
     .tp_dealloc = hamt_node_bitmap_dealloc,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = hamt_node_bitmap_traverse,
     .tp_free = PyObject_GC_Del,
     .tp_hash = PyObject_HashNotImplemented,
@@ -2861,7 +2861,7 @@ PyTypeObject _PyHamt_CollisionNode_Type = {
     sizeof(PyObject *),
     .tp_dealloc = hamt_node_collision_dealloc,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = hamt_node_collision_traverse,
     .tp_free = PyObject_GC_Del,
     .tp_hash = PyObject_HashNotImplemented,

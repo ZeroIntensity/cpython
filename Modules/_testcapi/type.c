@@ -9,7 +9,7 @@ static PyType_Slot HeapTypeNameType_slots[] = {
 static PyType_Spec HeapTypeNameType_Spec = {
     .name = "_testcapi.HeapTypeNameType",
     .basicsize = sizeof(PyObject),
-    .flags = _Py_TPFLAGS_CPYTHON,
+    .flags = Py_TPFLAGS_DEFAULT,
     .slots = HeapTypeNameType_slots,
 };
 

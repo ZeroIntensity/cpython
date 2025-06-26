@@ -8657,7 +8657,7 @@ static PyTypeObject EncodingMapType = {
     .tp_name = "EncodingMap",
     .tp_basicsize = sizeof(struct encoding_map),
     /* methods */
-    .tp_flags = _Py_TPFLAGS_CPYTHON,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_methods = encoding_map_methods,
 };
 
@@ -15755,7 +15755,7 @@ PyTypeObject PyUnicode_Type = {
     PyObject_GenericGetAttr,      /* tp_getattro */
     0,                            /* tp_setattro */
     0,                            /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
         Py_TPFLAGS_UNICODE_SUBCLASS |
         _Py_TPFLAGS_MATCH_SELF, /* tp_flags */
     unicode_doc,                  /* tp_doc */
@@ -16354,7 +16354,7 @@ PyTypeObject PyUnicodeIter_Type = {
     PyObject_GenericGetAttr,        /* tp_getattro */
     0,                  /* tp_setattro */
     0,                  /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     0,                  /* tp_doc */
     unicodeiter_traverse, /* tp_traverse */
     0,                  /* tp_clear */
@@ -16372,7 +16372,7 @@ PyTypeObject _PyUnicodeASCIIIter_Type = {
     .tp_basicsize = sizeof(unicodeiterobject),
     .tp_dealloc = unicodeiter_dealloc,
     .tp_getattro = PyObject_GenericGetAttr,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_traverse = unicodeiter_traverse,
     .tp_iter = PyObject_SelfIter,
     .tp_iternext = unicode_ascii_iter_next,

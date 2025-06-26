@@ -581,7 +581,7 @@ initialize_static_fields(PyTypeObject *type, PyStructSequence_Desc *desc,
     type->tp_base = &PyTuple_Type;
     type->tp_methods = structseq_methods;
     type->tp_new = structseq_new;
-    type->tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | tp_flags;
+    type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | tp_flags;
     type->tp_traverse = structseq_traverse;
     type->tp_members = tp_members;
 }
@@ -768,7 +768,7 @@ _PyStructSequence_NewType(PyStructSequence_Desc *desc, unsigned long tp_flags)
     Py_ssize_t hidden = n_members - desc->n_in_sequence;
     spec.basicsize = (int)(sizeof(PyStructSequence) + (hidden - 1) * sizeof(PyObject *));
     spec.itemsize = sizeof(PyObject *);
-    spec.flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | tp_flags;
+    spec.flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | tp_flags;
     spec.slots = slots;
 
     type = (PyTypeObject *)PyType_FromSpecWithBases(&spec, (PyObject *)&PyTuple_Type);

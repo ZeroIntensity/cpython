@@ -1154,7 +1154,7 @@ static PyType_Slot bytesio_slots[] = {
 PyType_Spec bytesio_spec = {
     .name = "_io.BytesIO",
     .basicsize = sizeof(bytesio),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = bytesio_slots,
 };
@@ -1244,7 +1244,7 @@ static PyType_Slot bytesiobuf_slots[] = {
 PyType_Spec bytesiobuf_spec = {
     .name = "_io._BytesIOBuffer",
     .basicsize = sizeof(bytesiobuf),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = bytesiobuf_slots,
 };

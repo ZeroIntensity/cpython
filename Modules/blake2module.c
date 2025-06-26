@@ -1042,7 +1042,7 @@ static PyType_Slot blake2s_type_slots[] = {
 static PyType_Spec blake2b_type_spec = {
     .name = "_blake2.blake2b",
     .basicsize = sizeof(Blake2Object),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE
              | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HEAPTYPE,
     .slots = blake2b_type_slots
 };
@@ -1050,7 +1050,7 @@ static PyType_Spec blake2b_type_spec = {
 static PyType_Spec blake2s_type_spec = {
     .name = "_blake2.blake2s",
     .basicsize = sizeof(Blake2Object),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE
              | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_HEAPTYPE,
     .slots = blake2s_type_slots
 };

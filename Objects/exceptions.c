@@ -629,7 +629,7 @@ static PyTypeObject _PyExc_BaseException = {
     PyObject_GenericGetAttr,    /*tp_getattro*/
     PyObject_GenericSetAttr,    /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASE_EXC_SUBCLASS,  /*tp_flags*/
     PyDoc_STR("Common base class for all exceptions"), /* tp_doc */
     BaseException_traverse,     /* tp_traverse */
@@ -666,7 +666,7 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
     sizeof(PyBaseExceptionObject), \
     0, BaseException_dealloc, 0, 0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, \
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, \
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, \
     PyDoc_STR(EXCDOC), BaseException_traverse, \
     BaseException_clear, 0, 0, 0, 0, 0, 0, 0, &_ ## EXCBASE, \
     0, 0, 0, offsetof(PyBaseExceptionObject, dict), \
@@ -681,7 +681,7 @@ PyTypeObject _PyExc_ ## EXCNAME = { \
     sizeof(Py ## EXCSTORE ## Object), \
     0, EXCSTORE ## _dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, \
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, \
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, \
     PyDoc_STR(EXCDOC), EXCSTORE ## _traverse, \
     EXCSTORE ## _clear, 0, 0, 0, 0, 0, 0, 0, &_ ## EXCBASE, \
     0, 0, 0, offsetof(Py ## EXCSTORE ## Object, dict), \
@@ -702,7 +702,7 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
     sizeof(Py ## EXCSTORE ## Object), 0, \
     EXCSTORE ## _dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     EXCSTR, 0, 0, 0, \
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, \
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC, \
     PyDoc_STR(EXCDOC), EXCSTORE ## _traverse, \
     EXCSTORE ## _clear, 0, 0, 0, 0, EXCMETHODS, \
     EXCMEMBERS, EXCGETSET, &_ ## EXCBASE, \
@@ -3661,7 +3661,7 @@ static PyTypeObject _PyExc_UnicodeEncodeError = {
     sizeof(PyUnicodeErrorObject), 0,
     UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     UnicodeEncodeError_str, 0, 0, 0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Unicode encoding error."), UnicodeError_traverse,
     UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
     0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
@@ -3774,7 +3774,7 @@ static PyTypeObject _PyExc_UnicodeDecodeError = {
     sizeof(PyUnicodeErrorObject), 0,
     UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     UnicodeDecodeError_str, 0, 0, 0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Unicode decoding error."), UnicodeError_traverse,
     UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
     0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
@@ -3880,7 +3880,7 @@ static PyTypeObject _PyExc_UnicodeTranslateError = {
     sizeof(PyUnicodeErrorObject), 0,
     UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     UnicodeTranslateError_str, 0, 0, 0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Unicode translation error."), UnicodeError_traverse,
     UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
     0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
@@ -4088,7 +4088,7 @@ PyTypeObject _PyExc_MemoryError = {
     sizeof(PyBaseExceptionObject),
     0, MemoryError_dealloc, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Out of memory."), BaseException_traverse,
     BaseException_clear, 0, 0, 0, 0, 0, 0, 0, &_PyExc_Exception,
     0, 0, 0, offsetof(PyBaseExceptionObject, dict),

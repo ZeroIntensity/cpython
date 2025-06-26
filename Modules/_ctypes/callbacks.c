@@ -63,7 +63,7 @@ PyType_Spec cthunk_spec = {
     .name = "_ctypes.CThunkObject",
     .basicsize = sizeof(CThunkObject),
     .itemsize = sizeof(ffi_type),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = cthunk_slots,
 };

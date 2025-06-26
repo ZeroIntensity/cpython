@@ -734,7 +734,7 @@ PyTypeObject PyMethodDescr_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
     Py_TPFLAGS_HAVE_VECTORCALL |
     Py_TPFLAGS_METHOD_DESCRIPTOR,               /* tp_flags */
     0,                                          /* tp_doc */
@@ -774,7 +774,7 @@ PyTypeObject PyClassMethodDescr_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -811,7 +811,7 @@ PyTypeObject PyMemberDescr_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -848,7 +848,7 @@ PyTypeObject PyGetSetDescr_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
     0,                                          /* tp_clear */
@@ -885,7 +885,7 @@ PyTypeObject PyWrapperDescr_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
     Py_TPFLAGS_METHOD_DESCRIPTOR,               /* tp_flags */
     0,                                          /* tp_doc */
     descr_traverse,                             /* tp_traverse */
@@ -1467,7 +1467,7 @@ PyTypeObject _PyMethodWrapper_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC, /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC, /* tp_flags */
     0,                                          /* tp_doc */
     wrapper_traverse,                           /* tp_traverse */
     0,                                          /* tp_clear */
@@ -2015,7 +2015,7 @@ PyTypeObject PyDictProxy_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_MAPPING,                     /* tp_flags */
     mappingproxy_new__doc__,                    /* tp_doc */
     mappingproxy_traverse,                      /* tp_traverse */
@@ -2058,7 +2058,7 @@ PyTypeObject PyProperty_Type = {
     PyObject_GenericGetAttr,                    /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
         Py_TPFLAGS_BASETYPE,                    /* tp_flags */
     property_init__doc__,                       /* tp_doc */
     property_traverse,                          /* tp_traverse */

@@ -292,7 +292,7 @@ static PyType_Slot Xxo_Type_slots[] = {
 static PyType_Spec Xxo_Type_spec = {
     .name = "xxlimited.Xxo",
     .basicsize = sizeof(XxoObject),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = Xxo_Type_slots,
 };
 
@@ -306,7 +306,7 @@ static PyType_Slot Str_Type_slots[] = {
 static PyType_Spec Str_Type_spec = {
     .name = "xxlimited.Str",
     .basicsize = 0,
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = Str_Type_slots,
 };
 

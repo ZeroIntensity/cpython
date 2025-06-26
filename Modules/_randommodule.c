@@ -598,7 +598,7 @@ static PyType_Spec Random_Type_spec = {
     "_random.Random",
     sizeof(RandomObject),
     0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     Random_Type_slots
 };
 

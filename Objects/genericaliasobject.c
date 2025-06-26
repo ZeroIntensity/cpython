@@ -961,7 +961,7 @@ PyTypeObject _Py_GenericAliasIterType = {
     .tp_methods = ga_iter_methods,
     .tp_dealloc = ga_iter_dealloc,
     .tp_clear = ga_iter_clear,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
 };
 
 static PyObject *
@@ -990,7 +990,7 @@ PyTypeObject Py_GenericAliasType = {
     .tp_hash = ga_hash,
     .tp_call = ga_call,
     .tp_getattro = ga_getattro,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_VECTORCALL,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_VECTORCALL,
     .tp_traverse = ga_traverse,
     .tp_richcompare = ga_richcompare,
     .tp_weaklistoffset = offsetof(gaobject, weakreflist),

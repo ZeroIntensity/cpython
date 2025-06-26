@@ -747,7 +747,7 @@ static PyType_Spec ThreadHandle_Type_spec = {
     "_thread._ThreadHandle",
     sizeof(PyThreadHandleObject),
     0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC,
     ThreadHandle_Type_slots,
 };
 
@@ -1006,7 +1006,7 @@ static PyType_Slot lock_type_slots[] = {
 static PyType_Spec lock_type_spec = {
     .name = "_thread.lock",
     .basicsize = sizeof(lockobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_MANAGED_WEAKREF),
     .slots = lock_type_slots,
 };
@@ -1296,7 +1296,7 @@ static PyType_Slot rlock_type_slots[] = {
 static PyType_Spec rlock_type_spec = {
     .name = "_thread.RLock",
     .basicsize = sizeof(rlockobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_MANAGED_WEAKREF),
     .slots = rlock_type_slots,
 };
@@ -1388,7 +1388,7 @@ static PyType_Slot local_dummy_type_slots[] = {
 static PyType_Spec local_dummy_type_spec = {
     .name = "_thread._localdummy",
     .basicsize = sizeof(localdummyobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = local_dummy_type_slots,
 };
@@ -1744,7 +1744,7 @@ static PyType_Slot local_type_slots[] = {
 static PyType_Spec local_type_spec = {
     .name = "_thread._local",
     .basicsize = sizeof(localobject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = local_type_slots,
 };

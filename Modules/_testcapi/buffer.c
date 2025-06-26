@@ -89,7 +89,7 @@ static PyTypeObject testBufType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "testBufType",
     .tp_basicsize = sizeof(testBufObject),
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .tp_new = testbuf_new,
     .tp_dealloc = testbuf_dealloc,
     .tp_traverse = testbuf_traverse,

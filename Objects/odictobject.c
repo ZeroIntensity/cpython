@@ -1554,7 +1554,7 @@ PyTypeObject PyODict_Type = {
     0,                                          /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,/* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,/* tp_flags */
     odict_doc,                                  /* tp_doc */
     odict_traverse,                             /* tp_traverse */
     odict_tp_clear,                             /* tp_clear */
@@ -1831,7 +1831,7 @@ PyTypeObject PyODictIter_Type = {
     PyObject_GenericGetAttr,                  /* tp_getattro */
     0,                                        /* tp_setattro */
     0,                                        /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,  /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,  /* tp_flags */
     0,                                        /* tp_doc */
     odictiter_traverse,                       /* tp_traverse */
     0,                                        /* tp_clear */

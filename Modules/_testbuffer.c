@@ -2671,7 +2671,7 @@ static PyTypeObject NDArray_Type = {
     PyObject_GenericGetAttr,     /* tp_getattro */
     0,                           /* tp_setattro */
     &ndarray_as_buffer,          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON,          /* tp_flags */
+    Py_TPFLAGS_DEFAULT,          /* tp_flags */
     0,                           /* tp_doc */
     0,                           /* tp_traverse */
     0,                           /* tp_clear */
@@ -2791,7 +2791,7 @@ static PyTypeObject StaticArray_Type = {
     0,                               /* tp_getattro */
     0,                               /* tp_setattro */
     &staticarray_as_buffer,          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON,              /* tp_flags */
+    Py_TPFLAGS_DEFAULT,              /* tp_flags */
     0,                               /* tp_doc */
     0,                               /* tp_traverse */
     0,                               /* tp_clear */

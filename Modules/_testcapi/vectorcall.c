@@ -233,7 +233,7 @@ _testcapi_make_vectorcall_class_impl(PyObject *module, PyTypeObject *base)
     PyType_Spec spec = {
         .name = "_testcapi.VectorcallClass",
         .basicsize = (int)(base->tp_basicsize + sizeof(vectorcallfunc)),
-        .flags = _Py_TPFLAGS_CPYTHON
+        .flags = Py_TPFLAGS_DEFAULT
             | Py_TPFLAGS_HAVE_VECTORCALL
             | Py_TPFLAGS_BASETYPE,
         .slots = VectorCallClass_slots,
@@ -320,7 +320,7 @@ static PyTypeObject MethodDescriptorBase_Type = {
     .tp_new = MethodDescriptor_new,
     .tp_call = PyVectorcall_Call,
     .tp_vectorcall_offset = offsetof(MethodDescriptorObject, vectorcall),
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
                 Py_TPFLAGS_METHOD_DESCRIPTOR | Py_TPFLAGS_HAVE_VECTORCALL,
     .tp_descr_get = func_descr_get,
 };
@@ -328,13 +328,13 @@ static PyTypeObject MethodDescriptorBase_Type = {
 static PyTypeObject MethodDescriptorDerived_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "MethodDescriptorDerived",
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
 };
 
 static PyTypeObject MethodDescriptorNopGet_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "MethodDescriptorNopGet",
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_call = call_return_args,
     .tp_descr_get = nop_descr_get,
 };
@@ -363,7 +363,7 @@ static PyTypeObject MethodDescriptor2_Type = {
     .tp_new = MethodDescriptor2_new,
     .tp_call = PyVectorcall_Call,
     .tp_vectorcall_offset = offsetof(MethodDescriptor2Object, vectorcall),
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_VECTORCALL,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_VECTORCALL,
 };
 
 

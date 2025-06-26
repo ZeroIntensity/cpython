@@ -253,7 +253,7 @@ static PyType_Slot md5_type_slots[] = {
 static PyType_Spec md5_type_spec = {
     .name = "_md5.md5",
     .basicsize =  sizeof(MD5object),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_HAVE_GC),
     .slots = md5_type_slots
 };

@@ -611,22 +611,6 @@ given type object has a specified feature.
                  Py_TPFLAGS_HAVE_STACKLESS_EXTENSION | \
                 0)
 
-/* Type supports immortalization.
- *
- * In order to support immortality, an object must:
- * - Be allocated under the "object" or "memory" domain.
- * - Not rely on a Py_REFCNT() value to be something other than 0 or 1.
- * - Use tp_finalize() and/or PyObject_CallFinalizerFromDealloc() to run destruction code.
- * - Traverse all objects it holds a reference to in tp_traverse().
- *
- * These are all best practices in the C API, but it's not *guaranteed* that a type follows it.
- * In practice, there are very few types that don't support the immortalization contract.
- */
-#define PyUnstable_TPFLAGS_CAN_IMMORTALIZE (1UL << 16)
-
-/* All types in CPython can immortalize. */
-#define _Py_TPFLAGS_CPYTHON Py_TPFLAGS_DEFAULT | PyUnstable_TPFLAGS_CAN_IMMORTALIZE
-
 /* NOTE: Some of the following flags reuse lower bits (removed as part of the
  * Python 3.0 transition). */
 

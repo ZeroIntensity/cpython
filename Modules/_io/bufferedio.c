@@ -2528,7 +2528,7 @@ static PyType_Slot bufferediobase_slots[] = {
 /* Do not set Py_TPFLAGS_HAVE_GC so that tp_traverse and tp_clear are inherited */
 PyType_Spec bufferediobase_spec = {
     .name = "_io._BufferedIOBase",
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = bufferediobase_slots,
 };
@@ -2592,7 +2592,7 @@ static PyType_Slot bufferedreader_slots[] = {
 PyType_Spec bufferedreader_spec = {
     .name = "_io.BufferedReader",
     .basicsize = sizeof(buffered),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = bufferedreader_slots,
 };
@@ -2650,7 +2650,7 @@ static PyType_Slot bufferedwriter_slots[] = {
 PyType_Spec bufferedwriter_spec = {
     .name = "_io.BufferedWriter",
     .basicsize = sizeof(buffered),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = bufferedwriter_slots,
 };
@@ -2700,7 +2700,7 @@ static PyType_Slot bufferedrwpair_slots[] = {
 PyType_Spec bufferedrwpair_spec = {
     .name = "_io.BufferedRWPair",
     .basicsize = sizeof(rwpair),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = bufferedrwpair_slots,
 };
@@ -2768,7 +2768,7 @@ static PyType_Slot bufferedrandom_slots[] = {
 PyType_Spec bufferedrandom_spec = {
     .name = "_io.BufferedRandom",
     .basicsize = sizeof(buffered),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = bufferedrandom_slots,
 };

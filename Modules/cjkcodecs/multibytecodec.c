@@ -778,7 +778,7 @@ static PyType_Slot multibytecodec_slots[] = {
 static PyType_Spec multibytecodec_spec = {
     .name = MODULE_NAME ".MultibyteCodec",
     .basicsize = sizeof(MultibyteCodecObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = multibytecodec_slots,
 };
@@ -1163,7 +1163,7 @@ static PyType_Slot encoder_slots[] = {
 static PyType_Spec encoder_spec = {
     .name = MODULE_NAME ".MultibyteIncrementalEncoder",
     .basicsize = sizeof(MultibyteIncrementalEncoderObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = encoder_slots,
 };
@@ -1445,7 +1445,7 @@ static PyType_Slot decoder_slots[] = {
 static PyType_Spec decoder_spec = {
     .name = MODULE_NAME ".MultibyteIncrementalDecoder",
     .basicsize = sizeof(MultibyteIncrementalDecoderObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = decoder_slots,
 };
@@ -1765,7 +1765,7 @@ static PyType_Slot reader_slots[] = {
 static PyType_Spec reader_spec = {
     .name = MODULE_NAME ".MultibyteStreamReader",
     .basicsize = sizeof(MultibyteStreamReaderObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = reader_slots,
 };
@@ -2003,7 +2003,7 @@ static PyType_Slot writer_slots[] = {
 static PyType_Spec writer_spec = {
     .name = MODULE_NAME ".MultibyteStreamWriter",
     .basicsize = sizeof(MultibyteStreamWriterObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = writer_slots,
 };

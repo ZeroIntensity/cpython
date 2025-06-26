@@ -438,7 +438,7 @@ static PyGetSetDef SHA3_getseters[] = {
     static PyType_Spec type_spec_obj = { \
         .name = "_sha3." type_name, \
         .basicsize = sizeof(SHA3object), \
-        .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_IMMUTABLETYPE \
+        .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_IMMUTABLETYPE \
                  | Py_TPFLAGS_HAVE_GC, \
         .slots = type_slots \
     }

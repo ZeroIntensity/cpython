@@ -246,6 +246,6 @@ static PyType_Spec PySSLCertificate_spec = {
     "_ssl.Certificate",
     sizeof(PySSLCertificate),
     0,
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE,
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION | Py_TPFLAGS_IMMUTABLETYPE,
     PySSLCertificate_slots,
 };

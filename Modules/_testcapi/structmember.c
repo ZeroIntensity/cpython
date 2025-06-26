@@ -112,7 +112,7 @@ static PyType_Slot test_structmembers_slots[] = {
 
 static PyType_Spec test_structmembers_spec = {
     .name = "_testcapi._test_structmembersType_NewAPI",
-    .flags = _Py_TPFLAGS_CPYTHON,
+    .flags = Py_TPFLAGS_DEFAULT,
     .basicsize = sizeof(test_structmembers),
     .slots = test_structmembers_slots,
 };

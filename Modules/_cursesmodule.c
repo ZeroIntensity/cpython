@@ -3015,7 +3015,7 @@ static PyType_Slot PyCursesWindow_Type_slots[] = {
 static PyType_Spec PyCursesWindow_Type_spec = {
     .name = "_curses.window",
     .basicsize =  sizeof(PyCursesWindowObject),
-    .flags = _Py_TPFLAGS_CPYTHON
+    .flags = Py_TPFLAGS_DEFAULT
         | Py_TPFLAGS_DISALLOW_INSTANTIATION
         | Py_TPFLAGS_IMMUTABLETYPE
         | Py_TPFLAGS_HEAPTYPE

@@ -192,7 +192,7 @@ static PyTypeObject _HashInheritanceTester_Type = {
     PyObject_GenericGetAttr,  /* tp_getattro */
     0,                          /* tp_setattro */
     0,                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON,         /* tp_flags */
+    Py_TPFLAGS_DEFAULT,         /* tp_flags */
     0,                          /* tp_doc */
     0,                          /* tp_traverse */
     0,                          /* tp_clear */
@@ -2912,7 +2912,7 @@ static PyTypeObject MyList_Type = {
     0,                                          /* tp_getattro */
     0,                                          /* tp_setattro */
     0,                                          /* tp_as_buffer */
-    _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,   /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,   /* tp_flags */
     0,                                          /* tp_doc */
     0,                                          /* tp_traverse */
     0,                                          /* tp_clear */
@@ -2966,7 +2966,7 @@ static PyTypeObject GenericAlias_Type = {
     sizeof(PyGenericAliasObject),
     0,
     .tp_dealloc = generic_alias_dealloc,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_methods = generic_alias_methods,
 };
 
@@ -3001,7 +3001,7 @@ static PyTypeObject Generic_Type = {
     "Generic",
     sizeof(PyGenericObject),
     0,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_methods = generic_methods,
 };
 
@@ -3021,7 +3021,7 @@ static PyTypeObject MethInstance_Type = {
     "MethInstance",
     sizeof(PyObject),
     .tp_new = PyType_GenericNew,
-    .tp_flags = _Py_TPFLAGS_CPYTHON,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_methods = meth_instance_methods,
     .tp_doc = (char*)PyDoc_STR(
         "Class with normal (instance) methods to test calling conventions"),
@@ -3043,7 +3043,7 @@ static PyTypeObject MethClass_Type = {
     "MethClass",
     sizeof(PyObject),
     .tp_new = PyType_GenericNew,
-    .tp_flags = _Py_TPFLAGS_CPYTHON,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_methods = meth_class_methods,
     .tp_doc = PyDoc_STR(
         "Class with class methods to test calling conventions"),
@@ -3065,7 +3065,7 @@ static PyTypeObject MethStatic_Type = {
     "MethStatic",
     sizeof(PyObject),
     .tp_new = PyType_GenericNew,
-    .tp_flags = _Py_TPFLAGS_CPYTHON,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_methods = meth_static_methods,
     .tp_doc = PyDoc_STR(
         "Class with static methods to test calling conventions"),
@@ -3114,7 +3114,7 @@ static PyTypeObject ContainerNoGC_type = {
     "_testcapi.ContainerNoGC",
     sizeof(ContainerNoGCobject),
     .tp_dealloc = ContainerNoGC_dealloc,
-    .tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .tp_members = ContainerNoGC_members,
     .tp_new = ContainerNoGC_new,
 };
@@ -3156,7 +3156,7 @@ create_manual_heap_type(void)
     }
     PyTypeObject* type = &heap_type->ht_type;
     type->tp_basicsize = sizeof(ManualHeapType);
-    type->tp_flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HEAPTYPE | Py_TPFLAGS_HAVE_GC;
+    type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE | Py_TPFLAGS_HAVE_GC;
     type->tp_new = PyType_GenericNew;
     type->tp_name = "ManualHeapType";
     type->tp_dictoffset = offsetof(ManualHeapType, dict);

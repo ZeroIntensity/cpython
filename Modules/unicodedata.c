@@ -1620,7 +1620,7 @@ static PyType_Slot ucd_type_slots[] = {
 static PyType_Spec ucd_type_spec = {
     .name = "unicodedata.UCD",
     .basicsize = sizeof(PreviousDBVersion),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_DISALLOW_INSTANTIATION |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_DISALLOW_INSTANTIATION |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = ucd_type_slots
 };

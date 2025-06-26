@@ -157,7 +157,7 @@ static PyType_Slot _abc_data_type_spec_slots[] = {
 static PyType_Spec _abc_data_type_spec = {
     .name = "_abc._abc_data",
     .basicsize = sizeof(_abc_data),
-    .flags = _Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = _abc_data_type_spec_slots,
 };
 

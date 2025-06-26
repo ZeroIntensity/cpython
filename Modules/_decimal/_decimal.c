@@ -857,7 +857,7 @@ static PyType_Slot signaldict_slots[] = {
 static PyType_Spec signaldict_spec = {
     .name = "decimal.SignalDictMixin",
     .basicsize = sizeof(PyDecSignalDictObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = signaldict_slots,
 };
@@ -2047,7 +2047,7 @@ static PyType_Slot ctxmanager_slots[] = {
 static PyType_Spec ctxmanager_spec = {
     .name = "decimal.ContextManager",
     .basicsize = sizeof(PyDecContextManagerObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE | Py_TPFLAGS_DISALLOW_INSTANTIATION),
     .slots = ctxmanager_slots,
 };
@@ -5201,7 +5201,7 @@ static PyType_Slot dec_slots[] = {
 static PyType_Spec dec_spec = {
     .name = "decimal.Decimal",
     .basicsize = sizeof(PyDecObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = dec_slots,
 };
@@ -5873,7 +5873,7 @@ static PyType_Slot context_slots[] = {
 static PyType_Spec context_spec = {
     .name = "decimal.Context",
     .basicsize = sizeof(PyDecContextObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_BASETYPE |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
               Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_IMMUTABLETYPE),
     .slots = context_slots,
 };

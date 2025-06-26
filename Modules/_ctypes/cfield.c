@@ -472,7 +472,7 @@ static PyType_Slot cfield_slots[] = {
 PyType_Spec cfield_spec = {
     .name = "ctypes.CField",
     .basicsize = sizeof(CFieldObject),
-    .flags = (_Py_TPFLAGS_CPYTHON | Py_TPFLAGS_HAVE_GC |
+    .flags = (Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
               Py_TPFLAGS_IMMUTABLETYPE),
     .slots = cfield_slots,
 };
