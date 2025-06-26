@@ -1391,6 +1391,10 @@ update_frame_locals(_PyInterpreterFrame *frame, PyObject *immortal)
     _PyStackRef *stackpointer = frame->stackpointer;
     while (stackpointer > locals) {
         stackpointer--;
+        if (PyStackRef_IsNullOrInt(*stackpointer)) {
+            continue;
+        }
+
         PyObject *op = PyStackRef_AsPyObjectBorrow(*stackpointer);
         if (op != immortal) {
             continue;
