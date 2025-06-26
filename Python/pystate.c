@@ -1380,6 +1380,39 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
     // if it held more than just the initial thread state.
 }
 
+static void
+update_frame_locals(_PyInterpreterFrame *frame, PyObject *immortal)
+{
+    // Ignore shim frames
+    if (frame->owner == FRAME_OWNED_BY_INTERPRETER) {
+        return;
+    }
+    _PyStackRef *locals = _PyFrame_GetLocalsArray(frame);
+    _PyStackRef *stackpointer = frame->stackpointer;
+    while (stackpointer > locals) {
+        stackpointer--;
+        PyObject *op = PyStackRef_AsPyObjectBorrow(*stackpointer);
+        if (op != immortal) {
+            continue;
+        }
+
+        if ((stackpointer->bits & Py_TAG_REFCNT) == 0) {
+            stackpointer->bits = ((uintptr_t)immortal) | Py_TAG_REFCNT;
+        }
+        assert(!PyStackRef_RefcountOnObject(*stackpointer));
+    }
+}
+
+static void
+update_frames(PyThreadState *tstate, PyObject *immortal)
+{
+    _PyInterpreterFrame *frame = _PyThreadState_GetFrame(tstate);
+    while (frame != NULL) {
+        update_frame_locals(frame, immortal);
+        frame = frame->previous;
+    }
+}
+
 int
 PyUnstable_Immortalize(PyObject *op)
 {
@@ -1427,6 +1460,10 @@ PyUnstable_Immortalize(PyObject *op)
         PyErr_NoMemory();
         return -1;
     }
+
+    // The stack references think that the object is mortal, we need to
+    // fix that.
+    update_frames(tstate, op);
 
     if (entry->gc_tracked) {
         _PyObject_GC_UNTRACK(op);
