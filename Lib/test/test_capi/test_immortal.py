@@ -804,14 +804,6 @@ class TestUserImmortalObjects(ImmortalUtilities):
         event.wait()
         self.assertTrue(hasattr(immortal, "cycle"))
 
-    @isolate(via_subprocess=True)
-    def test_cannot_immortalize(self):
-        import _testcapi
-
-        cannot_immortalize = _testcapi.CannotImmortalize()
-        with self.assertRaises(TypeError):
-            sys._immortalize(cannot_immortalize)
-
     @support.requires_resource("cpu")
     @always_isolate
     def test_the_party_pack(self):

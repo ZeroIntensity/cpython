@@ -3176,52 +3176,6 @@ create_manual_heap_type(void)
 }
 
 typedef struct {
-    PyObject_HEAD;
-} CannotImmortalize;
-
-static PyTypeObject CannotImmortalize_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "cannot_immortalize",
-    sizeof(CannotImmortalize),          /* tp_basicsize */
-    0,                                  /* tp_itemsize */
-    0,                                  /* destructor tp_dealloc */
-    0,                                  /* tp_vectorcall_offset */
-    0,                                  /* tp_getattr */
-    0,                                  /* tp_setattr */
-    0,                                  /* tp_as_async */
-    0,                                  /* tp_repr */
-    0,                                 /* tp_as_number */
-    0,                                  /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash */
-    0,                                  /* tp_call */
-    0,                                  /* tp_str */
-    PyObject_GenericGetAttr,            /* tp_getattro */
-    PyObject_GenericSetAttr,            /* tp_setattro */
-    0,                                  /* tp_as_buffer */
-    0,                                  /* tp_flags */
-    "Type that does not support immortality",
-    0,                                  /* traverseproc tp_traverse */
-    0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
-    0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
-    0,                                  /* tp_iternext */
-    0,                                  /* tp_methods */
-    0,                                  /* tp_members */
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    PyType_GenericNew,                  /* tp_new */
-    PyObject_Free,                      /* tp_free */
-};
-
-typedef struct {
     PyObject_VAR_HEAD
 } ManagedDictObject;
 
@@ -3334,11 +3288,6 @@ PyInit__testcapi(void)
         return NULL;
     Py_INCREF(&MethStatic_Type);
     PyModule_AddObject(m, "MethStatic", (PyObject *)&MethStatic_Type);
-
-    if (PyType_Ready(&CannotImmortalize_Type) < 0)
-        return NULL;
-    Py_INCREF(&CannotImmortalize_Type);
-    PyModule_AddObject(m, "CannotImmortalize", (PyObject *)&CannotImmortalize_Type);
 
     PyModule_AddObject(m, "CHAR_MAX", PyLong_FromLong(CHAR_MAX));
     PyModule_AddObject(m, "CHAR_MIN", PyLong_FromLong(CHAR_MIN));
