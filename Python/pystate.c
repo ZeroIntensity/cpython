@@ -1403,7 +1403,9 @@ update_frame_locals(_PyInterpreterFrame *frame, PyObject *immortal)
         if ((stackpointer->bits & Py_TAG_REFCNT) == 0) {
             stackpointer->bits = ((uintptr_t)immortal) | Py_TAG_REFCNT;
         }
+#ifndef Py_GIL_DISABLED
         assert(!PyStackRef_RefcountOnObject(*stackpointer));
+#endif
     }
 }
 
