@@ -668,6 +668,35 @@ class TestUserImmortalObjects(ImmortalUtilities):
         frame_locals()
 
     @isolate
+    def test_circular_frame_references(self):
+        import inspect
+
+        def push():
+            # This will create a circular reference, because the frame holds
+            # the locals. Frames aren't always garbage collected, so the
+            # normal garbage collection mechanism doesn't work here.
+            # sys._immortalize() has to manually update the stack references
+            # held in the locals.
+            frame = inspect.currentframe()
+            self.immortalize(frame)
+
+        push()
+
+        def deeply_nested_frame():
+            frame = inspect.currentframe()
+            def new_frame():
+                def another_new_frame():
+                    x = frame
+                    self.immortalize(frame)
+                    frame.f_locals['x'] = frame
+
+                another_new_frame()
+
+            new_frame()
+
+        deeply_nested_frame()
+
+    @isolate
     def test_function_code(self):
         def func(value):
             return value * 2
