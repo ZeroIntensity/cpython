@@ -3344,6 +3344,7 @@ PyRefTracer PyRefTracer_GetTracer(void** data) {
 }
 
 
+
 static PyObject* constants[] = {
     &_Py_NoneStruct,                   // Py_CONSTANT_NONE
     (PyObject*)(&_Py_FalseStruct),     // Py_CONSTANT_FALSE
@@ -3401,6 +3402,7 @@ Py_TYPE(PyObject *ob)
 {
     return _Py_TYPE(ob);
 }
+
 
 // Py_REFCNT() implementation for the stable ABI
 #undef Py_REFCNT
