@@ -212,8 +212,7 @@ static inline unsigned int PyUnicode_CHECK_INTERNED(PyObject *op) {
     interned = _PyASCIIObject_CAST(op)->state.interned;
 #endif
 
-    if (interned == SSTATE_INTERNED_MORTAL && _Py_IsImmortal(op))
-    {
+    if (interned == SSTATE_INTERNED_MORTAL && _Py_IsImmortal(op)) {
         // User made this object immortal
         return SSTATE_INTERNED_IMMORTAL;
     }
