@@ -574,18 +574,15 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 static int
 is_finalized(PyObject *op, _Py_immortal **immortal_ptr)
 {
-    if (_PyType_IS_GC(Py_TYPE(op)))
-    {
+    if (_PyType_IS_GC(Py_TYPE(op))) {
         return _PyGC_FINALIZED(op);
     }
     else {
         _Py_immortal *immortal = _Py_FindUserDefinedImmortal(op);
-        if (immortal == NULL)
-        {
+        if (immortal == NULL) {
             return 0;
         }
-        if (immortal_ptr != NULL)
-        {
+        if (immortal_ptr != NULL) {
             *immortal_ptr = immortal;
         }
         return immortal->finalized;
@@ -601,10 +598,8 @@ _PyObject_IsFinalized(PyObject *op)
 void
 _PyObject_SetFinalized(PyObject *op, _Py_immortal *immortal)
 {
-    if (immortal == NULL)
-    {
-        if (_PyType_IS_GC(Py_TYPE(op)))
-        {
+    if (immortal == NULL) {
+        if (_PyType_IS_GC(Py_TYPE(op))) {
             _PyGC_SET_FINALIZED(op);
         }
     }
