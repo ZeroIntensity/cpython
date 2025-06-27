@@ -619,7 +619,24 @@ Object Protocol
    :term:`reference count` modifications, via :c:macro:`Py_INCREF` or :c:macro:`Py_DECREF`, with
    the cost of being less memory efficient.
 
-   See (PEP number) for more information.
+   In order to be made immortal, an object must follow the "immortalization
+   contract". This contract is based on best practices in Python's C API, and
+   it's very unlikely that a type doesn't follow it.
+
+   * The object must be allocated under either the "object" or "memory" allocator
+     domains. See :ref:`Allocator Domains <allocator-domains>` for more information.
+     Default values of :c:member:`~PyTypeObject.tp_alloc` always use the object
+     allocator.
+   * All :term:`strong references <strong reference>` released in the object's
+     :c:member:`~PyTypeObject.tp_dealloc` slot must also be traversed by the
+     object's :c:member:`~PyTypeObject.tp_traverse` slot, if the type can
+     contain circular references. This is generally true for any garbage
+     collected type.
+   * All finalization must be done in :c:member:`~PyTypeObject.tp_finalize`
+     alongside :c:func:`PyObject_CallFinalizerFromDealloc`. This does *not*
+     include finalizers triggered by :c:macro:`Py_DECREF`; as long as they also
+     follow this contract, it is safe to release references in a destructor.
+     This is almost always true as of :pep:`442`.
 
    .. warning::
 
