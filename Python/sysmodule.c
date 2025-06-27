@@ -2778,8 +2778,7 @@ sys__immortalize(PyObject *module, PyObject *object)
 /*[clinic end generated code: output=8fcf66c1dcf312cf input=9c09b9551182c8aa]*/
 {
     int result = PyUnstable_Immortalize(object);
-    if (result < 0)
-    {
+    if (result < 0) {
         return NULL;
     }
     assert(_Py_IsImmortal(object));
