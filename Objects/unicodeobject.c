@@ -15907,8 +15907,7 @@ _PyUnicode_InternStatic(PyInterpreterState *interp, PyObject **p)
 static void
 immortalize_interned(PyObject *s)
 {
-    if (_Py_IsImmortal(s))
-    {
+    if (_Py_IsImmortal(s)) {
         // User-defined immortal object. Don't do anything extra.
         _PyUnicode_STATE(s).interned = SSTATE_INTERNED_IMMORTAL;
         return;
