@@ -784,8 +784,7 @@ delete_deferred_memory_common(PyMemAllocatorDomain domain,
 {
     assert(deferred_trash != NULL);
     assert(deferred_trash->garbage != NULL);
-    for (Py_ssize_t i = 0; i < deferred_trash->length; ++i)
-    {
+    for (Py_ssize_t i = 0; i < deferred_trash->length; ++i) {
         void *trash = deferred_trash->garbage[i];
         if (trash == NULL) {
             continue;
@@ -821,8 +820,7 @@ reset_memory(PyInterpreterState *interp)
     reset_memory_common(PYMEM_DOMAIN_OBJ, &imm_state->trashcan.objects);
     reset_memory_common(PYMEM_DOMAIN_MEM, &imm_state->trashcan.memory);
     // Re-enable freelists
-    for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i)
-    {
+    for (Py_ssize_t i = 0; i < _PyFreeLists_LENGTH; ++i) {
         struct _Py_freelist *freelists = (struct _Py_freelist *) _Py_freelists_GET();
         freelists[i] = imm_state->trashcan.freelist_caches[i];
     }
@@ -952,8 +950,7 @@ visit_finalize(PyObject *op, void *parent)
     _PyObject_ASSERT(op, is_finalized(op));
 
     if (_PyObject_IS_GC(op) && Py_TYPE(op)->tp_traverse != NULL) {
-        if (Py_EnterRecursiveCall(" while finalizing immortal objects") < 0)
-        {
+        if (Py_EnterRecursiveCall(" while finalizing immortal objects") < 0) {
             PyErr_WriteUnraisable(op);
             return -1;
         }
