@@ -2346,6 +2346,24 @@ incref_decref_delayed(PyObject *self, PyObject *op)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+leak(PyObject *self, PyObject *unused)
+{
+    PyObject *str = PyUnicode_FromString("noexist");
+    if (str == NULL) {
+        return NULL;
+    }
+
+    for (int i = 0; i < 1000; ++i) {
+        PyObject *null = PyImport_Import(str);
+        assert(null == NULL);
+        PyErr_Clear();
+    }
+
+    Py_DECREF(str);
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef module_functions[] = {
     {"get_configs", get_configs, METH_NOARGS},
     {"get_recursion_depth", get_recursion_depth, METH_NOARGS},
@@ -2448,6 +2466,7 @@ static PyMethodDef module_functions[] = {
     {"is_static_immortal", is_static_immortal, METH_O},
     {"incref_decref_delayed", incref_decref_delayed, METH_O},
     GET_NEXT_DICT_KEYS_VERSION_METHODDEF
+    {"leak", leak, METH_NOARGS},
     {NULL, NULL} /* sentinel */
 };
 
