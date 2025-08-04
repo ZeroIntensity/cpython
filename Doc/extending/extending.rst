@@ -462,10 +462,10 @@ We can then use this knowledge to implement our ``print`` function like so:
 .. code-block:: c
 
    static PyObject *
-   spam_print(PyObject *self, PyObject *message)
+   spam_print(PyObject *self, PyObject *string)
    {
-      const char *message = PyUnicode_AsUTF8(message);
-      puts(message);
+      const char *string = PyUnicode_AsUTF8(message);
+      puts(string);
       Py_RETURN_NONE;
    }
 
@@ -490,7 +490,75 @@ But what if we try something that isn't a string?
    >>> spam.print(42)
    [1]    22480 segmentation fault (core dumped)  python
 
-Uh oh, what went wrong?
+Uh oh, what went wrong? The problem is that when :c:func:`PyUnicode_AsUTF8`
+gets an object that isn't a Python :class:`str` object, it returns ``NULL``
+and sets an exception. This is how the C API propagates errors.
+
+.. _extending-errors:
+
+Error Handling
+--------------
+
+The C programming language does not have exceptions in the same way that Python
+does. In C, all functions have a single return value which needs to encode the
+return value as well as the validity of the result.
+
+The Exception Indicator
+***********************
+
+Python stores the "current exception" on the :term:`attached thread state`,
+meaning it's local to the current thread. A thread's current exception is a
+``PyObject *`` referring to a :class:`BaseException`, or ``NULL`` if no
+exception is set. This is like an enhanced ``errno``.
+
+Propagating Errors
+******************
+
+If a C API function raises an error, the exception indicator will be set and a
+value will be returned which indicates that a failure occurred. As a consumer of
+an API function, you need to explicitly check for this error return value and
+return a value that indicates that your function has failed as well.
+
+In the C API, a ``NULL`` value is never valid for a ``PyObject *``, so it is
+used to signal that an error has occurred. For example, when
+:c:func:`PyUnicode_AsUTF8` gets an invalid object as its input, it returns
+``NULL`` and sets the aforementioned exception indicator.
+
+This is the most common error sentinel and is used for
+:c:type:`PyCFunction`\s as well; so, to propagate an error to the caller,
+we must return ``NULL``. Failure return values will travel up the call stack
+until it gets somewhere the exception can be dealt with (usually the Python
+bytecode interpreter loop).
+
+.. note::
+
+   If a function does not return a pointer, then it needs to specify a new
+   error sentinel. A common case is a function which returns an ``int`` instead.
+   In the C API, these functions will return ``-1`` to denote than error occurred.
+
+Adding Error Handling
+---------------------
+
+Now that we know about exception handling and propagation, lets try to guard
+against invalid input in ``print``.
+
+As mentioned previously, :c:func:`PyUnicode_AsUTF8` will return ``NULL`` if
+something went wrong. So, we need to protect against ``NULL`` and propagate
+the exception to the caller, like this:
+
+.. code-block:: c
+   :emphasize-lines: 5-7
+
+   static PyObject *
+   spam_print(PyObject *self, PyObject *message)
+   {
+      const char *string = PyUnicode_AsUTF8(message);
+      if (string == NULL) {
+         return NULL;
+      }
+      puts(string);
+      Py_RETURN_NONE;
+   }
 
 A Deeper Example
 ================
@@ -534,181 +602,6 @@ type and its components have been stored in the variables whose addresses are
 passed.  It returns false (zero) if an invalid argument list was passed.  In the
 latter case it also raises an appropriate exception so the calling function can
 return ``NULL`` immediately (as we saw in the example).
-
-
-.. _extending-errors:
-
-Intermezzo: Errors and Exceptions
-=================================
-
-An important convention throughout the Python interpreter is the following: when
-a function fails, it should set an exception condition and return an error value
-(usually ``-1`` or a ``NULL`` pointer).  Exception information is stored in
-three members of the interpreter's thread state.  These are ``NULL`` if
-there is no exception.  Otherwise they are the C equivalents of the members
-of the Python tuple returned by :meth:`sys.exc_info`.  These are the
-exception type, exception instance, and a traceback object.  It is important
-to know about them to understand how errors are passed around.
-
-The Python API defines a number of functions to set various types of exceptions.
-
-The most common one is :c:func:`PyErr_SetString`.  Its arguments are an exception
-object and a C string.  The exception object is usually a predefined object like
-:c:data:`PyExc_ZeroDivisionError`.  The C string indicates the cause of the error
-and is converted to a Python string object and stored as the "associated value"
-of the exception.
-
-Another useful function is :c:func:`PyErr_SetFromErrno`, which only takes an
-exception argument and constructs the associated value by inspection of the
-global variable :c:data:`errno`.  The most general function is
-:c:func:`PyErr_SetObject`, which takes two object arguments, the exception and
-its associated value.  You don't need to :c:func:`Py_INCREF` the objects passed
-to any of these functions.
-
-You can test non-destructively whether an exception has been set with
-:c:func:`PyErr_Occurred`.  This returns the current exception object, or ``NULL``
-if no exception has occurred.  You normally don't need to call
-:c:func:`PyErr_Occurred` to see whether an error occurred in a function call,
-since you should be able to tell from the return value.
-
-When a function *f* that calls another function *g* detects that the latter
-fails, *f* should itself return an error value (usually ``NULL`` or ``-1``).  It
-should *not* call one of the ``PyErr_*`` functions --- one has already
-been called by *g*. *f*'s caller is then supposed to also return an error
-indication to *its* caller, again *without* calling ``PyErr_*``, and so on
---- the most detailed cause of the error was already reported by the function
-that first detected it.  Once the error reaches the Python interpreter's main
-loop, this aborts the currently executing Python code and tries to find an
-exception handler specified by the Python programmer.
-
-(There are situations where a module can actually give a more detailed error
-message by calling another ``PyErr_*`` function, and in such cases it is
-fine to do so.  As a general rule, however, this is not necessary, and can cause
-information about the cause of the error to be lost: most operations can fail
-for a variety of reasons.)
-
-To ignore an exception set by a function call that failed, the exception
-condition must be cleared explicitly by calling :c:func:`PyErr_Clear`.  The only
-time C code should call :c:func:`PyErr_Clear` is if it doesn't want to pass the
-error on to the interpreter but wants to handle it completely by itself
-(possibly by trying something else, or pretending nothing went wrong).
-
-Every failing :c:func:`malloc` call must be turned into an exception --- the
-direct caller of :c:func:`malloc` (or :c:func:`realloc`) must call
-:c:func:`PyErr_NoMemory` and return a failure indicator itself.  All the
-object-creating functions (for example, :c:func:`PyLong_FromLong`) already do
-this, so this note is only relevant to those who call :c:func:`malloc` directly.
-
-Also note that, with the important exception of :c:func:`PyArg_ParseTuple` and
-friends, functions that return an integer status usually return a positive value
-or zero for success and ``-1`` for failure, like Unix system calls.
-
-Finally, be careful to clean up garbage (by making :c:func:`Py_XDECREF` or
-:c:func:`Py_DECREF` calls for objects you have already created) when you return
-an error indicator!
-
-The choice of which exception to raise is entirely yours.  There are predeclared
-C objects corresponding to all built-in Python exceptions, such as
-:c:data:`PyExc_ZeroDivisionError`, which you can use directly. Of course, you
-should choose exceptions wisely --- don't use :c:data:`PyExc_TypeError` to mean
-that a file couldn't be opened (that should probably be :c:data:`PyExc_OSError`).
-If something's wrong with the argument list, the :c:func:`PyArg_ParseTuple`
-function usually raises :c:data:`PyExc_TypeError`.  If you have an argument whose
-value must be in a particular range or must satisfy other conditions,
-:c:data:`PyExc_ValueError` is appropriate.
-
-You can also define a new exception that is unique to your module.
-The simplest way to do this is to declare a static global object variable at
-the beginning of the file::
-
-   static PyObject *SpamError = NULL;
-
-and initialize it by calling :c:func:`PyErr_NewException` in the module's
-:c:data:`Py_mod_exec` function (:c:func:`!spam_module_exec`)::
-
-   SpamError = PyErr_NewException("spam.error", NULL, NULL);
-
-Since :c:data:`!SpamError` is a global variable, it will be overwitten every time
-the module is reinitialized, when the :c:data:`Py_mod_exec` function is called.
-
-For now, let's avoid the issue: we will block repeated initialization by raising an
-:py:exc:`ImportError`::
-
-   static PyObject *SpamError = NULL;
-
-   static int
-   spam_module_exec(PyObject *m)
-   {
-       if (SpamError != NULL) {
-           PyErr_SetString(PyExc_ImportError,
-                           "cannot initialize spam module more than once");
-           return -1;
-       }
-       SpamError = PyErr_NewException("spam.error", NULL, NULL);
-       if (PyModule_AddObjectRef(m, "SpamError", SpamError) < 0) {
-           return -1;
-       }
-
-       return 0;
-   }
-
-   static PyModuleDef_Slot spam_module_slots[] = {
-       {Py_mod_exec, spam_module_exec},
-       {0, NULL}
-   };
-
-   static struct PyModuleDef spam_module = {
-       .m_base = PyModuleDef_HEAD_INIT,
-       .m_name = "spam",
-       .m_size = 0,  // non-negative
-       .m_slots = spam_module_slots,
-   };
-
-   PyMODINIT_FUNC
-   PyInit_spam(void)
-   {
-       return PyModuleDef_Init(&spam_module);
-   }
-
-Note that the Python name for the exception object is :exc:`!spam.error`.  The
-:c:func:`PyErr_NewException` function may create a class with the base class
-being :exc:`Exception` (unless another class is passed in instead of ``NULL``),
-described in :ref:`bltin-exceptions`.
-
-Note also that the :c:data:`!SpamError` variable retains a reference to the newly
-created exception class; this is intentional!  Since the exception could be
-removed from the module by external code, an owned reference to the class is
-needed to ensure that it will not be discarded, causing :c:data:`!SpamError` to
-become a dangling pointer. Should it become a dangling pointer, C code which
-raises the exception could cause a core dump or other unintended side effects.
-
-For now, the :c:func:`Py_DECREF` call to remove this reference is missing.
-Even when the Python interpreter shuts down, the global :c:data:`!SpamError`
-variable will not be garbage-collected. It will "leak".
-We did, however, ensure that this will happen at most once per process.
-
-We discuss the use of :c:macro:`PyMODINIT_FUNC` as a function return type later in this
-sample.
-
-The :exc:`!spam.error` exception can be raised in your extension module using a
-call to :c:func:`PyErr_SetString` as shown below::
-
-   static PyObject *
-   spam_system(PyObject *self, PyObject *args)
-   {
-       const char *command;
-       int sts;
-
-       if (!PyArg_ParseTuple(args, "s", &command))
-           return NULL;
-       sts = system(command);
-       if (sts < 0) {
-           PyErr_SetString(SpamError, "System command failed");
-           return NULL;
-       }
-       return PyLong_FromLong(sts);
-   }
-
 
 .. _backtoexample:
 
