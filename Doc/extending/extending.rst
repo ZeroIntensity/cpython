@@ -132,7 +132,7 @@ This is the simplest possible module. There are three main components here:
 1. :c:member:`~PyModuleDef.m_base`: The head of the object that contains
    :c:type:`PyObject` information. This gives the ``PyModuleDef`` the ability
    to act as a Python object, as it can be casted to a ``PyObject *``. Always
-   set this to :c:macro:`PyModuledef_HEAD_INIT`.
+   set this to :c:macro:`PyModuleDef_HEAD_INIT`.
 2. :c:member:`~PyModuleDef.m_name`: The name of the module. This is pretty
    self-explanatory. In Python, this will be reflected as the :attr:`~module.__name__`
    attribute.
@@ -179,13 +179,12 @@ a ``setup.py`` file. Let's start out with a simple ``setup.py`` file:
 
 
    setup(
-       name='fib',
+       name='spam',
        version='0.1.0',
        packages=find_packages(),
        license='MIT',
        classifiers=[
            'Development Status :: 3 - Alpha',
-           'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
            'Natural Language :: English',
            'Programming Language :: Python :: 3 :: Only',
            'Programming Language :: Python :: Implementation :: CPython',
@@ -219,7 +218,16 @@ call to ``setup``:
 .. code-block:: python
 
    setup(
-       ...,  # the arguments from before
+       name='spam',
+       version='0.1.0',
+       packages=find_packages(),
+       license='MIT',
+       classifiers=[
+           'Development Status :: 3 - Alpha',
+           'Natural Language :: English',
+           'Programming Language :: Python :: 3 :: Only',
+           'Programming Language :: Python :: Implementation :: CPython',
+       ],
        ext_modules=[
            Extension(
                # the qualified name of the extension module to build
@@ -340,7 +348,7 @@ terminated array of ``PyMethodDef`` structures. For example:
 .. code-block:: c
    :emphasize-lines: 1-9,15
 
-   static PyMethodDef[] spam_methods = {
+   static PyMethodDef spam_methods[] = {
       {
          .ml_name = "hello_world",
          .ml_meth = spam_hello_world,
@@ -348,7 +356,7 @@ terminated array of ``PyMethodDef`` structures. For example:
          .ml_doc = PyDoc_STR("Print out 'hello world'."),
       },
       {NULL} /* Sentinel value for NULL termination */
-   }
+   };
 
    static PyModuleDef spam_module = {
       .m_base = PyModuleDef_HEAD_INIT,
@@ -371,11 +379,124 @@ Let's recompile our module and try out our new method:
    >>> spam.hello_world()
    hello world
 
+A More Complicated "Hello World"
+================================
+
+Now, let's try something a little more complicated. Instead of printing solely
+"hello world" from C, how about we print a string passed by the user?
+We'll call this function ``spam_print``.
+
+The C API provides a few different ways to accept parameters.
+Remember that the :c:member:`~PyMethodDef.ml_flags` field determined the
+calling convention for the C function? Conveniently, the C API provides a
+flag for single-argument functions: :c:macro:`METH_O`.
+
+With ``METH_O``, the ``PyObject *unused`` parameter from before will be used to
+accept a single Python object (in our case, a :class:`str` object) from the user.
+Let's add some code to do that:
+
+.. code-block:: c
+   :emphasize-lines: 1-5,14-19
+
+   static PyObject *
+   spam_print(PyObject *self, PyObject *message)
+   {
+      Py_RETURN_NONE;
+   }
+
+   static PyMethodDef spam_methods[] = {
+      {
+         .ml_name = "hello_world",
+         .ml_meth = spam_hello_world,
+         .ml_flags = METH_NOARGS,
+         .ml_doc = PyDoc_STR("Print out 'hello world'."),
+      },
+      {
+         .ml_name = "print",
+         .ml_meth = spam_print,
+         .ml_flags = METH_O,
+         .ml_doc = PyDoc_STR("Print out a message."),
+      },
+      {NULL} /* Sentinel value for NULL termination */
+   };
+
+If we recompile and tried to run our new function right now, we can see that
+passing anything other than a single argument will raise a :exc:`TypeError`:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.print()
+   Traceback (most recent call last):
+     File "<python-input-2>", line 1, in <module>
+       spam.print()
+        ~~~~~~~~~^^
+   TypeError: spam.print() takes exactly one argument (0 given)
+   >>> spam.print(1, 2)
+   Traceback (most recent call last):
+     File "<python-input-2>", line 1, in <module>
+       spam.print(1, 2)
+        ~~~~~~~~~^^^^^^
+   TypeError: spam.print() takes exactly one argument (2 given)
+   >>>
+
+Adapting String Objects
+-----------------------
+
+Python :class:`str` objects are concretely typed as a :c:type:`PyUnicodeObject`.
+
+.. note::
+
+   Python :type:`str` objects are called :c:type:`PyUnicodeObject` in the C API
+   as a holdover from when :class:`str` and ``unicode`` were different in
+   Python 2. This is similar to :type:`int` objects, which are concretely typed
+   as :c:type:`PyLongObject` in the C API.
+
+For many primitive C types, the C API provides functions to convert to and from
+Python objects. For ``char *``, we can use
+:c:func:`PyUnicode_AsUTF8` and :c:func:`PyUnicode_FromString` to convert
+to and from C strings.
+
+We can then use this knowledge to implement our ``print`` function like so:
+
+.. code-block:: c
+
+   static PyObject *
+   spam_print(PyObject *self, PyObject *message)
+   {
+      const char *message = PyUnicode_AsUTF8(message);
+      puts(message);
+      Py_RETURN_NONE;
+   }
+
+.. note::
+
+   Right now we are ignoring the fact that ``message`` might not actually be a
+   ``PyUnicodeObject *`` or might not be UTF-8. We will get to error handling later.
+
+Yay, now our new ``print`` function works:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.print("Nobody expects the Spanish Inquisition")
+   Nobody expects the Spanish Inquisition
+
+But what if we try something that isn't a string?
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.print(42)
+   [1]    22480 segmentation fault (core dumped)  python
+
+Uh oh, what went wrong?
+
 A Deeper Example
 ================
 
- let's say we want to create a Python interface to the C
-library function :c:func:`system` [#]_. This function takes a null-terminated
+Let's say we want to create a Python interface to the C library
+function :c:func:`system` [#]_. This function takes a null-terminated
 character string as argument and returns an integer.  We want this function to
 be callable from Python as follows:
 
