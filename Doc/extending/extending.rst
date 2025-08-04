@@ -115,7 +115,7 @@ All user-visible symbols defined by :file:`Python.h` have a prefix of ``Py`` or
 
 
 Creating a Python Module
-~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------
 
 Before we can make any functions, we need to make a module that can be imported
 from Python. First, we need to make a :c:type:`PyModuleDef`, a structure that contains
@@ -537,7 +537,7 @@ bytecode interpreter loop).
    In the C API, these functions will return ``-1`` to denote than error occurred.
 
 Adding Error Handling
----------------------
+*********************
 
 Now that we know about exception handling and propagation, lets try to guard
 against invalid input in ``print``.
@@ -559,6 +559,201 @@ the exception to the caller, like this:
       puts(string);
       Py_RETURN_NONE;
    }
+
+Now, if we try to pass an invalid object to ``print``, we get an exception:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.print(42)
+   Traceback (most recent call last):
+     File "<python-input-2>", line 1, in <module>
+       spam.print(42)
+       ~~~~~~~~~~^^^^
+   TypeError: bad argument type for built-in operation
+
+Well, that's better than a crash, but it's not very descriptive. This is a
+generic error message that comes up when :c:func:`PyUnicode_AsUTF8` calls
+:c:func:`PyErr_BadArgument` internally. We can improve this by adding our own
+checking to ``spam_print``. We know that we can check the type of something
+using :c:func:`Py_TYPE`, but how can we set exceptions?
+
+Raising Exceptions
+******************
+
+To explicitly set the error indicator, we can use functions from the ``PyErr*``
+family. The two most common are :c:func:`PyErr_SetString` and
+:c:func:`PyErr_Format`. Both of these functions take a Python
+:class:`BaseException` object and a way to include a message:
+
+1. :c:func:`PyErr_SetString` takes a ``const char *`` to use as the message.
+2. :c:func:`PyErr_Format` uses a format string followed by variadic arguments
+   to make it easier to include some extra information in the message (such as
+   the :attr:`~object.__str__` of a Python object).
+
+After setting an exception, we need to then return ``NULL`` (or whatever the
+error sentinel is) to let it be propagated back up the call stack.
+There are also a few helpers for raising common exceptions, such as
+:c:func:`PyErr_NoMemory` for when allocating memory fails.
+
+Standard Exceptions
+*******************
+
+All of the builtin exceptions are accessible in C with a naming scheme of
+``PyExc_{Name}`` where ``Name`` is the name as it appears in Python. For
+example, :exc:`IndexError` in Python is available as :c:data:`PyExc_IndexError`
+in the C API.
+
+The full list of global C API exceptions can be found at :ref:`standardexceptions`.
+
+Adding Type Validation
+----------------------
+
+Now that we know how to raise exceptions, we can use our knowledge about
+:c:func:`Py_TYPE` and :c:data:`PyUnicode_Type` from earlier to add our own
+type validation to ``spam_print``:
+
+.. code-block:: c
+   :emphasize-lines: 4-7
+
+   static PyObject *
+   spam_print(PyObject *self, PyObject *message)
+   {
+      if (Py_TYPE(message) != &PyUnicode_Type) {
+         PyErr_SetString(PyExc_TypeError, "expected a string");
+         return NULL;
+      }
+      const char *string = PyUnicode_AsUTF8(message);
+      if (string == NULL) {
+         return NULL;
+      }
+      puts(string);
+      Py_RETURN_NONE;
+   }
+
+If we try our example from earlier, we now get a much more sane error message:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.print(42)
+   Traceback (most recent call last):
+     File "<python-input-2>", line 1, in <module>
+       spam.print(42)
+       ~~~~~~~~~~^^^^
+   TypeError: expected a string
+
+Better, but there's a subtle downside to our code from a moment ago. Let's try
+to use a subclass of :class:`str` and see what happens:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> class MyString(str):
+   ...     pass
+   ...
+   >>> spam.print(MyString("hello"))
+   Traceback (most recent call last):
+     File "<python-input-2>", line 1, in <module>
+       spam.print(MyString("hello"))
+       ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+   TypeError: expected a string
+
+Since we're checking if the object's type is *exactly* a pointer to
+:c:type:`PyUnicode_Type`, subclasses of :class:`str` don't work.
+How do we fix this?
+
+Type Checking API
+*****************
+
+Primitive types in the C API generally come with ``Py{Name}_Check`` and
+``Py{Name}_CheckExact`` to check if an object is of a given type.
+``Check`` checks if the object is of a type or a subclass of a type, while
+``CheckExact`` checks if the object is exactly a certain type; no subclasses
+allowed! These functions return ``1`` if the object is of the type and ``0``
+otherwise. Unlike many other functions in the C API, these cannot fail or set
+an exception, so we don't need any error checking when using them.
+
+
+For example, the C API provides :c:func:`PyUnicode_Check` and
+:c:func:`PyUnicode_CheckExact` to check if something is a Python :class:`str`
+object. ``PyUnicode_Check`` checks for subclasses, while
+``PyUnicode_CheckExact`` is equivalent to our :c:func:`Py_TYPE` check from
+earlier.
+
+There is also :c:func:`PyObject_IsInstance`, which is equivalent to
+:func:`isinstance` in Python and will go through the type's
+:attr:`~type.__instancecheck__` method. ``PyObject_IsInstance`` is generally
+not needed for checking primitive types in the C API. As a general rule of
+thumb, if a type exposes a ``Check`` or ``CheckExact`` API, prefer that over
+using ``PyObject_IsInstance``.
+
+Better Type Validation
+**********************
+
+So, now that we know how to properly check if the object is a :class:`str`, we
+can improve our example to support subclasses:
+
+.. code-block:: c
+   :emphasize-lines: 4-7
+
+   static PyObject *
+   spam_print(PyObject *self, PyObject *message)
+   {
+      if (!PyUnicode_Check(message)) {
+         PyErr_SetString(PyExc_TypeError, "expected a string");
+         return NULL;
+      }
+      const char *string = PyUnicode_AsUTF8(message);
+      if (string == NULL) {
+         return NULL;
+      }
+      puts(string);
+      Py_RETURN_NONE;
+   }
+
+While we're at it, we can make that error message nicer. Let's modify it to
+include the object's :attr:`~object.__repr__` result in the error message
+using the ``%R`` format specifier in :c:func:`PyErr_Format`:
+
+.. code-block:: c
+   :emphasize-lines: 5-7
+
+   static PyObject *
+   spam_print(PyObject *self, PyObject *message)
+   {
+      if (!PyUnicode_Check(message)) {
+         PyErr_Format(PyExc_TypeError,
+                      "expected a string, but got %R",
+                      message);
+         return NULL;
+      }
+      const char *string = PyUnicode_AsUTF8(message);
+      if (string == NULL) {
+         return NULL;
+      }
+      puts(string);
+      Py_RETURN_NONE;
+   }
+
+Yay, now everything works as intended!
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> class MyString(str):
+   ...     pass
+   ...
+   >>> spam.print(MyString("hello"))
+   hello
+   >>> spam.print(42)
+   Traceback (most recent call last):
+     File "<python-input-3>", line 1, in <module>
+       spam.print(42)
+       ~~~~~~~~~~^^^^
+   TypeError: expected a string, but got 42
+   >>>
+
 
 A Deeper Example
 ================
