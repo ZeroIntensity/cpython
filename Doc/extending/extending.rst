@@ -164,48 +164,212 @@ An example :c:macro:`PyMODINIT_FUNC` for our module looks like::
       return PyModuleDef_Init(&spam_module);
    }
 
+.. _compilation:
+
+Compiling the Module
+--------------------
+
+The most common way to build CPython extension modules is to use ``setuptools`` and
+a ``setup.py`` file. Let's start out with a simple ``setup.py`` file:
+
+.. code-block:: python
+   :emphasize-lines: 14
+
+   from setuptools import setup, find_packages
+
+
+   setup(
+       name='fib',
+       version='0.1.0',
+       packages=find_packages(),
+       license='MIT',
+       classifiers=[
+           'Development Status :: 3 - Alpha',
+           'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
+           'Natural Language :: English',
+           'Programming Language :: Python :: 3 :: Only',
+           'Programming Language :: Python :: Implementation :: CPython',
+       ],
+   )
+
+
+This defines a new package called ``spam`` with version '0.1.0' and some other
+metadata.
+
+.. note::
+
+   In the classifiers we indicate:
+
+   ``Programming Language :: Python :: Implementation :: CPython``
+
+   This indicates that our package requires CPython extension modules or
+   implementation details and would not work on PyPy, Jython, or other Python
+   implementations.
+
+With the standard boilerplate in place, we need to add the C extension specific
+parts. Start by importing the ``Extension`` type from ``setuptools``:
+
+.. code-block:: python
+
+   from setuptools import setup, find_packages, Extension
+
+Next, we need to add a list of all of the extension modules we need build to our
+call to ``setup``:
+
+.. code-block:: python
+
+   setup(
+       ...,  # the arguments from before
+       ext_modules=[
+           Extension(
+               # the qualified name of the extension module to build
+               'spam',
+               # the files to compile into our module relative to ``setup.py``
+               ['spammodule.c'],
+           ),
+       ],
+   )
+
+The ``Extension`` class makes sure we get the correct CPython headers and flags
+which were used to build the CPython invoking ``setup.py``. We can customize the
+build process with arguments to ``Extension``, but the default is enough to get
+us started.
+
+Per :pep:`518`, we also need to include a ``pyproject.toml`` file telling
+``pip`` how to build our project. We can use a simple one like this:
+
+.. code-block:: toml
+
+   [build-system]
+   requires = ["setuptools>=80"]
+   build-backend = "setuptools.build_meta"
+
+
+Building
+--------
+
+Let's make sure our build environment is working. It's recommended to build
+extension modules inside of a :term:`virtual environment`, so we'll do that
+too.
+
+.. code-block:: bash
+
+   $ python -m venv .venv
+   $ source .venv/bin/activate
+   $ python -m pip install .
+
+
+``pip install .`` will call into ``setuptools`` and use the ``setup.py``
+to build our extension module. Now, we should be able to import our module
+from Python:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.__name__
+   'spam'
+
+.. _methodtable:
 
 Creating a Callable Python Object
 ---------------------------------
 
-First off, we need a C function to pass to Python to be called.
-To do this, we first need a C function. Let's start out small::
+Now that we have a module, we can start writing some C functions for it.
+Let's start out by writing a "hello world" that simply calls the C ``puts()``
+function. We'll call this ``spam_hello_world``.
 
-need to associate some extra metadata with our C
-function. This metadata is stored along with the function in a
-:c:type:`PyMethodDef` structure.
+Before we can do that, we have to know how the C API expects functions to look.
+There are several different flags that determine the signature of a C function, but there
+are two required parts to all functions and methods defined through the C API:
 
-This structure defines the name of the function as it will appear in Python, the
-pointer to the C implementation, information about how to invoke the function,
-and finally the docstring.
+1. They must return a Python object (``PyObject *``).
+2. They must take at least one "self" parameter, also a Python object.
+   For module functions, this is the Python module object.
 
-A :c:type:`PyMethodDef` for our ``pyfib`` function looks like:
+Let's start with the simplest flag: :c:macro:`METH_NOARGS`. ``METH_NOARGS`` has an
+additional unused ``PyObject *`` parameter (for compatibility with the other
+flags). So, our first function looks like this::
 
-.. code-block:: c
+   static PyObject *
+   spam_hello_world(PyObject *self, PyObject *unused)
+   {
+      puts("hello world");
+      Py_RETURN_NONE;
+   }
 
-   PyDOC_STRVAR(fib_doc, "computes the nth Fibonacci number");
-   PyMethodDef fib_method = {
-       "fib",                /* The name as a C string. */
-       (PyCFunction) pyfib,  /* The C function to invoke. */
-       METH_O,               /* Flags telling Python how to invoke ``pyfib`` */
-       fib_doc,              /* The docstring as a C string. */
+.. note::
+
+   Since a C function has to return something, the above uses the
+   :c:macro:`Py_RETURN_NONE` macro to return :const:`None` from our C function.
+
+Now, in order to expose this in our module, we have to create a
+:c:type:`PyMethodDef`, which contains some metadata about how our C function
+should look from Python. Here's an example ``PyMethodDef`` for the above::
+
+   PyMethodDef spam_hello_world_method = {
+      .ml_name = "hello_world",
+      .ml_meth = spam_hello_world,
+      .ml_flags = METH_NOARGS,
+      .ml_doc = PyDoc_STR("Print out 'hello world'."),
    };
 
+.. note::
 
-:c:func:`PyDoc_STRVAR`
-~~~~~~~~~~~~~~~~~~~~~~
+   Unlike :c:type:`PyModuleDef`, a :c:type:`PyMethodDef` is not a Python object,
+   because it does not have a :c:type:`PyObject` as its first field. This means
+   it cannot be casted to a ``PyObject *`` or used from Python.
 
-We don't just use a normal ```const char*`` for the docstring because
-CPython can be compiled to not include docstrings. This is useful on platforms
-with less available RAM. To properly respect this compile time option we wrap
-all docstrings in the :c:func:`PyDoc_STRVAR` macro.
+To break all this down:
 
-:c:macro:`METH_O`
-~~~~~~~~~~~~~~~~~
+1. :c:member:`~PyMethodDef.ml_name`: The name of the method, as it will appear
+   on the ``__name__`` attribute.
+2. :c:member:`~PyMethodDef.ml_meth`: A function pointer to the method definition.
+   C expects this to be a :c:type:`PyCFunction` (which it is, in our example),
+   but more complex functions may need to explicitly cast to a ``PyCFunction``.
+3. :c:member:`~PyMethodDef.ml_flags`: Related to the above, this determines the
+   calling convention for the C function.
+4. :c:member:`~PyMethodDef.ml_doc`: The docstring of the function, as it will
+   appear on the ``__doc__`` attribute from Python. Once again, this should be
+   wrapped around :c:macro:`PyDoc_STR` or :c:macro:`PyDoc_STRVAR` to make it
+   possible to disable docstrings.
 
-For our function we only accept a single argument as a :c:type:`PyObject` so we
-can use the :c:macro:`METH_O` flag. For a list of the available flags see:
-:c:member:`PyMethodDef.ml_flags`.
+Finally, we have to attach our ``PyMethodDef`` to our ``PyModuleDef``. This is
+done using the :c:member:`PyMethodDef.m_methods` field, which expects a ``NULL``
+terminated array of ``PyMethodDef`` structures. For example:
+
+.. code-block:: c
+   :emphasize-lines: 1-9,15
+
+   static PyMethodDef[] spam_methods = {
+      {
+         .ml_name = "hello_world",
+         .ml_meth = spam_hello_world,
+         .ml_flags = METH_NOARGS,
+         .ml_doc = PyDoc_STR("Print out 'hello world'."),
+      },
+      {NULL} /* Sentinel value for NULL termination */
+   }
+
+   static PyModuleDef spam_module = {
+      .m_base = PyModuleDef_HEAD_INIT,
+      .m_name = "spam",
+      .m_doc = PyDoc_STR("Example module."),
+      .m_methods = spam_methods,
+   };
+
+.. note::
+
+   Since :c:member:`~PyMethodDef.m_methods` expects raw :c:type:`PyMethodDef`
+   structures instead of pointers, ``NULL`` termination of the array really
+   means having a ``NULL`` :c:member:`~PyMethodDef.ml_name` attribute.
+
+Let's recompile our module and try out our new method:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> spam.hello_world()
+   hello world
 
 A Deeper Example
 ================
@@ -468,172 +632,6 @@ macro)::
 :c:data:`Py_None` is the C name for the special Python object ``None``.  It is a
 genuine Python object rather than a ``NULL`` pointer, which means "error" in most
 contexts, as we have seen.
-
-
-.. _methodtable:
-
-The Module's Method Table and Initialization Function
-=====================================================
-
-I promised to show how :c:func:`!spam_system` is called from Python programs.
-First, we need to list its name and address in a "method table"::
-
-   static PyMethodDef spam_methods[] = {
-       ...
-       {"system",  spam_system, METH_VARARGS,
-        "Execute a shell command."},
-       ...
-       {NULL, NULL, 0, NULL}        /* Sentinel */
-   };
-
-Note the third entry (``METH_VARARGS``).  This is a flag telling the interpreter
-the calling convention to be used for the C function.  It should normally always
-be ``METH_VARARGS`` or ``METH_VARARGS | METH_KEYWORDS``; a value of ``0`` means
-that an obsolete variant of :c:func:`PyArg_ParseTuple` is used.
-
-When using only ``METH_VARARGS``, the function should expect the Python-level
-parameters to be passed in as a tuple acceptable for parsing via
-:c:func:`PyArg_ParseTuple`; more information on this function is provided below.
-
-The :c:macro:`METH_KEYWORDS` bit may be set in the third field if keyword
-arguments should be passed to the function.  In this case, the C function should
-accept a third ``PyObject *`` parameter which will be a dictionary of keywords.
-Use :c:func:`PyArg_ParseTupleAndKeywords` to parse the arguments to such a
-function.
-
-The method table must be referenced in the module definition structure::
-
-   static struct PyModuleDef spam_module = {
-       ...
-       .m_methods = spam_methods,
-       ...
-   };
-
-This structure, in turn, must be passed to the interpreter in the module's
-initialization function.  The initialization function must be named
-:c:func:`!PyInit_name`, where *name* is the name of the module, and should be the
-only non-\ ``static`` item defined in the module file::
-
-   PyMODINIT_FUNC
-   PyInit_spam(void)
-   {
-       return PyModuleDef_Init(&spam_module);
-   }
-
-Note that :c:macro:`PyMODINIT_FUNC` declares the function as ``PyObject *`` return type,
-declares any special linkage declarations required by the platform, and for C++
-declares the function as ``extern "C"``.
-
-:c:func:`!PyInit_spam` is called when each interpreter imports its module
-:mod:`!spam` for the first time.  (See below for comments about embedding Python.)
-A pointer to the module definition must be returned via :c:func:`PyModuleDef_Init`,
-so that the import machinery can create the module and store it in ``sys.modules``.
-
-When embedding Python, the :c:func:`!PyInit_spam` function is not called
-automatically unless there's an entry in the :c:data:`PyImport_Inittab` table.
-To add the module to the initialization table, use :c:func:`PyImport_AppendInittab`,
-optionally followed by an import of the module::
-
-   #define PY_SSIZE_T_CLEAN
-   #include <Python.h>
-
-   int
-   main(int argc, char *argv[])
-   {
-       PyStatus status;
-       PyConfig config;
-       PyConfig_InitPythonConfig(&config);
-
-       /* Add a built-in module, before Py_Initialize */
-       if (PyImport_AppendInittab("spam", PyInit_spam) == -1) {
-           fprintf(stderr, "Error: could not extend in-built modules table\n");
-           exit(1);
-       }
-
-       /* Pass argv[0] to the Python interpreter */
-       status = PyConfig_SetBytesString(&config, &config.program_name, argv[0]);
-       if (PyStatus_Exception(status)) {
-           goto exception;
-       }
-
-       /* Initialize the Python interpreter.  Required.
-          If this step fails, it will be a fatal error. */
-       status = Py_InitializeFromConfig(&config);
-       if (PyStatus_Exception(status)) {
-           goto exception;
-       }
-       PyConfig_Clear(&config);
-
-       /* Optionally import the module; alternatively,
-          import can be deferred until the embedded script
-          imports it. */
-       PyObject *pmodule = PyImport_ImportModule("spam");
-       if (!pmodule) {
-           PyErr_Print();
-           fprintf(stderr, "Error: could not import module 'spam'\n");
-       }
-
-       // ... use Python C API here ...
-
-       return 0;
-
-     exception:
-        PyConfig_Clear(&config);
-        Py_ExitStatusException(status);
-   }
-
-.. note::
-
-   If you declare a global variable or a local static one, the module may
-   experience unintended side-effects on re-initialisation, for example when
-   removing entries from ``sys.modules`` or importing compiled modules into
-   multiple interpreters within a process
-   (or following a :c:func:`fork` without an intervening :c:func:`exec`).
-   If module state is not yet fully :ref:`isolated <isolating-extensions-howto>`,
-   authors should consider marking the module as having no support for subinterpreters
-   (via :c:macro:`Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED`).
-
-A more substantial example module is included in the Python source distribution
-as :file:`Modules/xxlimited.c`.  This file may be used as a template or simply
-read as an example.
-
-
-.. _compilation:
-
-Compilation and Linkage
-=======================
-
-There are two more things to do before you can use your new extension: compiling
-and linking it with the Python system.  If you use dynamic loading, the details
-may depend on the style of dynamic loading your system uses; see the chapters
-about building extension modules (chapter :ref:`building`) and additional
-information that pertains only to building on Windows (chapter
-:ref:`building-on-windows`) for more information about this.
-
-If you can't use dynamic loading, or if you want to make your module a permanent
-part of the Python interpreter, you will have to change the configuration setup
-and rebuild the interpreter.  Luckily, this is very simple on Unix: just place
-your file (:file:`spammodule.c` for example) in the :file:`Modules/` directory
-of an unpacked source distribution, add a line to the file
-:file:`Modules/Setup.local` describing your file:
-
-.. code-block:: sh
-
-   spam spammodule.o
-
-and rebuild the interpreter by running :program:`make` in the toplevel
-directory.  You can also run :program:`make` in the :file:`Modules/`
-subdirectory, but then you must first rebuild :file:`Makefile` there by running
-':program:`make` Makefile'.  (This is necessary each time you change the
-:file:`Setup` file.)
-
-If your module requires additional libraries to link with, these can be listed
-on the line in the configuration file as well, for instance:
-
-.. code-block:: sh
-
-   spam spammodule.o -lX11
-
 
 .. _callingpython:
 
