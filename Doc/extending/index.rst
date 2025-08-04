@@ -4,7 +4,7 @@
   Extending and Embedding the Python Interpreter
 ##################################################
 
-This document describes how to write modules in C or C++ to extend the Python
+This tutorial describes how to write modules in C or C++ to extend the Python
 interpreter with new modules.  Those modules can not only define new functions
 but also new object types and their methods.  The document also describes how
 to embed the Python interpreter in another application, for use as an extension
@@ -18,9 +18,17 @@ gives a more formal definition of the language.  :ref:`library-index` documents
 the existing object types, functions and modules (both built-in and written in
 Python) that give the language its wide application range.
 
-For a detailed description of the whole Python/C API, see the separate
+For a detailed description of the whole C API, see the separate
 :ref:`c-api-index`.
 
+Why write an extension module?
+==============================
+
+There are two main reasons to write an extension module:
+
+1. To provide a Python interface to a native library.
+2. To write performance critical code; extensions are typically much faster
+   than Python code.
 
 Recommended third party tools
 =============================
@@ -29,7 +37,6 @@ This guide only covers the basic tools for creating extensions provided
 as part of this version of CPython. Some :ref:`third party tools
 <c-api-tools>` offer both simpler and more sophisticated approaches to creating
 C and C++ extensions for Python.
-
 
 Creating extensions without third party tools
 =============================================

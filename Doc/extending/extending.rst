@@ -22,7 +22,7 @@ your system setup; details are given in later chapters.
 
 .. note::
 
-   The C extension interface is specific to CPython, and extension modules do
+   The C extension interface is specific to :term:`CPython`, and extension modules do
    not work on other Python implementations.  In many cases, it is possible to
    avoid writing C extensions and preserve portability to other implementations.
    For example, if your use case is calling C library functions or system calls,
@@ -33,6 +33,43 @@ your system setup; details are given in later chapters.
    portable between implementations of Python than writing and compiling a C
    extension module.
 
+
+Introduction to Python's Object Implementation
+==============================================
+
+In the C API, Python objects are represented by a :c:type:`PyObject` pointer. A
+``PyObject *`` is a reference to an object which is managed by the interpreter.
+
+For our sake, the :c:type:`!PyObject` structure has two important fields that
+are common to every single object:
+
+1. The object's :term:`reference count`, accessible through :c:func:`Py_REFCNT`.
+   When an object is created, it starts with a reference count of one is deallocated
+   when its reference count hits zero (through the :c:func:`Py_DECREF` macro).
+   By incrementing an object's reference count, you hold a :term:`strong reference`
+   to it. This will be described in further detail later.
+2. A pointer to the object's type, accessible through :c:func:`Py_TYPE`.
+   This is a pointer to a :c:type:`PyTypeObject`, a subtype of :c:type:`PyObject`.
+   This is how objects communicate their runtime type. For example: if a
+   given ``PyObject *`` refers to an :class:`int` object, then the
+   type field will be set to :c:data:`&PyLong_Type`, where :c:data:`PyLong_Type`
+   is the Python :class:`int` type.
+
+Object References
+-----------------
+
+``PyObject *`` is an abstract reference that can point to any type;
+however, we eventually need to actually store information on an object. Subtypes
+of :class:`object` are represented by structures whose first member is a
+:c:type:`PyObject` followed by any instance data needed.
+
+In C, a pointer to a structure is equivalent to a pointer to its first member.
+So, all objects in Python have a :c:type:`PyObject` field as their first member,
+making it safe to cast from a type defined this way to and from
+``PyObject *``. In general, you rarely need to use the more specialized type
+when working with the C API because most APIs expect and return plain
+``PyObject *`` values. A common exception to this rule is the use of a
+:c:type:`PyTypeObject` pointer, which is returned from :c:func:`Py_TYPE`.
 
 .. _extending-simpleexample:
 
