@@ -52,7 +52,7 @@ are common to every single object:
    This is a pointer to a :c:type:`PyTypeObject`, a subtype of :c:type:`PyObject`.
    This is how objects communicate their runtime type. For example: if a
    given ``PyObject *`` refers to an :class:`int` object, then the
-   type field will be set to :c:data:`&PyLong_Type`, where :c:data:`PyLong_Type`
+   type field will be set to :c:data:`PyLong_Type`, where :c:data:`PyLong_Type`
    is the Python :class:`int` type.
 
 Object References
@@ -73,24 +73,16 @@ when working with the C API because most APIs expect and return plain
 
 .. _extending-simpleexample:
 
-A Simple Example
-================
+A "Hello World" Example
+=======================
 
 Let's create an extension module called ``spam`` (the favorite food of Monty
-Python fans...) and let's say we want to create a Python interface to the C
-library function :c:func:`system` [#]_. This function takes a null-terminated
-character string as argument and returns an integer.  We want this function to
-be callable from Python as follows:
+Python fans...) and make a very simple program: a "hello world".
 
-.. code-block:: pycon
-
-   >>> import spam
-   >>> status = spam.system("ls -l")
-
-Begin by creating a file :file:`spammodule.c`.  (Historically, if a module is
+Begin by creating a file ``spammodule.c``.  (Historically, if a module is
 called ``spam``, the C file containing its implementation is called
-:file:`spammodule.c`; if the module name is very long, like ``spammify``, the
-module name can be just :file:`spammify.c`.)
+``spammodule.c``; if the module name is very long, like ``spammify``, the
+module name can be just ``spammify.c``.)
 
 The first two lines of our file can be::
 
@@ -112,28 +104,128 @@ the module and a copyright notice if you like).
    See :ref:`arg-parsing-string-and-buffers` for a description of this macro.
 
 All user-visible symbols defined by :file:`Python.h` have a prefix of ``Py`` or
-``PY``, except those defined in standard header files. For convenience, and
-since they are used extensively by the Python interpreter, ``"Python.h"``
-includes a few standard header files: ``<stdio.h>``, ``<string.h>``,
-``<errno.h>``, and ``<stdlib.h>``.  If the latter header file does not exist on
-your system, it declares the functions :c:func:`malloc`, :c:func:`free` and
-:c:func:`realloc` directly.
+``PY``, except those defined in standard header files.
 
-The next thing we add to our module file is the C function that will be called
-when the Python expression ``spam.system(string)`` is evaluated (we'll see
-shortly how it ends up being called)::
+.. note::
+   For convenience, and since they are used extensively by the Python interpreter,
+   ``"Python.h"`` includes a few standard header files: ``<stdio.h>``, ``<string.h>``,
+   ``<errno.h>``, and ``<stdlib.h>``.  If the latter header file does not exist on
+   your system, it declares the functions :c:func:`malloc`, :c:func:`free` and
+   :c:func:`realloc` directly.
 
-   static PyObject *
-   spam_system(PyObject *self, PyObject *args)
+
+Creating a Python Module
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before we can make any functions, we need to make a module that can be imported
+from Python. First, we need to make a :c:type:`PyModuleDef`, a structure that contains
+some metadata which describes a Python module object::
+
+   static PyModuleDef spam_module = {
+      .m_base = PyModuleDef_HEAD_INIT,
+      .m_name = "spam",
+      .m_doc = PyDoc_STR("Example module."),
+   };
+
+This is the simplest possible module. There are three main components here:
+
+1. :c:member:`~PyModuleDef.m_base`: The head of the object that contains
+   :c:type:`PyObject` information. This gives the ``PyModuleDef`` the ability
+   to act as a Python object, as it can be casted to a ``PyObject *``. Always
+   set this to :c:macro:`PyModuledef_HEAD_INIT`.
+2. :c:member:`~PyModuleDef.m_name`: The name of the module. This is pretty
+   self-explanatory. In Python, this will be reflected as the :attr:`~module.__name__`
+   attribute.
+3. :c:member:`~PyModuleDef.m_doc`: The docstring of the module, reflected in
+   the :attr:`~module.__doc__` attribute in Python. This should be wrapped in
+   either the :c:macro:`PyDoc_STR` or :c:macro:`PyDoc_STRVAR` macro to make
+   it possible to disable docstrings at compile-time.
+
+Note that :c:type:`PyModuleDef` contains other fields, but C will initialize
+them to ``NULL``/``0`` for you. For now, let's ignore them and focus on getting
+something that can be imported.
+
+Making The Shared Object Importable
+-----------------------------------
+
+With our module defined, we need to tell CPython how to import our
+module. To do that we need to define a single function with type
+:c:macro:`PyMODINIT_FUNC` named ``PyInit_{name}`` where ``name`` is the name of
+our module, as we put it in :c:member:`~PyModuleDef.m_name` earlier.
+Then, we use the :c:func:`PyModuleDef_Init` function to initialize our
+module and turn it into something that Python can use. This will happen
+the first time someone writes ``import spam`` in Python.
+
+An example :c:macro:`PyMODINIT_FUNC` for our module looks like::
+
+   PyMODINIT_FUNC
+   PyInit_spam(void)
    {
-       const char *command;
-       int sts;
-
-       if (!PyArg_ParseTuple(args, "s", &command))
-           return NULL;
-       sts = system(command);
-       return PyLong_FromLong(sts);
+      return PyModuleDef_Init(&spam_module);
    }
+
+
+Creating a Callable Python Object
+---------------------------------
+
+First off, we need a C function to pass to Python to be called.
+To do this, we first need a C function. Let's start out small::
+
+need to associate some extra metadata with our C
+function. This metadata is stored along with the function in a
+:c:type:`PyMethodDef` structure.
+
+This structure defines the name of the function as it will appear in Python, the
+pointer to the C implementation, information about how to invoke the function,
+and finally the docstring.
+
+A :c:type:`PyMethodDef` for our ``pyfib`` function looks like:
+
+.. code-block:: c
+
+   PyDOC_STRVAR(fib_doc, "computes the nth Fibonacci number");
+   PyMethodDef fib_method = {
+       "fib",                /* The name as a C string. */
+       (PyCFunction) pyfib,  /* The C function to invoke. */
+       METH_O,               /* Flags telling Python how to invoke ``pyfib`` */
+       fib_doc,              /* The docstring as a C string. */
+   };
+
+
+:c:func:`PyDoc_STRVAR`
+~~~~~~~~~~~~~~~~~~~~~~
+
+We don't just use a normal ```const char*`` for the docstring because
+CPython can be compiled to not include docstrings. This is useful on platforms
+with less available RAM. To properly respect this compile time option we wrap
+all docstrings in the :c:func:`PyDoc_STRVAR` macro.
+
+:c:macro:`METH_O`
+~~~~~~~~~~~~~~~~~
+
+For our function we only accept a single argument as a :c:type:`PyObject` so we
+can use the :c:macro:`METH_O` flag. For a list of the available flags see:
+:c:member:`PyMethodDef.ml_flags`.
+
+A Deeper Example
+================
+
+ let's say we want to create a Python interface to the C
+library function :c:func:`system` [#]_. This function takes a null-terminated
+character string as argument and returns an integer.  We want this function to
+be callable from Python as follows:
+
+.. code-block:: pycon
+
+   >>> import spam
+   >>> status = spam.system("ls -l")
+
+Now that we have an idea of what we're going to write, we need to answer a few questions:
+
+1. How do we convert a Python :class:`str` object to C ``char *``, so we can pass it to
+   ``system``?
+2. How do we convert the C ``int`` to a Python :class:`int`, and then return it?
+3. What happens if the OS issues an error in the operation?
 
 There is a straightforward translation from the argument list in Python (for
 example, the single expression ``"ls -l"``) to the arguments passed to the C
