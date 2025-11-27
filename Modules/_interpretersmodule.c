@@ -393,6 +393,7 @@ typedef struct _Py_shared_object_proxy {
 
 static PyTypeObject SharedObjectProxy_Type;
 #define SharedObjectProxy_CheckExact(op) (Py_TYPE(_PyObject_CAST(op)) == &SharedObjectProxy_Type)
+#define SharedObjectProxy_RAW_CAST(op) ((SharedObjectProxy *)op)
 
 static inline SharedObjectProxy *
 SharedObjectProxy_CAST(PyObject *op)
@@ -446,13 +447,13 @@ _sharedobjectproxy_create(PyObject *object, PyInterpreterState *owning_interp)
 static int
 sharedobjectproxy_clear(PyObject *op)
 {
-    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
+    SharedObjectProxy *self = SharedObjectProxy_RAW_CAST(op);
     // Don't clear from another interpreter
     if (self->interp != _PyInterpreterState_GET()) {
         return 0;
     }
 
-    assert(!SharedObjectProxy_CheckExact(self->object));
+    assert(self->object == NULL || !SharedObjectProxy_CheckExact(self->object));
     Py_CLEAR(self->object);
     return 0;
 }
@@ -460,13 +461,13 @@ sharedobjectproxy_clear(PyObject *op)
 static int
 sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
 {
-    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
+    SharedObjectProxy *self = SharedObjectProxy_RAW_CAST(op);
     // Don't traverse from another interpreter
     if (self->interp != _PyInterpreterState_GET()) {
         return 0;
     }
 
-    assert(!SharedObjectProxy_CheckExact(self->object));
+    assert(self->object == NULL || !SharedObjectProxy_CheckExact(self->object));
     Py_VISIT(self->object);
     return 0;
 }
@@ -474,7 +475,7 @@ sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
 static void
 sharedobjectproxy_dealloc(PyObject *op)
 {
-    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
+    SharedObjectProxy *self = SharedObjectProxy_RAW_CAST(op);
     PyTypeObject *tp = Py_TYPE(self);
     (void)sharedobjectproxy_clear(op);
     PyObject_GC_UnTrack(self);

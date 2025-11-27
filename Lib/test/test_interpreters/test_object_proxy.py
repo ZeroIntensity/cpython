@@ -94,6 +94,25 @@ class SharedObjectProxyTests(TestBase):
         self.run_concurrently(thread)
         self.assertEqual(test.value, 400)
 
+    def test_proxy_call(self):
+        constant = 67  # Hilarious
+        def my_function(arg=1, /, *, arg2=2):
+            # We need the constant here to make this function unshareable.
+            return constant + arg + arg2
+
+        proxy = share(my_function)
+        self.assertIsInstance(proxy, SharedObjectProxy)
+        self.assertEqual(proxy(), 70)
+        self.assertEqual(proxy(0, arg2=1), 68)
+        self.assertEqual(proxy(2), 71)
+
+        interp = interpreters.create()
+        interp.exec("""if True:
+        assert isinstance(proxy(), int)
+        assert proxy() == 70
+        assert proxy(0, arg2=1) == 68
+        assert proxy(2) == 71""")
+
 
 
 
