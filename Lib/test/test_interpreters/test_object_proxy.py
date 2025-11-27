@@ -122,6 +122,20 @@ class SharedObjectProxyTests(TestBase):
             assert proxy(0, arg2=1) == 68
             assert proxy(2) == 71""")
 
+    def test_proxy_call_args(self):
+        def shared(arg):
+            return type(arg).__name__
+
+        proxy = share(shared)
+        self.assertEqual(proxy(1), "int")
+        self.assertEqual(proxy('test'), "str")
+        self.assertEqual(proxy(object()), "SharedObjectProxy")
+
+        with self.create_interp(proxy=proxy) as interp:
+            interp.exec("assert proxy(1) == 'int'")
+            interp.exec("assert proxy('test') == 'str'")
+            interp.exec("assert proxy(object()) == 'SharedObjectProxy'")
+
 
 
 

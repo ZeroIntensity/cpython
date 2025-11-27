@@ -560,7 +560,7 @@ _sharedobjectproxy_init_share(_PyXI_proxy_share *share,
         PyErr_Clear();
         share->object_to_wrap = Py_NewRef(op);
         share->xidata = NULL;
-        _PyXIData_Free(xidata);
+        PyMem_RawFree(xidata);
     } else {
         share->object_to_wrap = NULL;
         share->xidata = xidata;
@@ -641,7 +641,7 @@ _sharedobjectproxy_init_shared_args(PyObject *args, SharedObjectProxy *self)
 {
     assert(PyTuple_Check(args));
     Py_ssize_t args_size = PyTuple_GET_SIZE(args);
-    _PyXI_proxy_share *shared_args_state = PyMem_RawMalloc(args_size * sizeof(_PyXI_proxy_share));
+    _PyXI_proxy_share *shared_args_state = PyMem_RawCalloc(args_size, sizeof(_PyXI_proxy_share));
     if (shared_args_state == NULL) {
         PyErr_NoMemory();
         return NULL;
