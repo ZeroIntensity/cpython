@@ -155,6 +155,31 @@ class SharedObjectProxyTests(TestBase):
             assert obj.silly == 'silly'
             assert type(obj).__name__ == 'SharedObjectProxy'""")
 
+    def test_proxy_call_concurrently(self):
+        def shared(arg, *, kwarg):
+            return arg + kwarg
+
+        class Weird:
+            def __add__(_self, other):
+                self.assertIsInstance(_self, Weird)
+                self.assertIsInstance(other, int)
+                if other == 24:
+                    ob = Weird()
+                    ob.silly = "test"
+                    return ob
+                return 42
+
+        def thread(interp):
+            interp.exec("assert proxy(1, kwarg=2) == 3")
+            interp.exec("assert proxy(2, kwarg=5) == 7")
+            interp.exec("assert proxy(weird, kwarg=5) == 42")
+            interp.exec("assert proxy(weird, kwarg=24).silly == 'test'")
+
+
+        proxy = share(shared)
+        weird = share(Weird())
+        self.run_concurrently(thread, proxy=proxy, weird=weird)
+
 
 if __name__ == '__main__':
     unittest.main()
