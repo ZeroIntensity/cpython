@@ -180,6 +180,31 @@ class SharedObjectProxyTests(TestBase):
         weird = share(Weird())
         self.run_concurrently(thread, proxy=proxy, weird=weird)
 
+    def test_proxy_reference_cycle(self):
+        import gc
+
+        called = 0
+
+        class Cycle:
+            def __init__(self, other):
+                self.cycle = self
+                self.other = other
+
+            def __del__(self):
+                nonlocal called
+                called += 1
+
+        cycle_type = share(Cycle)
+        interp_a = cycle_type(0)
+        with self.create_interp(cycle_type=cycle_type, interp_a=interp_a) as interp:
+            interp.exec("interp_b = cycle_type(interp_a)")
+
+        del interp_a
+        for _ in range(3):
+            gc.collect()
+
+        self.assertEqual(called, 2)
+
 
 if __name__ == '__main__':
     unittest.main()
