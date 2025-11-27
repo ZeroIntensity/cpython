@@ -410,16 +410,6 @@ SharedObjectProxy_CAST(PyObject *op)
 #define SharedObjectProxy_CAST(op) SharedObjectProxy_CAST(_PyObject_CAST(op))
 #define SharedObjectProxy_OBJECT(op) FT_ATOMIC_LOAD_PTR_RELAXED(SharedObjectProxy_CAST(op)->object)
 
-#ifdef Py_GIL_DISABLED
-#define SharedObjectProxy_TSTATES(op) ((SharedObjectProxy_CAST(op))->thread_states.table)
-#define SharedObjectProxy_LOCK_TSTATES(op) PyMutex_Lock(&(SharedObjectProxy_CAST(op))->thread_states.mutex)
-#define SharedObjectProxy_UNLOCK_TSTATES(op) PyMutex_Unlock(&(SharedObjectProxy_CAST(op))->thread_states.mutex)
-#else
-#define SharedObjectProxy_TSTATES(op) ((op)->thread_states)
-#define SharedObjectProxy_LOCK_TSTATES(op)
-#define SharedObjectProxy_UNLOCK_TSTATES(op)
-#endif
-
 static PyObject *
 sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -428,21 +418,6 @@ sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    _Py_hashtable_allocator_t alloc = {
-        .malloc = PyMem_RawMalloc,
-        .free = PyMem_RawFree,
-    };
-    _Py_hashtable_t *tstates = _Py_hashtable_new_full(_Py_hashtable_hash_ptr,
-                                                      _Py_hashtable_compare_direct,
-                                                      NULL,
-                                                      NULL,
-                                                      &alloc);
-    if (tstates == NULL) {
-        Py_DECREF(self);
-        return PyErr_NoMemory();
-    }
-
-    SharedObjectProxy_TSTATES(self) = tstates;
     self->object = Py_None;
     self->interp = _PyInterpreterState_GET();
 
@@ -511,60 +486,6 @@ typedef struct {
     PyThreadState *for_call;
 } _PyXI_proxy_state;
 
-static void
-_sharedobjectproxy_destroy_tstate(PyThreadState *tstate, void *arg)
-{
-    assert(tstate != NULL);
-    assert(arg != NULL);
-    SharedObjectProxy *self = SharedObjectProxy_CAST(arg);
-    SharedObjectProxy_LOCK_TSTATES(self);
-    _Py_hashtable_t *table = SharedObjectProxy_TSTATES(self);
-    PyThreadState *to_destroy = _Py_hashtable_steal(table, tstate);
-    assert(to_destroy != NULL);
-    PyThreadState_Swap(to_destroy);
-    PyThreadState_Clear(to_destroy);
-    PyThreadState_DeleteCurrent();
-    _PyThreadState_Attach(tstate);
-    SharedObjectProxy_UNLOCK_TSTATES(self);
-    Py_DECREF(arg);
-}
-
-static int
-_sharedobjectproxy_enter_lock_held(SharedObjectProxy *self, _PyXI_proxy_state *state,
-                                   PyThreadState *tstate)
-{
-    _Py_hashtable_t *table = SharedObjectProxy_TSTATES(self);
-    PyThreadState *cached_tstate = _Py_hashtable_get(table, tstate);
-
-    if (cached_tstate != NULL) {
-        _PyThreadState_Detach(tstate);
-        state->for_call = cached_tstate;
-        return 0;
-    }
-
-    assert(self->interp != NULL);
-    PyThreadState *for_call = _PyThreadState_NewBound(self->interp,
-                                                      _PyThreadState_WHENCE_EXEC);
-    state->for_call = for_call;
-    if (for_call == NULL) {
-        PyErr_NoMemory();
-        return -1;
-    }
-    if (_Py_hashtable_set(table, tstate, for_call) < 0) {
-        PyErr_NoMemory();
-        return -1;
-    }
-    if (_PyThreadState_AddClearCallback(tstate,
-                                        _sharedobjectproxy_destroy_tstate,
-                                        Py_NewRef(self)) < 0) {
-
-        PyErr_NoMemory();
-        return -1;
-    }
-    _PyThreadState_Detach(tstate);
-    return 0;
-}
-
 static int
 _sharedobjectproxy_enter(SharedObjectProxy *self, _PyXI_proxy_state *state)
 {
@@ -578,12 +499,14 @@ _sharedobjectproxy_enter(SharedObjectProxy *self, _PyXI_proxy_state *state)
         return 0;
     }
     state->to_restore = tstate;
-    SharedObjectProxy_LOCK_TSTATES(self);
-    int res = _sharedobjectproxy_enter_lock_held(self, state, tstate);
-    SharedObjectProxy_UNLOCK_TSTATES(self);
-    if (res < 0) {
+    PyThreadState *for_call = _PyThreadState_NewBound(self->interp,
+                                                      _PyThreadState_WHENCE_EXEC);
+    state->for_call = for_call;
+    if (for_call == NULL) {
+        PyErr_NoMemory();
         return -1;
     }
+    _PyThreadState_Detach(tstate);
     _PyThreadState_Attach(state->for_call);
     assert(_PyInterpreterState_GET() == self->interp);
     return 0;
@@ -608,12 +531,15 @@ _sharedobjectproxy_exit(SharedObjectProxy *self, _PyXI_proxy_state *state)
     }
 
     assert(state->for_call == _PyThreadState_GET());
+    PyThreadState_Clear(state->for_call);
     PyThreadState_Swap(state->to_restore);
+    PyThreadState_Delete(state->for_call);
 
     if (should_throw) {
         _PyErr_SetString(state->to_restore, PyExc_RuntimeError, "exception in interpreter");
         return -1;
     }
+
     return 0;
 }
 
