@@ -8,15 +8,26 @@ from concurrent.interpreters import share, SharedObjectProxy
 from test.test_interpreters.utils import TestBase
 from threading import Barrier, Thread, Lock
 from concurrent import interpreters
+from contextlib import contextmanager
 
 
 class SharedObjectProxyTests(TestBase):
-    def run_concurrently(self, func, num_threads=4):
+    @contextmanager
+    def create_interp(self, **to_prepare):
+        interp = interpreters.create()
+        try:
+            if to_prepare != {}:
+                interp.prepare_main(**to_prepare)
+            yield interp
+        finally:
+            interp.close()
+
+    def run_concurrently(self, func, num_threads=4, **to_prepare):
         barrier = Barrier(num_threads)
         def thread():
-            interp = interpreters.create()
-            barrier.wait()
-            func(interp)
+            with self.create_interp(**to_prepare) as interp:
+                barrier.wait()
+                func(interp)
 
         with threading_helper.catch_threading_exception() as cm:
             with threading_helper.start_threads((Thread(target=thread) for _ in range(num_threads))):
@@ -54,22 +65,21 @@ class SharedObjectProxyTests(TestBase):
             def silly(self):
                 return "silly"
 
-        interp = interpreters.create()
         obj = Test()
-        proxy = share(obj)
         obj.test = "silly"
-        interp.prepare_main(proxy=proxy)
-        interp.exec("assert proxy.test == 'silly'")
-        interp.exec("assert isinstance(proxy.test, str)")
-        interp.exec("""if True:
-        from concurrent.interpreters import SharedObjectProxy
-        method = proxy.silly
-        assert isinstance(method, SharedObjectProxy)
-        assert method() == 'silly'
-        assert isinstance(method(), str)
-        """)
-        with self.assertRaises(interpreters.ExecutionFailed):
-            interp.exec("proxy.noexist")
+        proxy = share(obj)
+        with self.create_interp(proxy=proxy) as interp:
+            interp.exec("assert proxy.test == 'silly'")
+            interp.exec("assert isinstance(proxy.test, str)")
+            interp.exec("""if True:
+            from concurrent.interpreters import SharedObjectProxy
+            method = proxy.silly
+            assert isinstance(method, SharedObjectProxy)
+            assert method() == 'silly'
+            assert isinstance(method(), str)
+            """)
+            with self.assertRaises(interpreters.ExecutionFailed):
+                interp.exec("proxy.noexist")
 
     @threading_helper.requires_working_threading()
     def test_access_proxy_concurrently(self):
@@ -86,12 +96,11 @@ class SharedObjectProxyTests(TestBase):
         proxy = share(test)
 
         def thread(interp):
-            interp.prepare_main(proxy=proxy)
             for _ in range(100):
                 interp.exec("proxy.increment()")
                 interp.exec("assert isinstance(proxy.value, int)")
 
-        self.run_concurrently(thread)
+        self.run_concurrently(thread, proxy=proxy)
         self.assertEqual(test.value, 400)
 
     def test_proxy_call(self):
@@ -106,13 +115,12 @@ class SharedObjectProxyTests(TestBase):
         self.assertEqual(proxy(0, arg2=1), 68)
         self.assertEqual(proxy(2), 71)
 
-        interp = interpreters.create()
-        interp.prepare_main(proxy=proxy)
-        interp.exec("""if True:
-        assert isinstance(proxy(), int)
-        assert proxy() == 70
-        assert proxy(0, arg2=1) == 68
-        assert proxy(2) == 71""")
+        with self.create_interp(proxy=proxy) as interp:
+            interp.exec("""if True:
+            assert isinstance(proxy(), int)
+            assert proxy() == 70
+            assert proxy(0, arg2=1) == 68
+            assert proxy(2) == 71""")
 
 
 
