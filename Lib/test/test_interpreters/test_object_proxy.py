@@ -16,7 +16,9 @@ class SharedObjectProxyTests(TestBase):
             def __init__(self):
                 pass
 
-        return Test()
+        instance = Test()
+        self.assertFalse(interpreters.is_shareable(instance))
+        return instance
 
     def test_create(self):
         proxy = share(self.unshareable())
@@ -52,6 +54,14 @@ class SharedObjectProxyTests(TestBase):
 
             if cm.exc_value is not None:
                 raise cm.exc_value
+
+    def test_access_proxy(self):
+        interp = interpreters.create()
+        obj = self.unshareable()
+        proxy = share(obj)
+        obj.test = "silly"
+        interp.prepare_main(proxy=proxy)
+        interp.exec("print(proxy.test, proxy.test == 'silly', type(proxy.test))")
 
 
 if __name__ == '__main__':

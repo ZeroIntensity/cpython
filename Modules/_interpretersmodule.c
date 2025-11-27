@@ -391,19 +391,33 @@ typedef struct _Py_shared_object_proxy {
 #endif
 } SharedObjectProxy;
 
-#define SharedObjectProxy_CAST(op) ((SharedObjectProxy *)op)
+static inline SharedObjectProxy *
+SharedObjectProxy_CAST(PyObject *op)
+{
+    assert(op != NULL);
+    SharedObjectProxy *proxy = (SharedObjectProxy *)op;
+    assert(proxy->object != NULL);
+    assert(Py_REFCNT(proxy->object) > 0);
+    assert(!_PyMem_IsPtrFreed(proxy->object));
+    assert(proxy->interp != NULL);
+    assert(!_PyMem_IsPtrFreed(proxy->interp));
+    return proxy;
+}
+#define SharedObjectProxy_CAST(op) SharedObjectProxy_CAST(_PyObject_CAST(op))
 #define SharedObjectProxy_OBJECT(op) FT_ATOMIC_LOAD_PTR_RELAXED(SharedObjectProxy_CAST(op)->object)
 #define SharedObjectProxy_CheckExact(op) (Py_TYPE(_PyObject_CAST(op)) == &SharedObjectProxy_Type)
 
 #ifdef Py_GIL_DISABLED
-#define SharedObjectProxy_TSTATES(op) ((op)->thread_states.table)
-#define SharedObjectProxy_LOCK_TSTATES(op) PyMutex_Lock(&(op)->thread_states.mutex)
-#define SharedObjectProxy_UNLOCK_TSTATES(op) PyMutex_Unlock(&(op)->thread_states.mutex)
+#define SharedObjectProxy_TSTATES(op) ((SharedObjectProxy_CAST(op))->thread_states.table)
+#define SharedObjectProxy_LOCK_TSTATES(op) PyMutex_Lock(&(SharedObjectProxy_CAST(op))->thread_states.mutex)
+#define SharedObjectProxy_UNLOCK_TSTATES(op) PyMutex_Unlock(&(SharedObjectProxy_CAST(op))->thread_states.mutex)
 #else
 #define SharedObjectProxy_TSTATES(op) ((op)->thread_states)
 #define SharedObjectProxy_LOCK_TSTATES(op)
 #define SharedObjectProxy_UNLOCK_TSTATES(op)
 #endif
+
+static PyTypeObject SharedObjectProxy_Type;
 
 static int
 sharedobjectproxy_clear(PyObject *op)
@@ -414,6 +428,7 @@ sharedobjectproxy_clear(PyObject *op)
         return 0;
     }
 
+    assert(!SharedObjectProxy_CheckExact(self->object));
     Py_CLEAR(self->object);
     return 0;
 }
@@ -427,6 +442,7 @@ sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
         return 0;
     }
 
+    assert(!SharedObjectProxy_CheckExact(self->object));
     Py_VISIT(self->object);
     return 0;
 }
@@ -435,7 +451,6 @@ static void
 sharedobjectproxy_dealloc(PyObject *op)
 {
     SharedObjectProxy *self = SharedObjectProxy_CAST(op);
-    assert(_PyInterpreterState_GET() == self->interp);
     PyTypeObject *tp = Py_TYPE(self);
     (void)sharedobjectproxy_clear(op);
     PyObject_GC_UnTrack(self);
@@ -445,7 +460,7 @@ sharedobjectproxy_dealloc(PyObject *op)
 static PyObject *
 sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    SharedObjectProxy *self = SharedObjectProxy_CAST(type->tp_alloc(type, 0));
+    SharedObjectProxy *self = (SharedObjectProxy *)type->tp_alloc(type, 0);
     if (self == NULL) {
         return NULL;
     }
@@ -506,6 +521,7 @@ _sharedobjectproxy_enter_lock_held(SharedObjectProxy *self, _PyXI_proxy_state *s
         return 0;
     }
 
+    assert(self->interp != NULL);
     PyThreadState *for_call = _PyThreadState_NewBound(self->interp,
                                                       _PyThreadState_WHENCE_EXEC);
     state->for_call = for_call;
@@ -587,8 +603,6 @@ typedef struct {
     _PyXIData_t *xidata;
     PyObject *object;
 } _PyXI_proxy_share;
-
-static PyTypeObject SharedObjectProxy_Type;
 
 /* Use this in the calling interpreter. */
 static int
@@ -1207,14 +1221,21 @@ _sharedobjectproxy_create(PyObject *object)
     PyInterpreterState *interp = _PyInterpreterState_GET();
     assert(interp != NULL);
 
+    if (SharedObjectProxy_CheckExact(object)) {
+        object = SharedObjectProxy_CAST(object)->object;
+        interp = SharedObjectProxy_CAST(object)->interp;
+    }
+
     SharedObjectProxy *proxy = SharedObjectProxy_CAST(sharedobjectproxy_new(&SharedObjectProxy_Type,
                                                                             NULL, NULL));
     if (proxy == NULL) {
         return NULL;
     }
 
+    assert(!SharedObjectProxy_CheckExact(object));
+    assert(interp != NULL);
     proxy->object = Py_NewRef(object);
-    proxy->interp = _PyInterpreterState_GET();
+    proxy->interp = interp;
     return (PyObject *)proxy;
 }
 
