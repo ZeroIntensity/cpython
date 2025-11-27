@@ -1198,4 +1198,16 @@ skip_optional_pos:
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=c80f73761f860f6c input=a9049054013a1b77]*/
+
+PyDoc_STRVAR(_interpreters_share__doc__,
+"share($module, op, /)\n"
+"--\n"
+"\n"
+"Wrap an object in a shareable proxy that allows cross-interpreter access.\n"
+"\n"
+"The proxy will be assigned a context and may have its references cleared by\n"
+"_interpreters.close_proxy().");
+
+#define _INTERPRETERS_SHARE_METHODDEF    \
+    {"share", (PyCFunction)_interpreters_share, METH_O, _interpreters_share__doc__},
+/*[clinic end generated code: output=c1a117cea9045d1c input=a9049054013a1b77]*/

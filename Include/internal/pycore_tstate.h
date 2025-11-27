@@ -54,6 +54,20 @@ typedef struct _PyJitTracerState {
 } _PyJitTracerState;
 #endif
 
+typedef void (*_PyThreadState_ClearCallback)(PyThreadState *, void *);
+
+struct _PyThreadState_ClearNode {
+    struct _PyThreadState_ClearNode *next;
+    _PyThreadState_ClearCallback callback;
+    void *arg;
+};
+
+// Export for '_interpreters' shared extension.
+PyAPI_FUNC(int)
+_PyThreadState_AddClearCallback(PyThreadState *tstate,
+                                _PyThreadState_ClearCallback callback,
+                                void *arg);
+
 // Every PyThreadState is actually allocated as a _PyThreadStateImpl. The
 // PyThreadState fields are exposed as part of the C API, although most fields
 // are intended to be private. The _PyThreadStateImpl fields not exposed.
@@ -121,6 +135,8 @@ typedef struct _PyThreadStateImpl {
 #if _Py_TIER2
     _PyJitTracerState jit_tracer_state;
 #endif
+
+    struct _PyThreadState_ClearNode *clear_callbacks;
 } _PyThreadStateImpl;
 
 #ifdef __cplusplus

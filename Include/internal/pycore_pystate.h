@@ -135,13 +135,13 @@ _PyThreadState_IsAttached(PyThreadState *tstate)
 //
 // High-level code should generally call PyEval_RestoreThread() instead, which
 // calls this function.
-extern void _PyThreadState_Attach(PyThreadState *tstate);
+PyAPI_FUNC(void) _PyThreadState_Attach(PyThreadState *tstate);
 
 // Detaches the current thread from the interpreter.
 //
 // High-level code should generally call PyEval_SaveThread() instead, which
 // calls this function.
-extern void _PyThreadState_Detach(PyThreadState *tstate);
+PyAPI_FUNC(void) _PyThreadState_Detach(PyThreadState *tstate);
 
 // Detaches the current thread to the "suspended" state if a stop-the-world
 // pause is in progress.
