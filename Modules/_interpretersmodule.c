@@ -420,6 +420,54 @@ SharedObjectProxy_CAST(PyObject *op)
 #define SharedObjectProxy_UNLOCK_TSTATES(op)
 #endif
 
+static PyObject *
+sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    SharedObjectProxy *self = (SharedObjectProxy *)type->tp_alloc(type, 0);
+    if (self == NULL) {
+        return NULL;
+    }
+
+    _Py_hashtable_allocator_t alloc = {
+        .malloc = PyMem_RawMalloc,
+        .free = PyMem_RawFree,
+    };
+    _Py_hashtable_t *tstates = _Py_hashtable_new_full(_Py_hashtable_hash_ptr,
+                                                      _Py_hashtable_compare_direct,
+                                                      NULL,
+                                                      NULL,
+                                                      &alloc);
+    if (tstates == NULL) {
+        Py_DECREF(self);
+        return PyErr_NoMemory();
+    }
+
+    SharedObjectProxy_TSTATES(self) = tstates;
+    self->object = Py_None;
+    self->interp = _PyInterpreterState_GET();
+
+    return (PyObject *)self;
+}
+
+PyObject *
+_sharedobjectproxy_create(PyObject *object, PyInterpreterState *owning_interp)
+{
+    assert(object != NULL);
+    assert(owning_interp != NULL);
+    assert(!SharedObjectProxy_CheckExact(object));
+
+    SharedObjectProxy *proxy = SharedObjectProxy_CAST(sharedobjectproxy_new(&SharedObjectProxy_Type,
+                                                                            NULL, NULL));
+    if (proxy == NULL) {
+        return NULL;
+    }
+
+    proxy->object = Py_NewRef(object);
+    proxy->interp = owning_interp;
+    return (PyObject *)proxy;
+}
+
+
 static int
 sharedobjectproxy_clear(PyObject *op)
 {
@@ -456,35 +504,6 @@ sharedobjectproxy_dealloc(PyObject *op)
     (void)sharedobjectproxy_clear(op);
     PyObject_GC_UnTrack(self);
     tp->tp_free(self);
-}
-
-static PyObject *
-sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    SharedObjectProxy *self = (SharedObjectProxy *)type->tp_alloc(type, 0);
-    if (self == NULL) {
-        return NULL;
-    }
-
-    _Py_hashtable_allocator_t alloc = {
-        .malloc = PyMem_RawMalloc,
-        .free = PyMem_RawFree,
-    };
-    _Py_hashtable_t *tstates = _Py_hashtable_new_full(_Py_hashtable_hash_ptr,
-                                                      _Py_hashtable_compare_direct,
-                                                      NULL,
-                                                      NULL,
-                                                      &alloc);
-    if (tstates == NULL) {
-        Py_DECREF(self);
-        return PyErr_NoMemory();
-    }
-
-    SharedObjectProxy_TSTATES(self) = tstates;
-    self->object = Py_None;
-    self->interp = _PyInterpreterState_GET();
-
-    return (PyObject *)self;
 }
 
 typedef struct {
@@ -597,12 +616,10 @@ _sharedobjectproxy_exit(SharedObjectProxy *self, _PyXI_proxy_state *state)
     return 0;
 }
 
-PyObject *
-_sharedobjectproxy_create(PyObject *object);
-
 typedef struct {
     _PyXIData_t *xidata;
-    PyObject *object;
+    PyObject *object_to_wrap;
+    PyInterpreterState *owner;
 } _PyXI_proxy_share;
 
 /* Use this in the calling interpreter. */
@@ -612,29 +629,20 @@ _sharedobjectproxy_init_share(_PyXI_proxy_share *share,
 {
     assert(op != NULL);
     assert(share != NULL);
-    if (Py_TYPE(op) == &SharedObjectProxy_Type) {
-        // Already an object proxy; nothing to do
-        share->object = op;
-        share->xidata = NULL;
-        return 0;
-    }
-
     _PyXIData_t *xidata = _PyXIData_New();
     if (xidata == NULL) {
         return -1;
     }
+    share->owner = _PyInterpreterState_GET();
 
     if (_PyObject_GetXIData(_PyThreadState_GET(), op,
                             _PyXIDATA_XIDATA_ONLY, xidata) < 0) {
         PyErr_Clear();
-        share->object = _sharedobjectproxy_create(op);
+        share->object_to_wrap = Py_NewRef(op);
         share->xidata = NULL;
         _PyXIData_Free(xidata);
-        if (share->object == NULL) {
-            return -1;
-        }
     } else {
-        share->object = NULL;
+        share->object_to_wrap = NULL;
         share->xidata = xidata;
     }
 
@@ -643,16 +651,16 @@ _sharedobjectproxy_init_share(_PyXI_proxy_share *share,
 
 /* Use this in the switched interpreter. */
 static PyObject *
-_sharedobjectproxy_as_shared(_PyXI_proxy_share *share)
+_sharedobjectproxy_copy_for_interp(_PyXI_proxy_share *share)
 {
     assert(share != NULL);
     _PyXIData_t *xidata = share->xidata;
     if (xidata == NULL) {
-        // Not shareable; use the object proxy
-        return share->object;
+        // Not shareable; use an object proxy
+        return _sharedobjectproxy_create(share->object_to_wrap, share->owner);
     } else {
+        assert(share->object_to_wrap == NULL);
         PyObject *result = _PyXIData_NewObject(xidata);
-        assert(share->object == NULL);
         return result;
     }
 }
@@ -661,13 +669,15 @@ static void
 _sharedobjectproxy_finish_share(_PyXI_proxy_share *share)
 {
     if (share->xidata != NULL) {
+        assert(share->object_to_wrap == NULL);
         _PyXIData_Free(share->xidata);
+    } else {
+        assert(share->object_to_wrap != NULL);
+        Py_DECREF(share->object_to_wrap);
     }
 #ifdef Py_DEBUG
     share->xidata = NULL;
-    if (share->object != NULL) {
-        share->object = NULL;
-    }
+    share->object_to_wrap = NULL;
 #endif
 }
 
@@ -694,7 +704,7 @@ _sharedobjectproxy_wrap_result(SharedObjectProxy *self, PyObject *result,
         return NULL;
     }
 
-    PyObject *ret = _sharedobjectproxy_as_shared(&shared_result);
+    PyObject *ret = _sharedobjectproxy_copy_for_interp(&shared_result);
     //_sharedobjectproxy_finish_share(&shared_result);
     return ret;
 }
@@ -731,7 +741,7 @@ sharedobjectproxy_tp_call(PyObject *op, PyObject *args, PyObject *kwargs) {
     }
 
     for (Py_ssize_t i = 0; i < size; ++i) {
-        PyObject *shared = _sharedobjectproxy_as_shared(&shared_args_state[i]);
+        PyObject *shared = _sharedobjectproxy_copy_for_interp(&shared_args_state[i]);
         if (shared == NULL) {
             (void)_sharedobjectproxy_exit(self, &state);
             PyMem_RawFree(shared_args_state);
@@ -773,7 +783,7 @@ _sharedobjectproxy_single_share_common(SharedObjectProxy *self, PyObject *to_sha
         _sharedobjectproxy_finish_share(shared_arg);
         return NULL;
     }
-    PyObject *shared_obj = _sharedobjectproxy_as_shared(shared_arg);
+    PyObject *shared_obj = _sharedobjectproxy_copy_for_interp(shared_arg);
     if (shared_obj == NULL) {
         (void)_sharedobjectproxy_exit(self, state);
         _sharedobjectproxy_finish_share(shared_arg);
@@ -821,14 +831,14 @@ _sharedobjectproxy_double_share_common(SharedObjectProxy *self,
         _sharedobjectproxy_finish_share(shared_second);
         return -1;
     }
-    PyObject *first_obj = _sharedobjectproxy_as_shared(shared_first);
+    PyObject *first_obj = _sharedobjectproxy_copy_for_interp(shared_first);
     if (first_obj == NULL) {
         (void)_sharedobjectproxy_exit(self, state);
         _sharedobjectproxy_finish_share(shared_first);
         _sharedobjectproxy_finish_share(shared_second);
         return -1;
     }
-    PyObject *second_obj = _sharedobjectproxy_as_shared(shared_second);
+    PyObject *second_obj = _sharedobjectproxy_copy_for_interp(shared_second);
     if (second_obj == NULL) {
         Py_DECREF(first_obj);
         (void)_sharedobjectproxy_exit(self, state);
@@ -1182,12 +1192,7 @@ static PyObject *
 sharedobjectproxy_xid(_PyXIData_t *data)
 {
     SharedObjectProxy *proxy = SharedObjectProxy_CAST(data->obj);
-    SharedObjectProxy *new_proxy = SharedObjectProxy_CAST(_sharedobjectproxy_create(proxy->object));
-    if (new_proxy == NULL) {
-        return NULL;
-    }
-    new_proxy->interp = proxy->interp;
-    return (PyObject *)new_proxy;
+    return _sharedobjectproxy_create(proxy->object, proxy->interp);
 }
 
 static int
@@ -1219,31 +1224,6 @@ _get_current_xibufferview_type(void)
         return NULL;
     }
     return state->XIBufferViewType;
-}
-
-PyObject *
-_sharedobjectproxy_create(PyObject *object)
-{
-    assert(object != NULL);
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    assert(interp != NULL);
-
-    if (SharedObjectProxy_CheckExact(object)) {
-        object = SharedObjectProxy_CAST(object)->object;
-        interp = SharedObjectProxy_CAST(object)->interp;
-    }
-
-    SharedObjectProxy *proxy = SharedObjectProxy_CAST(sharedobjectproxy_new(&SharedObjectProxy_Type,
-                                                                            NULL, NULL));
-    if (proxy == NULL) {
-        return NULL;
-    }
-
-    assert(!SharedObjectProxy_CheckExact(object));
-    assert(interp != NULL);
-    proxy->object = Py_NewRef(object);
-    proxy->interp = interp;
-    return (PyObject *)proxy;
 }
 
 /* interpreter-specific code ************************************************/
@@ -2433,7 +2413,7 @@ static PyObject *
 _interpreters_share(PyObject *module, PyObject *op)
 /*[clinic end generated code: output=e2ce861ae3b58508 input=d333c93f128faf93]*/
 {
-    return _sharedobjectproxy_create(op);
+    return _sharedobjectproxy_create(op, _PyInterpreterState_GET());
 }
 
 static PyMethodDef module_functions[] = {
