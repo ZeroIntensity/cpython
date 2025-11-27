@@ -414,8 +414,7 @@ _sharedobjectproxy_enter(SharedObjectProxy *self, _PyXI_proxy_state *state)
         return 0;
     }
     state->to_restore = tstate;
-    PyThreadState *for_call = _PyThreadState_NewBound(self->interp,
-                                                      _PyThreadState_WHENCE_EXEC);
+    PyThreadState *for_call = _PyThreadState_NewForExec(self->interp);
     state->for_call = for_call;
     if (for_call == NULL) {
         PyErr_NoMemory();
@@ -446,9 +445,10 @@ _sharedobjectproxy_exit(SharedObjectProxy *self, _PyXI_proxy_state *state)
     }
 
     assert(state->for_call == _PyThreadState_GET());
-    PyThreadState_Clear(state->for_call);
     PyThreadState_Swap(state->to_restore);
-    PyThreadState_Delete(state->for_call);
+    // If we created a new thread state, we don't want to delete it.
+    // It's likely that it will be used again, but if not, the interpreter
+    // will clean it up at the end anyway.
 
     if (should_throw) {
         _PyErr_SetString(state->to_restore, PyExc_RuntimeError, "exception in interpreter");

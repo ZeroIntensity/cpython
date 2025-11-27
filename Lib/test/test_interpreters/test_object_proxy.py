@@ -7,7 +7,7 @@ from test.support import threading_helper
 import_helper.import_module("_interpreters")
 from concurrent.interpreters import share, SharedObjectProxy
 from test.test_interpreters.utils import TestBase
-from threading import Barrier, Thread, Lock
+from threading import Barrier, Thread, Lock, local
 from concurrent import interpreters
 from contextlib import contextmanager
 
@@ -241,6 +241,20 @@ class SharedObjectProxyTests(TestBase):
                 interp.exec("assert proxy.value in (0, 42)")
 
         self.run_concurrently(thread, proxy=proxy)
+
+    def test_retain_thread_local_variables(self):
+        thread_local = local()
+        thread_local.value = 42
+
+        def test():
+            old = thread_local.value
+            thread_local.value = 24
+            return old
+
+        proxy = share(test)
+        with self.create_interp(proxy=proxy) as interp:
+            interp.exec("assert proxy() == 42")
+            self.assertEqual(thread_local.value, 24)
 
 
 if __name__ == "__main__":

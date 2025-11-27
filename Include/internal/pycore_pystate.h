@@ -231,6 +231,9 @@ extern PyThreadState * _PyThreadState_RemoveExcept(PyThreadState *tstate);
 extern void _PyThreadState_DeleteList(PyThreadState *list, int is_after_fork);
 extern void _PyThreadState_ClearMimallocHeaps(PyThreadState *tstate);
 
+// Export for '_interpreters' shared extension
+PyAPI_FUNC(PyThreadState *) _PyThreadState_NewForExec(PyInterpreterState *interp);
+
 // Export for '_testinternalcapi' shared extension
 PyAPI_FUNC(PyObject*) _PyThreadState_GetDict(PyThreadState *tstate);
 
