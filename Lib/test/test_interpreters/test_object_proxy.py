@@ -2,8 +2,9 @@ import unittest
 
 from test.support import import_helper
 from test.support import threading_helper
+
 # Raise SkipTest if subinterpreters not supported.
-import_helper.import_module('_interpreters')
+import_helper.import_module("_interpreters")
 from concurrent.interpreters import share, SharedObjectProxy
 from test.test_interpreters.utils import TestBase
 from threading import Barrier, Thread, Lock
@@ -24,13 +25,16 @@ class SharedObjectProxyTests(TestBase):
 
     def run_concurrently(self, func, num_threads=4, **to_prepare):
         barrier = Barrier(num_threads)
+
         def thread():
             with self.create_interp(**to_prepare) as interp:
                 barrier.wait()
                 func(interp)
 
         with threading_helper.catch_threading_exception() as cm:
-            with threading_helper.start_threads((Thread(target=thread) for _ in range(num_threads))):
+            with threading_helper.start_threads(
+                (Thread(target=thread) for _ in range(num_threads))
+            ):
                 pass
 
             if cm.exc_value is not None:
@@ -41,7 +45,16 @@ class SharedObjectProxyTests(TestBase):
         self.assertIsInstance(proxy, SharedObjectProxy)
 
         # Shareable objects should pass through
-        for shareable in (None, True, False, 100, 10000, "hello", b"world", memoryview(b"test")):
+        for shareable in (
+            None,
+            True,
+            False,
+            100,
+            10000,
+            "hello",
+            b"world",
+            memoryview(b"test"),
+        ):
             self.assertTrue(interpreters.is_shareable(shareable))
             with self.subTest(shareable=shareable):
                 not_a_proxy = share(shareable)
@@ -53,10 +66,12 @@ class SharedObjectProxyTests(TestBase):
         def thread(interp):
             for iteration in range(100):
                 with self.subTest(iteration=iteration):
-                    interp.exec("""if True:
+                    interp.exec(
+                        """if True:
                     from concurrent.interpreters import share
 
-                    share(object())""")
+                    share(object())"""
+                    )
 
         self.run_concurrently(thread)
 
@@ -71,13 +86,15 @@ class SharedObjectProxyTests(TestBase):
         with self.create_interp(proxy=proxy) as interp:
             interp.exec("assert proxy.test == 'silly'")
             interp.exec("assert isinstance(proxy.test, str)")
-            interp.exec("""if True:
+            interp.exec(
+                """if True:
             from concurrent.interpreters import SharedObjectProxy
             method = proxy.silly
             assert isinstance(method, SharedObjectProxy)
             assert method() == 'silly'
             assert isinstance(method(), str)
-            """)
+            """
+            )
             with self.assertRaises(interpreters.ExecutionFailed):
                 interp.exec("proxy.noexist")
 
@@ -105,6 +122,7 @@ class SharedObjectProxyTests(TestBase):
 
     def test_proxy_call(self):
         constant = 67  # Hilarious
+
         def my_function(arg=1, /, *, arg2=2):
             # We need the constant here to make this function unshareable.
             return constant + arg + arg2
@@ -116,11 +134,13 @@ class SharedObjectProxyTests(TestBase):
         self.assertEqual(proxy(2), 71)
 
         with self.create_interp(proxy=proxy) as interp:
-            interp.exec("""if True:
+            interp.exec(
+                """if True:
             assert isinstance(proxy(), int)
             assert proxy() == 70
             assert proxy(0, arg2=1) == 68
-            assert proxy(2) == 71""")
+            assert proxy(2) == 71"""
+            )
 
     def test_proxy_call_args(self):
         def shared(arg):
@@ -128,7 +148,7 @@ class SharedObjectProxyTests(TestBase):
 
         proxy = share(shared)
         self.assertEqual(proxy(1), "int")
-        self.assertEqual(proxy('test'), "str")
+        self.assertEqual(proxy("test"), "str")
         self.assertEqual(proxy(object()), "SharedObjectProxy")
 
         with self.create_interp(proxy=proxy) as interp:
@@ -150,10 +170,12 @@ class SharedObjectProxyTests(TestBase):
         self.assertEqual(res.silly, "silly")
 
         with self.create_interp(proxy=proxy) as interp:
-            interp.exec("""if True:
+            interp.exec(
+                """if True:
             obj = proxy()
             assert obj.silly == 'silly'
-            assert type(obj).__name__ == 'SharedObjectProxy'""")
+            assert type(obj).__name__ == 'SharedObjectProxy'"""
+            )
 
     def test_proxy_call_concurrently(self):
         def shared(arg, *, kwarg):
@@ -174,7 +196,6 @@ class SharedObjectProxyTests(TestBase):
             interp.exec("assert proxy(2, kwarg=5) == 7")
             interp.exec("assert proxy(weird, kwarg=5) == 42")
             interp.exec("assert proxy(weird, kwarg=24).silly == 'test'")
-
 
         proxy = share(shared)
         weird = share(Weird())
@@ -212,6 +233,7 @@ class SharedObjectProxyTests(TestBase):
                 self.value = 0
 
         proxy = share(Test())
+
         def thread(interp):
             for _ in range(1000):
                 interp.exec("proxy.value = 42")
@@ -221,5 +243,5 @@ class SharedObjectProxyTests(TestBase):
         self.run_concurrently(thread, proxy=proxy)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
