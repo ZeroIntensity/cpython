@@ -398,7 +398,7 @@ static inline SharedObjectProxy *
 SharedObjectProxy_CAST(PyObject *op)
 {
     assert(op != NULL);
-    assert(SharedObjectProxy_CheckExact(op));
+    _PyObject_ASSERT(op, SharedObjectProxy_CheckExact(op));
     SharedObjectProxy *proxy = (SharedObjectProxy *)op;
     assert(proxy->object != NULL);
     assert(Py_REFCNT(proxy->object) > 0);
@@ -526,6 +526,7 @@ _sharedobjectproxy_destroy_tstate(PyThreadState *tstate, void *arg)
     PyThreadState_DeleteCurrent();
     _PyThreadState_Attach(tstate);
     SharedObjectProxy_UNLOCK_TSTATES(self);
+    Py_DECREF(arg);
 }
 
 static int
@@ -555,7 +556,7 @@ _sharedobjectproxy_enter_lock_held(SharedObjectProxy *self, _PyXI_proxy_state *s
     }
     if (_PyThreadState_AddClearCallback(tstate,
                                         _sharedobjectproxy_destroy_tstate,
-                                        self) < 0) {
+                                        Py_NewRef(self)) < 0) {
 
         PyErr_NoMemory();
         return -1;
