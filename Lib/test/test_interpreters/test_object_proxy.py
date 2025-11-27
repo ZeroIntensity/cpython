@@ -107,6 +107,7 @@ class SharedObjectProxyTests(TestBase):
         self.assertEqual(proxy(2), 71)
 
         interp = interpreters.create()
+        interp.prepare_main(proxy=proxy)
         interp.exec("""if True:
         assert isinstance(proxy(), int)
         assert proxy() == 70

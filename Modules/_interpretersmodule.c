@@ -640,10 +640,17 @@ _sharedobjectproxy_wrap_result(SharedObjectProxy *self, PyObject *result,
 static PyObject *
 sharedobjectproxy_tp_call(PyObject *op, PyObject *args, PyObject *kwargs) {
     SharedObjectProxy *self = SharedObjectProxy_CAST(op);
-    Py_ssize_t size = PyTuple_Size(args);
-    _PyXI_proxy_share *shared_args_state = PyMem_RawMalloc(size * sizeof(_PyXI_proxy_share));
+    assert(PyTuple_Check(args));
+    Py_ssize_t args_size = PyTuple_GET_SIZE(args);
+    assert(kwargs == NULL || PyDict_Check(kwargs));
+    Py_ssize_t kwarg_size = kwargs == NULL ? -1 : PyDict_GET_SIZE(kwargs);
+    _PyXI_proxy_share *shared_args_state = PyMem_RawMalloc(args_size * sizeof(_PyXI_proxy_share));
+    if (shared_args_state == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
 
-    for (Py_ssize_t i = 0; i < size; ++i) {
+    for (Py_ssize_t i = 0; i < args_size; ++i) {
         PyObject *arg = PyTuple_GetItem(args, i);
         if (arg == NULL) {
             PyMem_RawFree(shared_args_state);
@@ -656,19 +663,62 @@ sharedobjectproxy_tp_call(PyObject *op, PyObject *args, PyObject *kwargs) {
         }
     }
 
+    struct _dict_pair {
+        const char *key;
+        Py_ssize_t key_length;
+        _PyXI_proxy_share value;
+    };
+    struct _dict_pair *kwarg_pairs = NULL;
+    if (kwargs != NULL) {
+        kwarg_pairs = PyMem_RawCalloc(kwarg_size, sizeof(struct _dict_pair));
+        if (kwarg_pairs == NULL) {
+            PyErr_NoMemory();
+            PyMem_RawFree(shared_args_state);
+            return NULL;
+        }
+
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+        while (PyDict_Next(kwargs, &pos, &key, &value)) {
+            // XXX Can kwarg keys be dictionary subclasses?
+            assert(PyUnicode_Check(key));
+            Py_ssize_t index = pos - 1;
+            assert(index >= 0);
+            assert(index < kwarg_size);
+            struct _dict_pair *pair = &kwarg_pairs[index];
+            assert(pair->key == NULL);
+            assert(pair->key_length == 0);
+            const char *key_str = PyUnicode_AsUTF8AndSize(key, &pair->key_length);
+            if (key_str == NULL) {
+                PyMem_RawFree(shared_args_state);
+                PyMem_RawFree(kwarg_pairs);
+                return NULL;
+
+            }
+            pair->key = key_str;
+            if (_sharedobjectproxy_init_share(&pair->value, self, value) < 0) {
+                PyMem_RawFree(shared_args_state);
+                PyMem_RawFree(kwarg_pairs);
+                return NULL;
+            }
+        }
+    }
+
     _PyXI_proxy_state state;
     if (_sharedobjectproxy_enter(self, &state) < 0) {
         PyMem_RawFree(shared_args_state);
+        PyMem_RawFree(kwarg_pairs);
         return NULL;
     }
-    PyObject *shared_args = PyTuple_New(size);
+    PyObject *shared_args = PyTuple_New(args_size);
     if (shared_args == NULL) {
         (void)_sharedobjectproxy_exit(self, &state);
         PyMem_RawFree(shared_args_state);
+        PyMem_RawFree(kwarg_pairs);
         return NULL;
     }
 
-    for (Py_ssize_t i = 0; i < size; ++i) {
+    for (Py_ssize_t i = 0; i < args_size; ++i) {
         PyObject *shared = _sharedobjectproxy_copy_for_interp(&shared_args_state[i]);
         if (shared == NULL) {
             (void)_sharedobjectproxy_exit(self, &state);
@@ -678,10 +728,53 @@ sharedobjectproxy_tp_call(PyObject *op, PyObject *args, PyObject *kwargs) {
         PyTuple_SET_ITEM(shared_args, i, shared);
     }
 
-    // kwargs aren't supported yet
+    PyObject *shared_kwargs = NULL;
+    if (kwargs != NULL) {
+        shared_kwargs = PyDict_New();
+        if (shared_kwargs == NULL) {
+            Py_DECREF(shared_args);
+            (void)_sharedobjectproxy_exit(self, &state);
+            PyMem_RawFree(shared_args_state);
+            PyMem_RawFree(kwarg_pairs);
+            return NULL;
+        }
+        for (Py_ssize_t i = 0; i < kwarg_size; ++i) {
+            struct _dict_pair *pair = &kwarg_pairs[i];
+            assert(pair->key != NULL);
+            PyObject *key = PyUnicode_FromStringAndSize(pair->key, pair->key_length);
+            if (key == NULL) {
+                Py_DECREF(shared_args);
+                Py_DECREF(shared_kwargs);
+                (void)_sharedobjectproxy_exit(self, &state);
+                PyMem_RawFree(shared_args_state);
+                PyMem_RawFree(kwarg_pairs);
+                return NULL;
+            }
+            PyObject *shared_kwarg = _sharedobjectproxy_copy_for_interp(&pair->value);
+            if (shared_kwarg == NULL) {
+                Py_DECREF(shared_args);
+                Py_DECREF(shared_kwargs);
+                (void)_sharedobjectproxy_exit(self, &state);
+                PyMem_RawFree(shared_args_state);
+                PyMem_RawFree(kwarg_pairs);
+                return NULL;
+            }
+            if (PyDict_SetItem(shared_kwargs, key, shared_kwarg) < 0) {
+                Py_DECREF(shared_args);
+                Py_DECREF(shared_kwargs);
+                (void)_sharedobjectproxy_exit(self, &state);
+                PyMem_RawFree(shared_args_state);
+                PyMem_RawFree(kwarg_pairs);
+                return NULL;
+            }
+        }
+    }
+
+
     PyObject *res = PyObject_Call(SharedObjectProxy_OBJECT(self),
-                                  shared_args, NULL);
+                                  shared_args, shared_kwargs);
     Py_DECREF(shared_args);
+    Py_XDECREF(shared_kwargs);
 
     return _sharedobjectproxy_wrap_result(self, res, &state);
 }
