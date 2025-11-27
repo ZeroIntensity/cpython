@@ -206,6 +206,20 @@ class SharedObjectProxyTests(TestBase):
 
         self.assertEqual(called, 2)
 
+    def test_proxy_attribute_concurrently(self):
+        class Test:
+            def __init__(self):
+                self.value = 0
+
+        proxy = share(Test())
+        def thread(interp):
+            for _ in range(1000):
+                interp.exec("proxy.value = 42")
+                interp.exec("proxy.value = 0")
+                interp.exec("assert proxy.value in (0, 42)")
+
+        self.run_concurrently(thread, proxy=proxy)
+
 
 if __name__ == '__main__':
     unittest.main()
