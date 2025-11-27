@@ -2405,12 +2405,6 @@ static PyObject *
 _interpreters_share(PyObject *module, PyObject *op)
 /*[clinic end generated code: output=e2ce861ae3b58508 input=d333c93f128faf93]*/
 {
-    if (Py_IsNone(op)) {
-        PyErr_SetString(PyExc_ValueError,
-                        "None is a reserved value for dead object proxies, and "
-                        "does not need to be shared");
-        return NULL;
-    }
     return _sharedobjectproxy_create(op);
 }
 
