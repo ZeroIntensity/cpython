@@ -393,21 +393,7 @@ typedef struct _Py_shared_object_proxy {
 
 static PyTypeObject *
 _get_current_sharedobjectproxy_type(void);
-#define SharedObjectProxy_RAW_CAST(op) ((SharedObjectProxy *)op)
-
-static inline SharedObjectProxy *
-SharedObjectProxy_CAST(PyObject *op)
-{
-    assert(op != NULL);
-    SharedObjectProxy *proxy = (SharedObjectProxy *)op;
-    assert(proxy->object != NULL);
-    assert(Py_REFCNT(proxy->object) > 0);
-    assert(!_PyMem_IsPtrFreed(proxy->object));
-    assert(proxy->interp != NULL);
-    assert(!_PyMem_IsPtrFreed(proxy->interp));
-    return proxy;
-}
-#define SharedObjectProxy_CAST(op) SharedObjectProxy_CAST(_PyObject_CAST(op))
+#define SharedObjectProxy_CAST(op) ((SharedObjectProxy *)op)
 #define SharedObjectProxy_OBJECT(op) FT_ATOMIC_LOAD_PTR_RELAXED(SharedObjectProxy_CAST(op)->object)
 
 static PyObject *
@@ -454,7 +440,7 @@ _sharedobjectproxy_create(PyObject *object, PyInterpreterState *owning_interp)
 static int
 sharedobjectproxy_clear(PyObject *op)
 {
-    SharedObjectProxy *self = SharedObjectProxy_RAW_CAST(op);
+    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
     // Don't clear from another interpreter
     if (self->interp != _PyInterpreterState_GET()) {
         return 0;
@@ -467,7 +453,7 @@ sharedobjectproxy_clear(PyObject *op)
 static int
 sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
 {
-    SharedObjectProxy *self = SharedObjectProxy_RAW_CAST(op);
+    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
     // Don't traverse from another interpreter
     if (self->interp != _PyInterpreterState_GET()) {
         return 0;
@@ -480,7 +466,7 @@ sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
 static void
 sharedobjectproxy_dealloc(PyObject *op)
 {
-    SharedObjectProxy *self = SharedObjectProxy_RAW_CAST(op);
+    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
     PyTypeObject *tp = Py_TYPE(self);
     (void)sharedobjectproxy_clear(op);
     PyObject_GC_UnTrack(self);
