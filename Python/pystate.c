@@ -1638,47 +1638,11 @@ clear_datastack(PyThreadState *tstate)
     }
 }
 
-int
-_PyThreadState_AddClearCallback(PyThreadState *tstate,
-                                _PyThreadState_ClearCallback callback,
-                                void *arg)
-{
-    assert(tstate != NULL);
-    assert(_PyThreadState_IsAttached(tstate));
-    assert(callback != NULL);
-    _PyThreadStateImpl *impl = (_PyThreadStateImpl *)tstate;
-    struct _PyThreadState_ClearNode *node = PyMem_Malloc(sizeof(struct _PyThreadState_ClearNode));
-    if (node == NULL) {
-        PyErr_NoMemory();
-        return -1;
-    }
-    node->callback = callback;
-    node->next = impl->clear_callbacks;
-    node->arg = arg;
-    impl->clear_callbacks = node;
-    return 0;
-}
-
-void
-call_clear_callbacks(PyThreadState *tstate)
-{
-    assert(tstate != NULL);
-    assert(tstate == current_fast_get());
-    _PyThreadStateImpl *impl = (_PyThreadStateImpl *)tstate;
-    struct _PyThreadState_ClearNode *head = impl->clear_callbacks;
-    while (head != NULL) {
-        head->callback(tstate, head->arg);
-        head = head->next;
-    }
-}
-
 void
 PyThreadState_Clear(PyThreadState *tstate)
 {
-    assert(tstate != NULL);
     assert(tstate->_status.initialized && !tstate->_status.cleared);
     assert(current_fast_get()->interp == tstate->interp);
-    call_clear_callbacks(tstate);
     // GH-126016: In the _interpreters module, KeyboardInterrupt exceptions
     // during PyEval_EvalCode() are sent to finalization, which doesn't let us
     // mark threads as "not running main". So, for now this assertion is
