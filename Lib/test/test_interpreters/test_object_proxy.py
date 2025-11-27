@@ -16,6 +16,9 @@ class SharedObjectProxyTests(TestBase):
             def __init__(self):
                 pass
 
+            def silly(self):
+                return "silly"
+
         instance = Test()
         self.assertFalse(interpreters.is_shareable(instance))
         return instance
@@ -61,7 +64,16 @@ class SharedObjectProxyTests(TestBase):
         proxy = share(obj)
         obj.test = "silly"
         interp.prepare_main(proxy=proxy)
-        interp.exec("print(proxy.test, proxy.test == 'silly', type(proxy.test))")
+        interp.exec("assert proxy.test == 'silly'")
+        interp.exec("assert isinstance(proxy.test, str)")
+        interp.exec("""if True:
+        from concurrent.interpreters import SharedObjectProxy
+        method = proxy.silly
+        assert isinstance(method, SharedObjectProxy)
+        assert method() == 'silly'
+        assert isinstance(method(), str)
+        """)
+        #interp.exec("proxy.noexist")
 
 
 if __name__ == '__main__':

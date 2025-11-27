@@ -391,10 +391,14 @@ typedef struct _Py_shared_object_proxy {
 #endif
 } SharedObjectProxy;
 
+static PyTypeObject SharedObjectProxy_Type;
+#define SharedObjectProxy_CheckExact(op) (Py_TYPE(_PyObject_CAST(op)) == &SharedObjectProxy_Type)
+
 static inline SharedObjectProxy *
 SharedObjectProxy_CAST(PyObject *op)
 {
     assert(op != NULL);
+    assert(SharedObjectProxy_CheckExact(op));
     SharedObjectProxy *proxy = (SharedObjectProxy *)op;
     assert(proxy->object != NULL);
     assert(Py_REFCNT(proxy->object) > 0);
@@ -405,7 +409,6 @@ SharedObjectProxy_CAST(PyObject *op)
 }
 #define SharedObjectProxy_CAST(op) SharedObjectProxy_CAST(_PyObject_CAST(op))
 #define SharedObjectProxy_OBJECT(op) FT_ATOMIC_LOAD_PTR_RELAXED(SharedObjectProxy_CAST(op)->object)
-#define SharedObjectProxy_CheckExact(op) (Py_TYPE(_PyObject_CAST(op)) == &SharedObjectProxy_Type)
 
 #ifdef Py_GIL_DISABLED
 #define SharedObjectProxy_TSTATES(op) ((SharedObjectProxy_CAST(op))->thread_states.table)
@@ -416,8 +419,6 @@ SharedObjectProxy_CAST(PyObject *op)
 #define SharedObjectProxy_LOCK_TSTATES(op)
 #define SharedObjectProxy_UNLOCK_TSTATES(op)
 #endif
-
-static PyTypeObject SharedObjectProxy_Type;
 
 static int
 sharedobjectproxy_clear(PyObject *op)
@@ -1180,7 +1181,13 @@ static PyTypeObject SharedObjectProxy_Type = {
 static PyObject *
 sharedobjectproxy_xid(_PyXIData_t *data)
 {
-    return _sharedobjectproxy_create(data->obj);
+    SharedObjectProxy *proxy = SharedObjectProxy_CAST(data->obj);
+    SharedObjectProxy *new_proxy = SharedObjectProxy_CAST(_sharedobjectproxy_create(proxy->object));
+    if (new_proxy == NULL) {
+        return NULL;
+    }
+    new_proxy->interp = proxy->interp;
+    return (PyObject *)new_proxy;
 }
 
 static int
