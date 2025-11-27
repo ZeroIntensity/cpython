@@ -199,6 +199,7 @@ class SharedObjectProxyTests(TestBase):
         with self.create_interp(cycle_type=cycle_type, interp_a=interp_a) as interp:
             interp.exec("interp_b = cycle_type(interp_a)")
 
+        self.assertEqual(called, 0)
         del interp_a
         for _ in range(3):
             gc.collect()
