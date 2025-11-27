@@ -11,20 +11,8 @@ from concurrent import interpreters
 
 
 class SharedObjectProxyTests(TestBase):
-    def unshareable(self):
-        class Test:
-            def __init__(self):
-                pass
-
-            def silly(self):
-                return "silly"
-
-        instance = Test()
-        self.assertFalse(interpreters.is_shareable(instance))
-        return instance
-
     def test_create(self):
-        proxy = share(self.unshareable())
+        proxy = share(object())
         self.assertIsInstance(proxy, SharedObjectProxy)
 
         # Shareable objects should pass through
@@ -59,8 +47,12 @@ class SharedObjectProxyTests(TestBase):
                 raise cm.exc_value
 
     def test_access_proxy(self):
+        class Test:
+            def silly(self):
+                return "silly"
+
         interp = interpreters.create()
-        obj = self.unshareable()
+        obj = Test()
         proxy = share(obj)
         obj.test = "silly"
         interp.prepare_main(proxy=proxy)
@@ -73,7 +65,8 @@ class SharedObjectProxyTests(TestBase):
         assert method() == 'silly'
         assert isinstance(method(), str)
         """)
-        #interp.exec("proxy.noexist")
+        with self.assertRaises(interpreters.ExecutionFailed):
+            interp.exec("proxy.noexist")
 
 
 if __name__ == '__main__':
