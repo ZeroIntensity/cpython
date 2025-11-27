@@ -627,13 +627,20 @@ _sharedobjectproxy_wrap_result(SharedObjectProxy *self, PyObject *result,
     }
 
     Py_DECREF(result);
+    PyObject *ret;
+    if (state->to_restore != NULL) {
+        PyThreadState *save = PyThreadState_Swap(state->to_restore);
+        ret = _sharedobjectproxy_copy_for_interp(&shared_result);
+        PyThreadState_Swap(save);
+    } else {
+        ret = _sharedobjectproxy_copy_for_interp(&shared_result);
+    }
+
+    _sharedobjectproxy_finish_share(&shared_result);
     if (_sharedobjectproxy_exit(self, state) < 0) {
-        _sharedobjectproxy_finish_share(&shared_result);
         return NULL;
     }
 
-    PyObject *ret = _sharedobjectproxy_copy_for_interp(&shared_result);
-    //_sharedobjectproxy_finish_share(&shared_result);
     return ret;
 }
 
