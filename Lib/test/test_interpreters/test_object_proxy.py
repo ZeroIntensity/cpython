@@ -136,7 +136,24 @@ class SharedObjectProxyTests(TestBase):
             interp.exec("assert proxy('test') == 'str'")
             interp.exec("assert proxy(object()) == 'SharedObjectProxy'")
 
+    def test_proxy_call_return(self):
+        class Test:
+            def __init__(self, silly):
+                self.silly = silly
 
+        def shared():
+            return Test("silly")
+
+        proxy = share(shared)
+        res = proxy()
+        self.assertIsInstance(res, SharedObjectProxy)
+        self.assertEqual(res.silly, "silly")
+
+        with self.create_interp(proxy=proxy) as interp:
+            interp.exec("""if True:
+            obj = proxy()
+            assert obj.silly == 'silly'
+            assert type(obj).__name__ == 'SharedObjectProxy'""")
 
 
 if __name__ == '__main__':

@@ -396,84 +396,6 @@ _get_current_sharedobjectproxy_type(void);
 #define SharedObjectProxy_CAST(op) ((SharedObjectProxy *)op)
 #define SharedObjectProxy_OBJECT(op) FT_ATOMIC_LOAD_PTR_RELAXED(SharedObjectProxy_CAST(op)->object)
 
-static PyObject *
-sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    SharedObjectProxy *self = (SharedObjectProxy *)type->tp_alloc(type, 0);
-    if (self == NULL) {
-        return NULL;
-    }
-
-    self->object = Py_None;
-    self->interp = _PyInterpreterState_GET();
-
-    return (PyObject *)self;
-}
-
-PyObject *
-_sharedobjectproxy_create(PyObject *object, PyInterpreterState *owning_interp)
-{
-    assert(object != NULL);
-    assert(owning_interp != NULL);
-
-    PyTypeObject *type = _get_current_sharedobjectproxy_type();
-    if (type == NULL) {
-        return NULL;
-    }
-    assert(Py_TYPE(object) != type);
-    SharedObjectProxy *proxy = SharedObjectProxy_CAST(sharedobjectproxy_new(type,
-                                                                            NULL, NULL));
-    if (proxy == NULL) {
-        return NULL;
-    }
-
-    assert(PyObject_GC_IsTracked((PyObject *)proxy));
-    if (_PyInterpreterState_GET() == owning_interp) {
-        Py_INCREF(object);
-    }
-    proxy->object = object;
-    proxy->interp = owning_interp;
-    return (PyObject *)proxy;
-}
-
-
-static int
-sharedobjectproxy_clear(PyObject *op)
-{
-    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
-    // Don't clear from another interpreter
-    if (self->interp != _PyInterpreterState_GET()) {
-        return 0;
-    }
-
-    Py_CLEAR(self->object);
-    return 0;
-}
-
-static int
-sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
-{
-    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
-    // Don't traverse from another interpreter
-    if (self->interp != _PyInterpreterState_GET()) {
-        return 0;
-    }
-
-    Py_VISIT(self->object);
-    return 0;
-}
-
-static void
-sharedobjectproxy_dealloc(PyObject *op)
-{
-    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
-    PyTypeObject *tp = Py_TYPE(self);
-    (void)sharedobjectproxy_clear(op);
-    PyObject_GC_UnTrack(self);
-    tp->tp_free(self);
-    Py_DECREF(tp);
-}
-
 typedef struct {
     PyThreadState *to_restore;
     PyThreadState *for_call;
@@ -534,6 +456,105 @@ _sharedobjectproxy_exit(SharedObjectProxy *self, _PyXI_proxy_state *state)
     }
 
     return 0;
+}
+
+static PyObject *
+sharedobjectproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    SharedObjectProxy *self = (SharedObjectProxy *)type->tp_alloc(type, 0);
+    if (self == NULL) {
+        return NULL;
+    }
+
+    self->object = Py_None;
+    self->interp = _PyInterpreterState_GET();
+
+    return (PyObject *)self;
+}
+
+PyObject *
+_sharedobjectproxy_create(PyObject *object, PyInterpreterState *owning_interp)
+{
+    assert(object != NULL);
+    assert(owning_interp != NULL);
+
+    PyTypeObject *type = _get_current_sharedobjectproxy_type();
+    if (type == NULL) {
+        return NULL;
+    }
+    assert(Py_TYPE(object) != type);
+    SharedObjectProxy *proxy = SharedObjectProxy_CAST(sharedobjectproxy_new(type,
+                                                                            NULL, NULL));
+    if (proxy == NULL) {
+        return NULL;
+    }
+
+    assert(PyObject_GC_IsTracked((PyObject *)proxy));
+    proxy->object = NULL;
+    proxy->interp = owning_interp;
+
+    // We have to be in the correct interpreter to increment the object's
+    // reference count.
+    _PyXI_proxy_state state;
+    if (_sharedobjectproxy_enter(proxy, &state) < 0) {
+        Py_DECREF(proxy);
+        return NULL;
+    }
+
+    proxy->object = Py_NewRef(object);
+
+    if (_sharedobjectproxy_exit(proxy, &state)) {
+        Py_DECREF(proxy);
+        return NULL;
+    }
+
+    return (PyObject *)proxy;
+}
+
+
+static int
+sharedobjectproxy_clear(PyObject *op)
+{
+    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
+    if (self->object == NULL) {
+        return 0;
+    }
+
+    _PyXI_proxy_state state;
+    if (_sharedobjectproxy_enter(self, &state) < 0) {
+        // The object leaks :(
+        return -1;
+    }
+    Py_CLEAR(self->object);
+    return _sharedobjectproxy_exit(self, &state);
+}
+
+static int
+sharedobjectproxy_traverse(PyObject *op, visitproc visit, void *arg)
+{
+    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
+    if (self->interp != _PyInterpreterState_GET()) {
+        // Don't traverse from another interpreter
+        return 0;
+    }
+
+    Py_VISIT(self->object);
+    return 0;
+}
+
+static void
+sharedobjectproxy_dealloc(PyObject *op)
+{
+    SharedObjectProxy *self = SharedObjectProxy_CAST(op);
+    PyTypeObject *tp = Py_TYPE(self);
+    PyObject *err = PyErr_GetRaisedException();
+    if (sharedobjectproxy_clear(op) < 0) {
+        PyErr_FormatUnraisable("Exception in proxy destructor");
+    };
+    PyObject_GC_UnTrack(self);
+    tp->tp_free(self);
+    Py_DECREF(tp);
+    PyErr_SetRaisedException(err);
 }
 
 typedef struct {
