@@ -1,0 +1,48 @@
+import unittest
+
+from test.support import import_helper
+from test.support import threading_helper
+# Raise SkipTest if subinterpreters not supported.
+import_helper.import_module('_interpreters')
+from concurrent.interpreters import share, SharedObjectProxy
+from .utils import TestBase
+
+
+class SharedObjectProxyTests(TestBase):
+    def unshareable(self):
+        class Test:
+            def __init__(self):
+                pass
+
+        return Test()
+
+    def test_create(self):
+        proxy = share(self.unshareable())
+        self.assertIsInstance(proxy, SharedObjectProxy)
+
+        # Shareable objects should pass through
+        for shareable in (None, True, False, 100, 10000, "hello", b"world", memoryview(b"test")):
+            self.assertTrue(shareable)
+            with self.subTest(shareable=shareable):
+                not_a_proxy = share(shareable)
+                self.assertNotIsInstance(not_a_proxy, SharedObjectProxy)
+                self.assertIs(not_a_proxy, shareable)
+
+    @threading_helper.requires_working_threading()
+    def test_create_concurrently(self):
+        def thread():
+            for iteration in range(100):
+                with self.subTest(iteration=iteration):
+                    self.test_create()
+
+        with threading_helper.catch_threading_exception() as cm:
+            with threading_helper.start_threads((thread for _ in range(4))):
+                pass
+
+            if cm.exc_value is not None:
+                raise cm.exc_value
+
+
+if __name__ == '__main__':
+    # Test needs to be a package, so we can do relative imports.
+    unittest.main()
