@@ -907,6 +907,7 @@ _sharedobjectproxy_double_share_common(SharedObjectProxy *self,
         return -1;
     }
     if (_sharedobjectproxy_init_share(shared_second, self, second) < 0) {
+        _sharedobjectproxy_finish_share(shared_first);
         return -1;
     }
     if (_sharedobjectproxy_enter(self, state) < 0) {
