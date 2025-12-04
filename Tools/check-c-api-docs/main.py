@@ -8,6 +8,8 @@ SIMPLE_FUNCTION_REGEX = re.compile(r"PyAPI_FUNC(.+) (\w+)\(")
 SIMPLE_MACRO_REGEX = re.compile(r"# *define *(\w+)(\(.+\))? ")
 SIMPLE_INLINE_REGEX = re.compile(r"static inline .+( |\n)(\w+)")
 SIMPLE_DATA_REGEX = re.compile(r"PyAPI_DATA\(.+\) (\w+)")
+C_BLOCK_COMMENT_REGEX = re.compile(r"/\*.*?\*/", re.DOTALL)
+C_LINE_COMMENT_REGEX = re.compile(r"//.*$", re.MULTILINE)
 
 CPYTHON = Path(__file__).parent.parent.parent
 INCLUDE = CPYTHON / "Include"
@@ -96,6 +98,9 @@ def scan_file_for_docs(filename: str, text: str) -> tuple[list[str], list[str]]:
     undocumented: list[str] = []
     documented_ignored: list[str] = []
     colors = _colorize.get_colors()
+
+    text = C_BLOCK_COMMENT_REGEX.sub("", text)
+    text = C_LINE_COMMENT_REGEX.sub("", text)
 
     def check_for_name(name: str) -> None:
         documented = is_documented(name)
