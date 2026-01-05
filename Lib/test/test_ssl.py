@@ -3016,20 +3016,13 @@ class ThreadedTests(unittest.TestCase):
                 self.test_wrong_cert_tls12,
                 self.test_wrong_cert_tls13,
             ):
-                # Be careful with the number of threads here.
-                # Too many can result in failing tests.
-                for num in range(5):
-                    with self.subTest(func=func, num=num):
-                        threads.append(Thread(target=func))
+                for _ in range(5):
+                    threads.append(Thread(target=func))
 
             with threading_helper.catch_threading_exception() as cm:
-                for thread in threads:
-                    with self.subTest(thread=thread):
-                        thread.start()
+                with threading_helper.start_threads(threads):
+                    pass
 
-                for thread in threads:
-                    with self.subTest(thread=thread):
-                        thread.join()
                 if cm.exc_value is not None:
                     # Some threads can skip their test
                     if not isinstance(cm.exc_value, unittest.SkipTest):
