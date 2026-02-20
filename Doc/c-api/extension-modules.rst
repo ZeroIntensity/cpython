@@ -267,6 +267,11 @@ For example, a module called ``spam`` would be defined like this::
    }
 
 
+.. c:var:: PyTypeObject PyModuleDef_Type
+
+   The type of ``PyModuleDef`` objects.
+
+
 .. _single-phase-initialization:
 
 Legacy single-phase initialization
