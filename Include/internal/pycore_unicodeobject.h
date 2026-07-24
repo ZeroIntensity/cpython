@@ -393,6 +393,9 @@ extern void _PyUnicode_ClearInterned(PyInterpreterState *interp);
 // Export for '_sqlite3' shared extension.
 PyAPI_FUNC(const char *) _PyUnicode_AsUTF8NoNUL(PyObject *);
 
+// Checks if a string is a __dunder__ name
+extern int _PyUnicode_IsDunderName(PyObject *name);
+
 
 #ifdef __cplusplus
 }

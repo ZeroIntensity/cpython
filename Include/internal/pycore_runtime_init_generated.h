@@ -1404,6 +1404,7 @@ extern "C" {
     INIT_ID(__enter__), \
     INIT_ID(__eq__), \
     INIT_ID(__exit__), \
+    INIT_ID(__export__), \
     INIT_ID(__file__), \
     INIT_ID(__firstlineno__), \
     INIT_ID(__float__), \

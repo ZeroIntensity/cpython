@@ -6125,24 +6125,6 @@ done:
     return res;
 }
 
-/* Check if the "readied" PyUnicode name
-   is a double-underscore special name. */
-static int
-is_dunder_name(PyObject *name)
-{
-    Py_ssize_t length = PyUnicode_GET_LENGTH(name);
-    int kind = PyUnicode_KIND(name);
-    /* Special names contain at least "__x__" and are always ASCII. */
-    if (length > 4 && kind == PyUnicode_1BYTE_KIND) {
-        const Py_UCS1 *characters = PyUnicode_1BYTE_DATA(name);
-        return (
-            ((characters[length-2] == '_') && (characters[length-1] == '_')) &&
-            ((characters[0] == '_') && (characters[1] == '_'))
-        );
-    }
-    return 0;
-}
-
 /* Internal API to look for a name through the MRO.
    This returns a strong reference, and doesn't set an exception!
    If nonzero, version is set to the value of type->tp_version at the time of
@@ -6177,14 +6159,14 @@ _PyType_LookupStackRefAndVersion(PyTypeObject *type, PyObject *name, _PyStackRef
     if (cacheable) {
         struct _PyTypeCacheLookupResult r = _PyTypeCache_Lookup(type, name);
         if (r.cache_hit) {
-            OBJECT_STAT_INC_COND(type_cache_hits, !is_dunder_name(name));
-            OBJECT_STAT_INC_COND(type_cache_dunder_hits, is_dunder_name(name));
+            OBJECT_STAT_INC_COND(type_cache_hits, !_PyUnicode_IsDunderName(name));
+            OBJECT_STAT_INC_COND(type_cache_dunder_hits, _PyUnicode_IsDunderName(name));
             *out = r.value;
             return r.version_tag;
         }
     }
-    OBJECT_STAT_INC_COND(type_cache_misses, !is_dunder_name(name));
-    OBJECT_STAT_INC_COND(type_cache_dunder_misses, is_dunder_name(name));
+    OBJECT_STAT_INC_COND(type_cache_misses, !_PyUnicode_IsDunderName(name));
+    OBJECT_STAT_INC_COND(type_cache_dunder_misses, _PyUnicode_IsDunderName(name));
 
     /* We may end up clearing live exceptions below, so make sure it's ours. */
     assert(!PyErr_Occurred());
@@ -6669,7 +6651,7 @@ type_setattro(PyObject *self, PyObject *name, PyObject *value)
     res = type_update_dict(type, (PyDictObject *)dict, name, value, &old_value);
     assert(_PyType_CheckConsistency(type));
     if (res == 0) {
-        if (is_dunder_name(name) && has_slotdef(name)) {
+        if (_PyUnicode_IsDunderName(name) && has_slotdef(name)) {
             // The name corresponds to a type slot.
             res = update_slot_after_setattr(type, name);
         }
@@ -11675,7 +11657,7 @@ slotptr(PyTypeObject *type, int ioffset)
 }
 
 // Return true if "name" corresponds to at least one slot definition.  This is
-// a more accurate but more expensive test compared to is_dunder_name().
+// a more accurate but more expensive test compared to _PyUnicode_IsDunderName().
 static bool
 has_slotdef(PyObject *name)
 {

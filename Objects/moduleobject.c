@@ -1327,13 +1327,46 @@ try_load_lazy_submodule(PyModuleObject *m, PyObject *name)
     return result;
 }
 
+static int
+is_name_exported(PyObject *module, PyObject *name)
+{
+    assert(PyModule_Check(module));
+    assert(PyUnicode_Check(name));
+    if (_PyUnicode_IsDunderName(name)) {
+        // All __dunder__ names are inherently exported
+        return 1;
+    }
+    PyObject *exports = _PyObject_GenericGetAttrWithDict(module, &_Py_ID(__export__), NULL, 1);
+    assert(!PyErr_Occurred());
+
+    if (exports == NULL) {
+        // If there's no __export__ variable, assume everything is exported
+        return 1;
+    }
+
+    assert(PyUnicode_CheckExact(name));
+    int exported = PySequence_Contains(exports, name);
+    Py_DECREF(exports);
+    return exported;
+}
+
 PyObject*
 _Py_module_getattro_impl(PyModuleObject *m, PyObject *name, int suppress)
 {
     // When suppress=1, this function suppresses AttributeError.
     PyObject *attr, *mod_name, *getattr;
+
+    int exported = is_name_exported((PyObject *)m, name);
+    if (exported == -1) {
+        return NULL;
+    }
+
     attr = _PyObject_GenericGetAttrWithDict((PyObject *)m, name, NULL, suppress);
     if (attr) {
+        if (!exported) {
+            PyErr_Format(PyExc_ImportError, "%R is not exported by %R", name, m->md_name);
+            return NULL;
+        }
         if (PyLazyImport_CheckExact(attr)) {
             // gh-144957: Module __getattr__ should get a chance to provide
             // the attribute before resolving a lazy import placeholder.
@@ -1577,6 +1610,42 @@ module_clear(PyObject *self)
 }
 
 static PyObject *
+default_module_dir(PyObject *self, PyObject *dict)
+{
+    assert(PyModule_Check(self));
+    assert(PyDict_Check(dict));
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(dict);
+
+    PyObject *list = PyList_New(0);
+    if (list == NULL) {
+        return NULL;
+    }
+
+    PyObject *key;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(dict, &pos, &key, NULL)) {
+        assert(key != NULL);
+        int exported = is_name_exported(self, key);
+        if (exported == -1) {
+            Py_DECREF(list);
+            return NULL;
+        }
+
+        if (!exported) {
+            continue;
+        }
+
+        if (PyList_Append(list, key) < 0) {
+            Py_DECREF(list);
+            return NULL;
+        }
+    }
+
+    return list;
+}
+
+static PyObject *
 module_dir(PyObject *self, PyObject *args)
 {
     PyObject *result = NULL;
@@ -1594,7 +1663,9 @@ module_dir(PyObject *self, PyObject *args)
                 result = _PyObject_CallNoArgs(dirfunc);
             }
             else if (!PyErr_Occurred()) {
-                result = PyDict_Keys(dict);
+                Py_BEGIN_CRITICAL_SECTION(dict);
+                result = default_module_dir(self, dict);
+                Py_END_CRITICAL_SECTION();
             }
         }
         else {
