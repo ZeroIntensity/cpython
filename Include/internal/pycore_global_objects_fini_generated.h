@@ -1406,6 +1406,7 @@ _PyStaticObjects_CheckRefcnt(PyInterpreterState *interp) {
     _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__enter__));
     _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__eq__));
     _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__exit__));
+    _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__export__));
     _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__file__));
     _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__firstlineno__));
     _PyStaticObject_CheckRefcnt((PyObject *)&_Py_ID(__float__));
