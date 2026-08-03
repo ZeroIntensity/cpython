@@ -2360,6 +2360,10 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         LEAVE_CONDITIONAL_BLOCK(st);
         break;
     }
+    case Export_kind: {
+        VISIT(st, stmt, s->v.Export.target);
+        break;
+    }
     }
     LEAVE_RECURSIVE();
     return 1;

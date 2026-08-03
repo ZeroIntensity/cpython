@@ -2111,3 +2111,25 @@ _PyPegen_register_stmts(Parser *p, asdl_stmt_seq* stmts) {
     p->last_stmt_location.end_col_offset = last_stmt->end_col_offset;
     return stmts;
 }
+
+stmt_ty
+_PyPegen_check_exportable(Parser *p, stmt_ty s,
+                          int lineno, int col_offset,
+                          int end_lineno, int end_col_offset,
+                          PyArena *arena)
+{
+    switch (s->kind) {
+        case Assign_kind:
+        case AnnAssign_kind:
+            break;
+        case AugAssign_kind:
+            RAISE_SYNTAX_ERROR_KNOWN_LOCATION(
+                s, "cannot export an augmented assignment");
+            return NULL;
+        default:
+            RAISE_SYNTAX_ERROR_KNOWN_LOCATION(
+                s, "cannot export this statement");
+            return NULL;
+    }
+    return _PyAST_Export(s, lineno, col_offset, end_lineno, end_col_offset, arena);
+}

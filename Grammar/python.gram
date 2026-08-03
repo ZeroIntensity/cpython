@@ -120,6 +120,7 @@ simple_stmts[asdl_stmt_seq*]:
 # will throw a SyntaxError.
 simple_stmt[stmt_ty] (memo):
     | assignment
+    | &"export" export_stmt
     | &"type" type_alias
     | &('import' | 'from' | "lazy") import_stmt
     | e=star_expressions { _PyAST_Expr(e, EXTRA) }
@@ -142,6 +143,7 @@ compound_stmt[stmt_ty]:
     | &('for' | 'async') for_stmt
     | &'try' try_stmt
     | &'while' while_stmt
+    | &"export" export_compound_stmt
     | match_stmt
 
 # SIMPLE STATEMENTS
@@ -164,6 +166,12 @@ assignment[stmt_ty]:
     | a=single_target b=augassign ~ c=annotated_rhs {
          _PyAST_AugAssign(a, b->kind, c, EXTRA) }
     | invalid_assignment
+
+export_stmt[stmt_ty]:
+    | "export" a=assignment { _PyPegen_check_exportable(p, a, EXTRA) }
+
+export_compound_stmt[stmt_ty]:
+    | "export" a=(function_def | class_def) { _PyAST_Export(a, EXTRA) }
 
 annotated_rhs[expr_ty]: yield_expr | star_expressions
 

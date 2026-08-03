@@ -4395,6 +4395,12 @@ SimpleExtendsException(PyExc_Warning, ResourceWarning,
     "Base class for warnings about resource usage.");
 
 
+/*
+ *    ExportWarning extends Warning
+ */
+SimpleExtendsException(PyExc_Warning, ExportWarning,
+    "Base class for warnings about namespace exports.");
+
 
 #ifdef MS_WINDOWS
 #include <winsock2.h>
@@ -4504,6 +4510,7 @@ static struct static_exception static_exceptions[] = {
     ITEM(SyntaxWarning),
     ITEM(UnicodeWarning),
     ITEM(UserWarning),
+    ITEM(ExportWarning),
 
     // Level 4: OSError(Exception) subclasses
     ITEM(BlockingIOError),

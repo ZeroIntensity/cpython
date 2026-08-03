@@ -937,6 +937,22 @@ validate_stmt(stmt_ty stmt)
             (!stmt->v.AsyncFunctionDef.returns ||
              validate_expr(stmt->v.AsyncFunctionDef.returns, Load));
         break;
+    case Export_kind: {
+        stmt_ty t = stmt->v.Export.target;
+        switch (t->kind) {
+            case Assign_kind:
+            case AnnAssign_kind:
+            case FunctionDef_kind:
+            case AsyncFunctionDef_kind:
+            case ClassDef_kind:
+                return validate_stmt(t);
+            default:
+                PyErr_SetString(PyExc_ValueError,
+                                "Export target must be an assignment, "
+                                "function, or class definition");
+                return 0;
+        }
+    }
     case Pass_kind:
     case Break_kind:
     case Continue_kind:

@@ -1364,8 +1364,9 @@ _Py_module_getattro_impl(PyModuleObject *m, PyObject *name, int suppress)
     attr = _PyObject_GenericGetAttrWithDict((PyObject *)m, name, NULL, suppress);
     if (attr) {
         if (!exported) {
-            PyErr_Format(PyExc_ImportError, "%R is not exported by %R", name, m->md_name);
-            return NULL;
+            if (PyErr_WarnFormat(PyExc_ExportWarning, 1, "%R is not exported by %R", name, m->md_name) < 0) {
+                return NULL;
+            }
         }
         if (PyLazyImport_CheckExact(attr)) {
             // gh-144957: Module __getattr__ should get a chance to provide

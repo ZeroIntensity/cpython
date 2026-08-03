@@ -3093,6 +3093,63 @@ codegen_stmt_expr(compiler *c, location loc, expr_ty value)
     return SUCCESS;
 }
 
+static int
+codegen_export(compiler *c, location loc, stmt_ty s)
+{
+    NEW_JUMP_TARGET_LABEL(c, no_export);
+    NEW_JUMP_TARGET_LABEL(c, end);
+
+    ADDOP_JUMP(c, loc, SETUP_FINALLY, no_export);
+    ADDOP_NAME(c, loc, LOAD_NAME, &_Py_ID(__export__), names);
+    ADDOP(c, NO_LOCATION, POP_BLOCK);
+    ADDOP_JUMP(c, loc, JUMP, end);
+
+    USE_LABEL(c, no_export);
+    // [exc]
+    ADDOP(c, loc, POP_TOP);
+    // []
+    ADDOP_I(c, loc, BUILD_LIST, 0);
+    ADDOP_I(c, loc, COPY, 1);
+    ADDOP_NAME(c, loc, STORE_NAME, &_Py_ID(__export__), names);
+
+    USE_LABEL(c, end);
+    // [__export__]
+
+    stmt_ty t = s->v.Export.target;
+    identifier name;
+    switch (t->kind) {
+        case Assign_kind: {
+            abort();
+            break;
+        }
+        case AnnAssign_kind: {
+            name = t->v.AnnAssign.target->v.Name.id;
+            break;
+        }
+        case FunctionDef_kind: {
+            name = t->v.FunctionDef.name;
+            break;
+        }
+        case ClassDef_kind: {
+            name = t->v.ClassDef.name;
+            break;
+        }
+        default: {
+            PyErr_SetString(PyExc_SystemError, "unknown kind in export");
+            return ERROR;
+        }
+    }
+
+    ADDOP_LOAD_CONST(c, loc, name);
+
+    // [__export__, name]
+    ADDOP_I(c, loc, LIST_APPEND, 1);
+    ADDOP(c, loc, POP_TOP);
+
+    VISIT(c, stmt, t);
+    return SUCCESS;
+}
+
 #define CODEGEN_COND_BLOCK(FUNC, C, S) \
     do { \
         _PyCompile_EnterConditionalBlock((C)); \
@@ -3203,6 +3260,8 @@ codegen_visit_stmt(compiler *c, stmt_ty s)
     case AsyncFor_kind:
         CODEGEN_COND_BLOCK(codegen_async_for, c, s);
         break;
+    case Export_kind:
+        return codegen_export(c, LOC(s), s);
     }
 
     return SUCCESS;

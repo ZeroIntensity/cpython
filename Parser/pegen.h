@@ -384,6 +384,11 @@ stmt_ty _PyPegen_checked_from_import(Parser *p, asdl_seq *dots, expr_ty module_n
                                      PyArena *arena);
 asdl_stmt_seq* _PyPegen_register_stmts(Parser *p, asdl_stmt_seq* stmts);
 stmt_ty _PyPegen_register_stmt(Parser *p, stmt_ty s);
+stmt_ty
+_PyPegen_check_exportable(Parser *p, stmt_ty s,
+                          int lineno, int col_offset,
+                          int end_lineno, int end_col_offset,
+                          PyArena *arena);
 
 // Parser API
 

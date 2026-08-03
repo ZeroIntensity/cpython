@@ -71,6 +71,7 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Eq_singleton);
     Py_CLEAR(state->Eq_type);
     Py_CLEAR(state->ExceptHandler_type);
+    Py_CLEAR(state->Export_type);
     Py_CLEAR(state->Expr_type);
     Py_CLEAR(state->Expression_type);
     Py_CLEAR(state->FloorDiv_singleton);
@@ -469,6 +470,9 @@ static const char * const AnnAssign_fields[]={
     "annotation",
     "value",
     "simple",
+};
+static const char * const Export_fields[]={
+    "target",
 };
 static const char * const For_fields[]={
     "target",
@@ -1573,6 +1577,31 @@ add_ast_annotations(struct ast_state *state)
         return 0;
     }
     Py_DECREF(AnnAssign_annotations);
+    PyObject *Export_annotations = PyDict_New();
+    if (!Export_annotations) return 0;
+    {
+        PyObject *type = state->stmt_type;
+        Py_INCREF(type);
+        cond = PyDict_SetItemString(Export_annotations, "target", type) == 0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(Export_annotations);
+            return 0;
+        }
+    }
+    cond = PyObject_SetAttrString(state->Export_type, "_field_types",
+                                  Export_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(Export_annotations);
+        return 0;
+    }
+    cond = PyObject_SetAttrString(state->Export_type, "__annotations__",
+                                  Export_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(Export_annotations);
+        return 0;
+    }
+    Py_DECREF(Export_annotations);
     PyObject *For_annotations = PyDict_New();
     if (!For_annotations) return 0;
     {
@@ -6162,6 +6191,7 @@ init_types(void *arg)
         "     | TypeAlias(expr name, type_param* type_params, expr value)\n"
         "     | AugAssign(expr target, operator op, expr value)\n"
         "     | AnnAssign(expr target, expr annotation, expr? value, int simple)\n"
+        "     | Export(stmt target)\n"
         "     | For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)\n"
         "     | AsyncFor(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)\n"
         "     | While(expr test, stmt* body, stmt* orelse)\n"
@@ -6246,6 +6276,10 @@ init_types(void *arg)
     if (!state->AnnAssign_type) return -1;
     if (PyObject_SetAttr(state->AnnAssign_type, state->value, Py_None) == -1)
         return -1;
+    state->Export_type = make_type(state, "Export", state->stmt_type,
+                                   Export_fields, 1,
+        "Export(stmt target)");
+    if (!state->Export_type) return -1;
     state->For_type = make_type(state, "For", state->stmt_type, For_fields, 5,
         "For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)");
     if (!state->For_type) return -1;
@@ -7313,6 +7347,28 @@ _PyAST_AnnAssign(expr_ty target, expr_ty annotation, expr_ty value, int simple,
     p->v.AnnAssign.annotation = annotation;
     p->v.AnnAssign.value = value;
     p->v.AnnAssign.simple = simple;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+stmt_ty
+_PyAST_Export(stmt_ty target, int lineno, int col_offset, int end_lineno, int
+              end_col_offset, PyArena *arena)
+{
+    stmt_ty p;
+    if (!target) {
+        PyErr_SetString(PyExc_ValueError,
+                        "field 'target' is required for Export");
+        return NULL;
+    }
+    p = (stmt_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = Export_kind;
+    p->v.Export.target = target;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -9187,6 +9243,16 @@ ast2obj_stmt(struct ast_state *state, void* _o)
         value = ast2obj_int(state, o->v.AnnAssign.simple);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->simple, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case Export_kind:
+        tp = (PyTypeObject *)state->Export_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_stmt(state, o->v.Export.target);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->target, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -12262,6 +12328,36 @@ obj2ast_stmt(struct ast_state *state, PyObject* obj, stmt_ty* out, const char*
         }
         *out = _PyAST_AnnAssign(target, annotation, value, simple, lineno,
                                 col_offset, end_lineno, end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->Export_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        stmt_ty target;
+
+        if (PyObject_GetOptionalAttr(obj, state->target, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            PyErr_SetString(PyExc_TypeError, "required field \"target\" missing from Export");
+            return -1;
+        }
+        else {
+            int res;
+            if (_Py_EnterRecursiveCall(" while traversing 'Export' node")) {
+                goto failed;
+            }
+            res = obj2ast_stmt(state, tmp, &target, "target", arena);
+            _Py_LeaveRecursiveCall();
+            if (res != 0) goto failed;
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_Export(target, lineno, col_offset, end_lineno,
+                             end_col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -18168,6 +18264,9 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     if (PyModule_AddObjectRef(m, "AnnAssign", state->AnnAssign_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "Export", state->Export_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "For", state->For_type) < 0) {
