@@ -235,9 +235,9 @@ import_stmt[stmt_ty](memo):
 import_name[stmt_ty]:
     | lazy="lazy"? 'import' a=dotted_as_names { _PyAST_Import(a, lazy ? 1 : 0, EXTRA) }
 
-import_or_export[Token*]:
-    | a='import' { a }
-    | a='export' { a }
+import_or_export[expr_ty]:
+    | a='import' { _PyPegen_name_from_token(p, a) }
+    | a="export" { a }
 
 # note below: the ('.' | '...') is necessary because '...' is tokenized as ELLIPSIS
 import_from[stmt_ty]:

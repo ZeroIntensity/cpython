@@ -576,7 +576,7 @@ error:
     return NULL;
 }
 
-static expr_ty
+expr_ty
 _PyPegen_name_from_token(Parser *p, Token* t)
 {
     if (t == NULL) {

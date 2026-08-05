@@ -166,6 +166,7 @@ expr_ty _PyPegen_soft_keyword_token(Parser *p);
 expr_ty _PyPegen_fstring_middle_token(Parser* p);
 Token *_PyPegen_get_last_nonnwhitespace_token(Parser *);
 int _PyPegen_fill_token(Parser *p);
+expr_ty _PyPegen_name_from_token(Parser *p, Token* t);
 expr_ty _PyPegen_name_token(Parser *p);
 expr_ty _PyPegen_number_token(Parser *p);
 void *_PyPegen_string_token(Parser *p);
@@ -379,7 +380,7 @@ void *_PyPegen_arguments_parsing_error(Parser *, expr_ty);
 expr_ty _PyPegen_get_last_comprehension_item(comprehension_ty comprehension);
 void *_PyPegen_nonparen_genexp_in_call(Parser *p, expr_ty args, asdl_comprehension_seq *comprehensions);
 stmt_ty _PyPegen_checked_from_import(Parser *p, asdl_seq *dots, expr_ty module_name,
-                                     asdl_alias_seq *names, expr_ty lazy_token, Token *import_export_token, int lineno,
+                                     asdl_alias_seq *names, expr_ty lazy_token, expr_ty import_export_token, int lineno,
                                      int col_offset, int end_lineno, int end_col_offset,
                                      PyArena *arena);
 asdl_stmt_seq* _PyPegen_register_stmts(Parser *p, asdl_stmt_seq* stmts);
@@ -388,7 +389,7 @@ stmt_ty _PyPegen_check_exportable(Parser *p, stmt_ty s,
                                   int lineno, int col_offset,
                                   int end_lineno, int end_col_offset,
                                   PyArena *arena);
-int _PyPegen_is_export_kw(Token *t);
+int _PyPegen_is_export_kw(expr_ty e);
 
 // Parser API
 
