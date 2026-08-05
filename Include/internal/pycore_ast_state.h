@@ -207,6 +207,7 @@ struct ast_state {
     PyObject *id;
     PyObject *ifs;
     PyObject *is_async;
+    PyObject *is_export;
     PyObject *is_lazy;
     PyObject *items;
     PyObject *iter;

@@ -254,6 +254,7 @@ static int codegen_pattern_subpattern(compiler *,
                                       pattern_ty, pattern_context *);
 static int codegen_make_closure(compiler *c, location loc,
                                 PyCodeObject *co, Py_ssize_t flags);
+static int codegen_export_name(compiler *c, location loc, identifier name);
 
 
 /* Add an opcode with an integer argument */
@@ -3035,10 +3036,14 @@ codegen_from_import(compiler *c, stmt_ty s)
             store_name = alias->asname;
         }
 
+        if (s->v.ImportFrom.is_export) {
+            RETURN_IF_ERROR(codegen_export_name(c, LOC(s), store_name));
+        }
         RETURN_IF_ERROR(codegen_nameop(c, LOC(s), store_name, Store));
     }
     /* remove imported module */
     ADDOP(c, LOC(s), POP_TOP);
+
     return SUCCESS;
 }
 
@@ -3094,7 +3099,7 @@ codegen_stmt_expr(compiler *c, location loc, expr_ty value)
 }
 
 static int
-codegen_export(compiler *c, location loc, stmt_ty s)
+codegen_export_name(compiler *c, location loc, identifier name)
 {
     NEW_JUMP_TARGET_LABEL(c, no_export);
     NEW_JUMP_TARGET_LABEL(c, end);
@@ -3115,6 +3120,18 @@ codegen_export(compiler *c, location loc, stmt_ty s)
     USE_LABEL(c, end);
     // [__export__]
 
+    ADDOP_LOAD_CONST(c, loc, name);
+
+    // [__export__, name]
+    ADDOP_I(c, loc, LIST_APPEND, 1);
+    ADDOP(c, loc, POP_TOP);
+
+    return SUCCESS;
+}
+
+static int
+codegen_export(compiler *c, location loc, stmt_ty s)
+{
     stmt_ty t = s->v.Export.target;
     identifier name;
     switch (t->kind) {
@@ -3140,12 +3157,7 @@ codegen_export(compiler *c, location loc, stmt_ty s)
         }
     }
 
-    ADDOP_LOAD_CONST(c, loc, name);
-
-    // [__export__, name]
-    ADDOP_I(c, loc, LIST_APPEND, 1);
-    ADDOP(c, loc, POP_TOP);
-
+    RETURN_IF_ERROR(codegen_export_name(c, loc, name));
     VISIT(c, stmt, t);
     return SUCCESS;
 }

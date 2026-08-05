@@ -341,6 +341,7 @@ struct _stmt {
             asdl_alias_seq *names;
             int level;
             int is_lazy;
+            int is_export;
         } ImportFrom;
 
         struct {
@@ -776,8 +777,9 @@ stmt_ty _PyAST_Import(asdl_alias_seq * names, int is_lazy, int lineno, int
                       col_offset, int end_lineno, int end_col_offset, PyArena
                       *arena);
 stmt_ty _PyAST_ImportFrom(identifier module, asdl_alias_seq * names, int level,
-                          int is_lazy, int lineno, int col_offset, int
-                          end_lineno, int end_col_offset, PyArena *arena);
+                          int is_lazy, int is_export, int lineno, int
+                          col_offset, int end_lineno, int end_col_offset,
+                          PyArena *arena);
 stmt_ty _PyAST_Global(asdl_identifier_seq * names, int lineno, int col_offset,
                       int end_lineno, int end_col_offset, PyArena *arena);
 stmt_ty _PyAST_Nonlocal(asdl_identifier_seq * names, int lineno, int

@@ -47,7 +47,7 @@ module Python
           | Assert(expr test, expr? msg)
 
           | Import(alias* names, int? is_lazy)
-          | ImportFrom(identifier? module, alias* names, int? level, int? is_lazy)
+          | ImportFrom(identifier? module, alias* names, int? level, int? is_lazy, int? is_export)
 
           | Global(identifier* names)
           | Nonlocal(identifier* names)

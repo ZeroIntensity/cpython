@@ -2060,8 +2060,8 @@ _warn_relative_import_of_lazy(Parser *p, asdl_seq *dots, expr_ty module)
 
 stmt_ty
 _PyPegen_checked_from_import(Parser *p, asdl_seq *dots, expr_ty module_name,
-                             asdl_alias_seq *names, expr_ty lazy_token, int lineno,
-                             int col_offset, int end_lineno, int end_col_offset,
+                             asdl_alias_seq *names, expr_ty lazy_token, Token *import_export_token,
+                             int lineno, int col_offset, int end_lineno, int end_col_offset,
                              PyArena *arena)
 {
     identifier module = module_name->v.Name.id;
@@ -2088,7 +2088,8 @@ _PyPegen_checked_from_import(Parser *p, asdl_seq *dots, expr_ty module_name,
             return NULL;
         }
     }
-    return _PyAST_ImportFrom(module, names, level, lazy_token ? 1 : 0, lineno,
+    return _PyAST_ImportFrom(module, names, level, lazy_token ? 1 : 0,
+                             _PyPegen_is_export_kw(import_export_token), lineno,
                              col_offset, end_lineno, end_col_offset, arena);
 }
 
@@ -2132,4 +2133,10 @@ _PyPegen_check_exportable(Parser *p, stmt_ty s,
             return NULL;
     }
     return _PyAST_Export(s, lineno, col_offset, end_lineno, end_col_offset, arena);
+}
+
+int
+_PyPegen_is_export_kw(Token *t)
+{
+    return strcmp(PyBytes_AS_STRING(t->bytes), "export") == 0;
 }
