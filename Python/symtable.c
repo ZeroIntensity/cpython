@@ -2364,6 +2364,24 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         VISIT(st, stmt, s->v.Export.target);
         break;
     }
+    case ExportNames_kind: {
+        Py_ssize_t i;
+        asdl_identifier_seq *seq = s->v.Global.names;
+        for (i = 0; i < asdl_seq_LEN(seq); i++) {
+            identifier name = (identifier)asdl_seq_GET(seq, i);
+            long cur = symtable_lookup(st, name);
+            if (cur < 0)
+                return 0;
+
+            if (!symtable_add_def(st, name, DEF_GLOBAL, LOCATION(s))) {
+                return 0;
+            }
+            if (!symtable_record_directive(st, name, LOCATION(s))) {
+                return 0;
+            }
+        }
+        break;
+    }
     }
     LEAVE_RECURSIVE();
     return 1;

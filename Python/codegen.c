@@ -3162,6 +3162,19 @@ codegen_export(compiler *c, location loc, stmt_ty s)
     return SUCCESS;
 }
 
+static int
+codegen_export_names(compiler *c, location loc, stmt_ty s)
+{
+    asdl_identifier_seq *names = s->v.ExportNames.names;
+    Py_ssize_t n = asdl_seq_LEN(names);
+    for (Py_ssize_t i = 0; i < n; i++) {
+        identifier name = (identifier)asdl_seq_GET(names, i);
+        RETURN_IF_ERROR(codegen_export_name(c, loc, name));
+    }
+
+    return SUCCESS;
+}
+
 #define CODEGEN_COND_BLOCK(FUNC, C, S) \
     do { \
         _PyCompile_EnterConditionalBlock((C)); \
@@ -3274,6 +3287,8 @@ codegen_visit_stmt(compiler *c, stmt_ty s)
         break;
     case Export_kind:
         return codegen_export(c, LOC(s), s);
+    case ExportNames_kind:
+        return codegen_export_names(c, LOC(s), s);
     }
 
     return SUCCESS;

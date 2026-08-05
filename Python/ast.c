@@ -953,6 +953,9 @@ validate_stmt(stmt_ty stmt)
                 return 0;
         }
     }
+    case ExportNames_kind:
+        ret = validate_nonempty_seq(stmt->v.ExportNames.names, "names", "ExportNames");
+        break;
     case Pass_kind:
     case Break_kind:
     case Continue_kind:

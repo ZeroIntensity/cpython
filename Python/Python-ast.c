@@ -71,6 +71,7 @@ void _PyAST_Fini(PyInterpreterState *interp)
     Py_CLEAR(state->Eq_singleton);
     Py_CLEAR(state->Eq_type);
     Py_CLEAR(state->ExceptHandler_type);
+    Py_CLEAR(state->ExportNames_type);
     Py_CLEAR(state->Export_type);
     Py_CLEAR(state->Expr_type);
     Py_CLEAR(state->Expression_type);
@@ -475,6 +476,9 @@ static const char * const AnnAssign_fields[]={
 };
 static const char * const Export_fields[]={
     "target",
+};
+static const char * const ExportNames_fields[]={
+    "names",
 };
 static const char * const For_fields[]={
     "target",
@@ -1605,6 +1609,37 @@ add_ast_annotations(struct ast_state *state)
         return 0;
     }
     Py_DECREF(Export_annotations);
+    PyObject *ExportNames_annotations = PyDict_New();
+    if (!ExportNames_annotations) return 0;
+    {
+        PyObject *type = (PyObject *)&PyUnicode_Type;
+        type = Py_GenericAlias((PyObject *)&PyList_Type, type);
+        cond = type != NULL;
+        if (!cond) {
+            Py_DECREF(ExportNames_annotations);
+            return 0;
+        }
+        cond = PyDict_SetItemString(ExportNames_annotations, "names", type) ==
+                                    0;
+        Py_DECREF(type);
+        if (!cond) {
+            Py_DECREF(ExportNames_annotations);
+            return 0;
+        }
+    }
+    cond = PyObject_SetAttrString(state->ExportNames_type, "_field_types",
+                                  ExportNames_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(ExportNames_annotations);
+        return 0;
+    }
+    cond = PyObject_SetAttrString(state->ExportNames_type, "__annotations__",
+                                  ExportNames_annotations) == 0;
+    if (!cond) {
+        Py_DECREF(ExportNames_annotations);
+        return 0;
+    }
+    Py_DECREF(ExportNames_annotations);
     PyObject *For_annotations = PyDict_New();
     if (!For_annotations) return 0;
     {
@@ -6211,6 +6246,7 @@ init_types(void *arg)
         "     | AugAssign(expr target, operator op, expr value)\n"
         "     | AnnAssign(expr target, expr annotation, expr? value, int simple)\n"
         "     | Export(stmt target)\n"
+        "     | ExportNames(identifier* names)\n"
         "     | For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)\n"
         "     | AsyncFor(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)\n"
         "     | While(expr test, stmt* body, stmt* orelse)\n"
@@ -6299,6 +6335,10 @@ init_types(void *arg)
                                    Export_fields, 1,
         "Export(stmt target)");
     if (!state->Export_type) return -1;
+    state->ExportNames_type = make_type(state, "ExportNames", state->stmt_type,
+                                        ExportNames_fields, 1,
+        "ExportNames(identifier* names)");
+    if (!state->ExportNames_type) return -1;
     state->For_type = make_type(state, "For", state->stmt_type, For_fields, 5,
         "For(expr target, expr iter, stmt* body, stmt* orelse, string? type_comment)");
     if (!state->For_type) return -1;
@@ -7391,6 +7431,23 @@ _PyAST_Export(stmt_ty target, int lineno, int col_offset, int end_lineno, int
         return NULL;
     p->kind = Export_kind;
     p->v.Export.target = target;
+    p->lineno = lineno;
+    p->col_offset = col_offset;
+    p->end_lineno = end_lineno;
+    p->end_col_offset = end_col_offset;
+    return p;
+}
+
+stmt_ty
+_PyAST_ExportNames(asdl_identifier_seq * names, int lineno, int col_offset, int
+                   end_lineno, int end_col_offset, PyArena *arena)
+{
+    stmt_ty p;
+    p = (stmt_ty)_PyArena_Malloc(arena, sizeof(*p));
+    if (!p)
+        return NULL;
+    p->kind = ExportNames_kind;
+    p->v.ExportNames.names = names;
     p->lineno = lineno;
     p->col_offset = col_offset;
     p->end_lineno = end_lineno;
@@ -9276,6 +9333,17 @@ ast2obj_stmt(struct ast_state *state, void* _o)
         value = ast2obj_stmt(state, o->v.Export.target);
         if (!value) goto failed;
         if (PyObject_SetAttr(result, state->target, value) == -1)
+            goto failed;
+        Py_DECREF(value);
+        break;
+    case ExportNames_kind:
+        tp = (PyTypeObject *)state->ExportNames_type;
+        result = PyType_GenericNew(tp, NULL, NULL);
+        if (!result) goto failed;
+        value = ast2obj_list(state, (asdl_seq*)o->v.ExportNames.names,
+                             ast2obj_identifier);
+        if (!value) goto failed;
+        if (PyObject_SetAttr(result, state->names, value) == -1)
             goto failed;
         Py_DECREF(value);
         break;
@@ -12386,6 +12454,57 @@ obj2ast_stmt(struct ast_state *state, PyObject* obj, stmt_ty* out, const char*
         }
         *out = _PyAST_Export(target, lineno, col_offset, end_lineno,
                              end_col_offset, arena);
+        if (*out == NULL) goto failed;
+        return 0;
+    }
+    tp = state->ExportNames_type;
+    isinstance = PyObject_IsInstance(obj, tp);
+    if (isinstance == -1) {
+        return -1;
+    }
+    if (isinstance) {
+        asdl_identifier_seq* names;
+
+        if (PyObject_GetOptionalAttr(obj, state->names, &tmp) < 0) {
+            return -1;
+        }
+        if (tmp == NULL) {
+            tmp = PyList_New(0);
+            if (tmp == NULL) {
+                return -1;
+            }
+        }
+        {
+            int res;
+            Py_ssize_t len;
+            Py_ssize_t i;
+            if (!PyList_Check(tmp)) {
+                PyErr_Format(PyExc_TypeError, "ExportNames field \"names\" must be a list, not a %T", tmp);
+                goto failed;
+            }
+            len = PyList_GET_SIZE(tmp);
+            names = _Py_asdl_identifier_seq_new(len, arena);
+            if (names == NULL) goto failed;
+            for (i = 0; i < len; i++) {
+                identifier val;
+                PyObject *tmp2 = Py_NewRef(PyList_GET_ITEM(tmp, i));
+                if (_Py_EnterRecursiveCall(" while traversing 'ExportNames' node")) {
+                    goto failed;
+                }
+                res = obj2ast_identifier(state, tmp2, &val, "names", arena);
+                _Py_LeaveRecursiveCall();
+                Py_DECREF(tmp2);
+                if (res != 0) goto failed;
+                if (len != PyList_GET_SIZE(tmp)) {
+                    PyErr_SetString(PyExc_RuntimeError, "ExportNames field \"names\" changed size during iteration");
+                    goto failed;
+                }
+                asdl_seq_SET(names, i, val);
+            }
+            Py_CLEAR(tmp);
+        }
+        *out = _PyAST_ExportNames(names, lineno, col_offset, end_lineno,
+                                  end_col_offset, arena);
         if (*out == NULL) goto failed;
         return 0;
     }
@@ -18314,6 +18433,9 @@ astmodule_exec(PyObject *m)
         return -1;
     }
     if (PyModule_AddObjectRef(m, "Export", state->Export_type) < 0) {
+        return -1;
+    }
+    if (PyModule_AddObjectRef(m, "ExportNames", state->ExportNames_type) < 0) {
         return -1;
     }
     if (PyModule_AddObjectRef(m, "For", state->For_type) < 0) {
