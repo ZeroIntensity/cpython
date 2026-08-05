@@ -3130,14 +3130,26 @@ codegen_export_name(compiler *c, location loc, identifier name)
 }
 
 static int
+codegen_export_assignment(compiler *c, location loc, stmt_ty t)
+{
+    Py_ssize_t n = asdl_seq_LEN(t->v.Assign.targets);
+    for (Py_ssize_t i = 0; i < n; i++) {
+        expr_ty name = (expr_ty)asdl_seq_GET(t->v.Assign.targets, i);
+        RETURN_IF_ERROR(codegen_export_name(c, loc, name->v.Name.id));
+    }
+
+    VISIT(c, stmt, t);
+    return SUCCESS;
+}
+
+static int
 codegen_export(compiler *c, location loc, stmt_ty s)
 {
     stmt_ty t = s->v.Export.target;
     identifier name;
     switch (t->kind) {
         case Assign_kind: {
-            abort();
-            break;
+            return codegen_export_assignment(c, loc, t);
         }
         case AnnAssign_kind: {
             name = t->v.AnnAssign.target->v.Name.id;
