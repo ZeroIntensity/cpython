@@ -8,6 +8,7 @@
 #include "pycore_bitutils.h"        // _Py_popcount32()
 #include "pycore_ceval.h"       // _Py_set_eval_breaker_bit
 #include "pycore_code.h"            // _Py_GetBaseCodeUnit
+#include "pycore_critical_section.h"
 #include "pycore_interpframe.h"
 #include "pycore_object.h"          // _PyObject_GC_UNTRACK()
 #include "pycore_opcode_metadata.h" // _PyOpcode_OpName[]
@@ -40,10 +41,10 @@
 
 #define _PyExecutorObject_CAST(op)  ((_PyExecutorObject *)(op))
 
-#ifndef Py_GIL_DISABLED
 static bool
 has_space_for_executor(PyCodeObject *code, _Py_CODEUNIT *instr)
 {
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
     if (code == (PyCodeObject *)&_Py_InitCleanup) {
         return false;
     }
@@ -59,6 +60,7 @@ has_space_for_executor(PyCodeObject *code, _Py_CODEUNIT *instr)
 static int32_t
 get_index_for_executor(PyCodeObject *code, _Py_CODEUNIT *instr)
 {
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
     if (instr->op.code == ENTER_EXECUTOR) {
         return instr->op.arg;
     }
@@ -92,6 +94,7 @@ get_index_for_executor(PyCodeObject *code, _Py_CODEUNIT *instr)
 static void
 insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorObject *executor)
 {
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
     Py_INCREF(executor);
     if (instr->op.code == ENTER_EXECUTOR) {
         assert(index == instr->op.arg);
@@ -111,7 +114,6 @@ insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorO
     instr->op.code = ENTER_EXECUTOR;
     instr->op.arg = index;
 }
-#endif // Py_GIL_DISABLED
 
 static _PyExecutorObject *
 make_executor_from_uops(_PyThreadStateImpl *tstate, _PyUOpInstruction *buffer, int length, const _PyBloomFilter *dependencies);
@@ -120,6 +122,68 @@ static int
 uop_optimize(_PyInterpreterFrame *frame, PyThreadState *tstate,
              _PyExecutorObject **exec_ptr,
              bool progress_needed);
+
+static inline int
+optimize_code(_PyInterpreterFrame *frame, PyThreadState *tstate, PyCodeObject *code)
+{
+    assert(frame != NULL);
+    assert(tstate != NULL);
+    assert(code != NULL);
+    _PyThreadStateImpl *_tstate = (_PyThreadStateImpl *)tstate;
+
+    assert(!_tstate->compiling);
+    assert(_tstate->jit_tracer_state->initial_state.stack_depth >= 0);
+    assert(_tstate->jit_tracer_state->initial_state.func != NULL);
+    _tstate->compiling = true;
+    // The first executor in a chain and the MAX_CHAIN_DEPTH'th executor *must*
+    // make progress in order to avoid infinite loops or excessively-long
+    // side-exit chains. We can only insert the executor into the bytecode if
+    // this is true, since a deopt won't infinitely re-enter the executor:
+    int chain_depth = _tstate->jit_tracer_state->initial_state.chain_depth;
+    chain_depth %= MAX_CHAIN_DEPTH;
+    bool progress_needed = chain_depth == 0;
+
+    _Py_CODEUNIT *start = _tstate->jit_tracer_state->initial_state.start_instr;
+    if (progress_needed && !has_space_for_executor(code, start)) {
+        _tstate->compiling = false;
+        return 0;
+    }
+    _PyExecutorObject *executor;
+    int err = uop_optimize(frame, tstate, &executor, progress_needed);
+    if (err <= 0) {
+        _tstate->compiling = false;
+        return err;
+    }
+    assert(executor != NULL);
+    if (progress_needed) {
+        int index = get_index_for_executor(code, start);
+        if (index < 0) {
+            /* Out of memory. Don't raise and assume that the
+             * error will show up elsewhere.
+             *
+             * If an optimizer has already produced an executor,
+             * it might get confused by the executor disappearing,
+             * but there is not much we can do about that here. */
+            Py_DECREF(executor);
+            _tstate->compiling = false;
+            return 0;
+        }
+        insert_executor(code, start, index, executor);
+    }
+    executor->vm_data.chain_depth = chain_depth;
+    assert(executor->vm_data.valid);
+    _PyExitData *exit = _tstate->jit_tracer_state->initial_state.exit;
+    if (exit != NULL && !progress_needed) {
+        exit->executor = executor;
+    }
+    else {
+        // An executor inserted into the code object now has a strong reference
+        // to it from the code object. Thus, we don't need this reference anymore.
+        Py_DECREF(executor);
+    }
+    _tstate->compiling = false;
+    return 1;
+}
 
 /* Returns 1 if optimized, 0 if not optimized, and -1 for an error.
  * If optimized, *executor_ptr contains a new reference to the executor
@@ -144,67 +208,18 @@ _PyOptimizer_Optimize(
         // longer valid, don't compile to prevent a reference leak.
         return 0;
     }
-    assert(!interp->compiling);
-    assert(_tstate->jit_tracer_state->initial_state.stack_depth >= 0);
-#ifndef Py_GIL_DISABLED
-    assert(_tstate->jit_tracer_state->initial_state.func != NULL);
-    interp->compiling = true;
-    // The first executor in a chain and the MAX_CHAIN_DEPTH'th executor *must*
-    // make progress in order to avoid infinite loops or excessively-long
-    // side-exit chains. We can only insert the executor into the bytecode if
-    // this is true, since a deopt won't infinitely re-enter the executor:
-    int chain_depth = _tstate->jit_tracer_state->initial_state.chain_depth;
-    chain_depth %= MAX_CHAIN_DEPTH;
-    bool progress_needed = chain_depth == 0;
     PyCodeObject *code = (PyCodeObject *)_tstate->jit_tracer_state->initial_state.code;
-    _Py_CODEUNIT *start = _tstate->jit_tracer_state->initial_state.start_instr;
-    if (progress_needed && !has_space_for_executor(code, start)) {
-        interp->compiling = false;
-        return 0;
-    }
-    _PyExecutorObject *executor;
-    int err = uop_optimize(frame, tstate, &executor, progress_needed);
-    if (err <= 0) {
-        interp->compiling = false;
-        return err;
-    }
-    assert(executor != NULL);
-    if (progress_needed) {
-        int index = get_index_for_executor(code, start);
-        if (index < 0) {
-            /* Out of memory. Don't raise and assume that the
-             * error will show up elsewhere.
-             *
-             * If an optimizer has already produced an executor,
-             * it might get confused by the executor disappearing,
-             * but there is not much we can do about that here. */
-            Py_DECREF(executor);
-            interp->compiling = false;
-            return 0;
-        }
-        insert_executor(code, start, index, executor);
-    }
-    executor->vm_data.chain_depth = chain_depth;
-    assert(executor->vm_data.valid);
-    _PyExitData *exit = _tstate->jit_tracer_state->initial_state.exit;
-    if (exit != NULL && !progress_needed) {
-        exit->executor = executor;
-    }
-    else {
-        // An executor inserted into the code object now has a strong reference
-        // to it from the code object. Thus, we don't need this reference anymore.
-        Py_DECREF(executor);
-    }
-    interp->compiling = false;
-    return 1;
-#else
-    return 0;
-#endif
+    int result;
+    Py_BEGIN_CRITICAL_SECTION(code);
+    result = optimize_code(frame, tstate, code);
+    Py_END_CRITICAL_SECTION();
+    return result;
 }
 
 static _PyExecutorObject *
 get_executor_lock_held(PyCodeObject *code, int offset)
 {
+    _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
     int code_len = (int)Py_SIZE(code);
     for (int i = 0 ; i < code_len;) {
         if (_PyCode_CODE(code)[i].op.code == ENTER_EXECUTOR && i*2 == offset) {
@@ -469,11 +484,13 @@ static PyMethodDef uop_executor_methods[] = {
     { NULL, NULL },
 };
 
+#ifndef Py_GIL_DISABLED
 static int
 executor_is_gc(PyObject *o)
 {
     return !_Py_IsImmortal(o);
 }
+#endif
 
 PyTypeObject _PyUOpExecutor_Type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
@@ -486,7 +503,13 @@ PyTypeObject _PyUOpExecutor_Type = {
     .tp_methods = uop_executor_methods,
     .tp_traverse = executor_traverse,
     .tp_clear = executor_clear,
+    // On the free-threaded build, the GC searches the entire heap rather than
+    // a list of tracked objects. When the executor is immortal and untracked,
+    // it shouldn't express that it's "non-GC" because it's still on the GC heap,
+    // and thus findable by the collector.
+#ifndef Py_GIL_DISABLED
     .tp_is_gc = executor_is_gc,
+#endif
 };
 
 /* TO DO -- Generate these tables */
