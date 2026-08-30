@@ -91,6 +91,18 @@ get_index_for_executor(PyCodeObject *code, _Py_CODEUNIT *instr)
     return size;
 }
 
+static inline _Py_CODEUNIT *
+executor_code(_PyExecutorObject *executor)
+{
+    assert(executor != NULL);
+    PyCodeObject *code = executor->vm_data.code;
+#ifndef Py_GIL_DISABLED
+    return _PyCode_CODE(code);
+#else
+    return _PyCode_GetTLBC(code);
+#endif
+}
+
 static void
 insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorObject *executor)
 {
@@ -108,7 +120,7 @@ insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorO
     executor->vm_data.opcode = instr->op.code;
     executor->vm_data.oparg = instr->op.arg;
     executor->vm_data.code = code;
-    executor->vm_data.index = (int)(instr - _PyCode_CODE(code));
+    executor->vm_data.index = (int)(instr - executor_code(executor));
     code->co_executors->executors[index] = executor;
     assert(index < MAX_EXECUTORS_SIZE);
     instr->op.code = ENTER_EXECUTOR;
@@ -221,9 +233,10 @@ get_executor_lock_held(PyCodeObject *code, int offset)
 {
     _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
     int code_len = (int)Py_SIZE(code);
+    _Py_CODEUNIT *bytecode = _PyCode_GetTLBC(code);
     for (int i = 0 ; i < code_len;) {
-        if (_PyCode_CODE(code)[i].op.code == ENTER_EXECUTOR && i*2 == offset) {
-            int oparg = _PyCode_CODE(code)[i].op.arg;
+        if (bytecode[i].op.code == ENTER_EXECUTOR && i*2 == offset) {
+            int oparg = bytecode[i].op.arg;
             _PyExecutorObject *res = code->co_executors->executors[oparg];
             Py_INCREF(res);
             return res;
@@ -623,7 +636,7 @@ add_to_trace(
 #endif
 
 #define INSTR_IP(INSTR, CODE) \
-    ((uint32_t)((INSTR) - ((_Py_CODEUNIT *)(CODE)->co_code_adaptive)))
+    ((uint32_t)((INSTR) - (_PyCode_GetTLBC(CODE))))
 
 
 /* Branch penalty: 0 for a fully biased branch and FITNESS_BRANCH_BALANCED for
@@ -1885,7 +1898,7 @@ _Py_ExecutorDetach(_PyExecutorObject *executor)
     if (code == NULL) {
         return;
     }
-    _Py_CODEUNIT *instruction = &_PyCode_CODE(code)[executor->vm_data.index];
+    _Py_CODEUNIT *instruction = &executor_code(executor)[executor->vm_data.index];
     assert(instruction->op.code == ENTER_EXECUTOR);
     int index = instruction->op.arg;
     assert(code->co_executors->executors[index] == executor);
@@ -2078,7 +2091,7 @@ find_line_number(PyCodeObject *code, _PyExecutorObject *executor)
 {
     int code_len = (int)Py_SIZE(code);
     for (int i = 0; i < code_len; i++) {
-        _Py_CODEUNIT *instr = &_PyCode_CODE(code)[i];
+        _Py_CODEUNIT *instr = &executor_code(executor)[i];
         int opcode = instr->op.code;
         if (opcode == ENTER_EXECUTOR) {
             _PyExecutorObject *exec = code->co_executors->executors[instr->op.arg];

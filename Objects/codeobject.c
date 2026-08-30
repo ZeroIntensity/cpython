@@ -3353,6 +3353,21 @@ deopt_code_unit(PyCodeObject *code, int i)
         inst.op.code = _PyOpcode_Deopt[opcode];
         assert(inst.op.code < MIN_SPECIALIZED_OPCODE);
     }
+
+    // ENTER_EXECUTOR isn't a specialized instruction, so it doesn't get deopted
+    // above. We need to manually get rid of it.
+#ifdef _Py_TIER2
+    if (opcode == ENTER_EXECUTOR) {
+        _PyExecutorObject *executor = code->co_executors->executors[inst.op.arg];
+        opcode = _PyOpcode_Deopt[executor->vm_data.opcode];
+        inst.op.code = opcode;
+        inst.op.arg = executor->vm_data.oparg;
+        assert(opcode < MIN_SPECIALIZED_OPCODE);
+    }
+#endif
+
+    // Threads shouldn't be sharing their executors
+    assert(opcode != ENTER_EXECUTOR);
     return inst;
 }
 
