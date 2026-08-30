@@ -3353,8 +3353,6 @@ deopt_code_unit(PyCodeObject *code, int i)
         inst.op.code = _PyOpcode_Deopt[opcode];
         assert(inst.op.code < MIN_SPECIALIZED_OPCODE);
     }
-    // JIT should not be enabled with free-threading
-    assert(inst.op.code != ENTER_EXECUTOR);
     return inst;
 }
 
