@@ -178,6 +178,9 @@ typedef struct {
     int32_t bloom_array_idx;        // Index in interp->executor_blooms/executor_ptrs.
     _PyExecutorLinkListNode links;  // Used by deletion list.
     PyCodeObject *code;  // Weak (NULL if no corresponding ENTER_EXECUTOR).
+#ifdef Py_GIL_DISABLED
+    int32_t tlbc_index;
+#endif
 } _PyVMData;
 
 typedef struct _PyExitData {

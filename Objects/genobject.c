@@ -251,6 +251,9 @@ gen_raise_already_executing_error(PyGenObject *gen)
     PyErr_SetString(PyExc_ValueError, msg);
 }
 
+static inline bool
+is_resume(_Py_CODEUNIT *instr);
+
 // Send 'arg' into 'gen'. On success, return PYGEN_NEXT or PYGEN_RETURN.
 // Returns PYGEN_ERROR on failure. 'presult' is set to the yielded or
 // returned value.
@@ -263,6 +266,25 @@ gen_send_ex2(PyGenObject *gen, PyObject *arg, PyObject **presult, int exc)
 
     PyThreadState *tstate = _PyThreadState_GET();
     _PyInterpreterFrame *frame = &gen->gi_iframe;
+
+#ifdef Py_GIL_DISABLED
+    // If this generator/coroutine last ran on another thread, its frame still
+    // points into that thread's copy of the bytecode.  RESUME normally rebases
+    // the frame onto the running thread's copy (via _LOAD_BYTECODE), but a
+    // send/throw that resumes after a yield re-enters mid-body without
+    // executing RESUME.
+    if (!is_resume(frame->instr_ptr) &&
+        frame->tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index) {
+        _Py_CODEUNIT *bytecode = _PyEval_GetExecutableCode(tstate, _PyFrame_GetCode(frame));
+        if (bytecode == NULL) {
+            *presult = NULL;
+            return PYGEN_ERROR;
+        }
+        ptrdiff_t off = frame->instr_ptr - _PyFrame_GetBytecode(frame);
+        frame->tlbc_index = ((_PyThreadStateImpl *)tstate)->tlbc_index;
+        frame->instr_ptr = bytecode + off;
+    }
+#endif
 
     /* Push arg onto the frame's value stack */
     PyObject *arg_obj = arg ? arg : Py_None;

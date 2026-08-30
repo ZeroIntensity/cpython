@@ -99,7 +99,9 @@ executor_code(_PyExecutorObject *executor)
 #ifndef Py_GIL_DISABLED
     return _PyCode_CODE(code);
 #else
-    return _PyCode_GetTLBC(code);
+    _PyCodeArray *tlbc = _PyCode_GetTLBCArray(code);
+    int32_t index = executor->vm_data.tlbc_index;
+    return (_Py_CODEUNIT *)tlbc->entries[index];
 #endif
 }
 
@@ -120,6 +122,9 @@ insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorO
     executor->vm_data.opcode = instr->op.code;
     executor->vm_data.oparg = instr->op.arg;
     executor->vm_data.code = code;
+#ifdef Py_GIL_DISABLED
+    executor->vm_data.tlbc_index = ((_PyThreadStateImpl *)_PyThreadState_GET())->tlbc_index;
+#endif
     executor->vm_data.index = (int)(instr - executor_code(executor));
     code->co_executors->executors[index] = executor;
     assert(index < MAX_EXECUTORS_SIZE);
@@ -147,6 +152,7 @@ optimize_code(_PyInterpreterFrame *frame, PyThreadState *tstate, PyCodeObject *c
     assert(_tstate->jit_tracer_state->initial_state.stack_depth >= 0);
     assert(_tstate->jit_tracer_state->initial_state.func != NULL);
     _tstate->compiling = true;
+
     // The first executor in a chain and the MAX_CHAIN_DEPTH'th executor *must*
     // make progress in order to avoid infinite loops or excessively-long
     // side-exit chains. We can only insert the executor into the bytecode if
@@ -214,6 +220,13 @@ _PyOptimizer_Optimize(
         // return immediately without optimization.
         return 0;
     }
+#ifdef Py_GIL_DISABLED
+    if (frame->tlbc_index != _tstate->tlbc_index) {
+        // Bail out if we have the wrong TLBC index
+        // TODO: This is a hack. We should ensure that this cases never fires.
+        return 0;
+    }
+#endif
     _PyExecutorObject *prev_executor = _tstate->jit_tracer_state->initial_state.executor;
     if (prev_executor != NULL && !prev_executor->vm_data.valid) {
         // gh-143604: If we are a side exit executor and the original executor is no
