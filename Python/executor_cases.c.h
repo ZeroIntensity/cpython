@@ -22564,6 +22564,9 @@
             CHECK_CURRENT_CACHED_VALUES(0);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             PyObject *instr_ptr = (PyObject *)CURRENT_OPERAND0_64();
+            #ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+            #endif
             frame->instr_ptr = (_Py_CODEUNIT *)instr_ptr;
             SET_CURRENT_CACHED_VALUES(0);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
@@ -22575,6 +22578,9 @@
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             _PyStackRef _stack_item_0 = _tos_cache0;
             PyObject *instr_ptr = (PyObject *)CURRENT_OPERAND0_64();
+            #ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+            #endif
             frame->instr_ptr = (_Py_CODEUNIT *)instr_ptr;
             _tos_cache0 = _stack_item_0;
             SET_CURRENT_CACHED_VALUES(1);
@@ -22588,6 +22594,9 @@
             _PyStackRef _stack_item_0 = _tos_cache0;
             _PyStackRef _stack_item_1 = _tos_cache1;
             PyObject *instr_ptr = (PyObject *)CURRENT_OPERAND0_64();
+            #ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+            #endif
             frame->instr_ptr = (_Py_CODEUNIT *)instr_ptr;
             _tos_cache1 = _stack_item_1;
             _tos_cache0 = _stack_item_0;
@@ -22603,6 +22612,9 @@
             _PyStackRef _stack_item_1 = _tos_cache1;
             _PyStackRef _stack_item_2 = _tos_cache2;
             PyObject *instr_ptr = (PyObject *)CURRENT_OPERAND0_64();
+            #ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+            #endif
             frame->instr_ptr = (_Py_CODEUNIT *)instr_ptr;
             _tos_cache2 = _stack_item_2;
             _tos_cache1 = _stack_item_1;
@@ -23338,6 +23350,9 @@
             assert(current_executor == (_PyExecutorObject*)executor);
             #endif
             assert(tstate->jit_exit == NULL || tstate->jit_exit->executor == current_executor);
+            #ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+            #endif
             tstate->current_executor = (PyObject *)current_executor;
             if (!current_executor->vm_data.valid) {
                 assert(tstate->jit_exit->executor == current_executor);
@@ -23873,16 +23888,46 @@
             _PyExecutorObject *executor;
             if (target->op.code == ENTER_EXECUTOR) {
                 PyCodeObject *code = _PyFrame_GetCode(frame);
+                _PyFrame_SetStackPointer(frame, stack_pointer);
+                _PyFrame_StackPointerValidate(frame);
+                Py_BEGIN_CRITICAL_SECTION(code);
+                _PyFrame_StackPointerInvalidate(frame);
                 executor = code->co_executors->executors[target->op.arg];
-                if (executor == _PyExecutor_FromExit(exit)) {
-                    _PyFrame_SetStackPointer(frame, stack_pointer);
+                assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                _PyFrame_StackPointerValidate(frame);
+                Py_XINCREF(executor);
+                _PyFrame_StackPointerInvalidate(frame);
+                assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                _PyFrame_StackPointerValidate(frame);
+                Py_END_CRITICAL_SECTION();
+                _PyFrame_StackPointerInvalidate(frame);
+                if (executor == NULL) {
+                    SET_CURRENT_CACHED_VALUES(0);
+                    GOTO_TIER_ONE(target);
+                }
+                #ifdef Py_GIL_DISABLED
+                if (executor->vm_data.tlbc_index != frame->tlbc_index ||
+                   executor->vm_data.tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index) {
+                    assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                     _PyFrame_StackPointerValidate(frame);
-                    _Py_ExecutorDetach(executor);
+                    Py_DECREF(executor);
                     _PyFrame_StackPointerInvalidate(frame);
                     SET_CURRENT_CACHED_VALUES(0);
                     GOTO_TIER_ONE(target);
                 }
-                Py_INCREF(executor);
+                #endif
+                if (executor == _PyExecutor_FromExit(exit)) {
+                    assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                    _PyFrame_StackPointerValidate(frame);
+                    _Py_ExecutorDetach(executor);
+                    _PyFrame_StackPointerInvalidate(frame);
+                    assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                    _PyFrame_StackPointerValidate(frame);
+                    Py_DECREF(executor);
+                    _PyFrame_StackPointerInvalidate(frame);
+                    SET_CURRENT_CACHED_VALUES(0);
+                    GOTO_TIER_ONE(target);
+                }
                 assert(tstate->jit_exit == exit);
                 exit->executor = executor;
                 SET_CURRENT_CACHED_VALUES(0);

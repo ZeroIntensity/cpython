@@ -456,6 +456,8 @@ _PyFrame_SetStackPointer(frame, stack_pointer)
 do {                                                   \
     OPT_STAT_INC(traces_executed);                     \
     next_instr = _Py_jit_entry((EXECUTOR), frame, stack_pointer, tstate); \
+    /* ENTER_EXECUTOR pins the executor while tier 2 is running. */ \
+    Py_DECREF(EXECUTOR);                               \
     frame = tstate->current_frame;                     \
     stack_pointer = _PyFrame_GetStackPointer(frame);   \
     int keep_tracing_bit = (uintptr_t)next_instr & 1;   \

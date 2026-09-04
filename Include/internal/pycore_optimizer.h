@@ -133,6 +133,9 @@ typedef struct _PyJitTracerInitialState {
     _Py_CODEUNIT *start_instr;
     _Py_CODEUNIT *close_loop_instr;
     _Py_CODEUNIT *jump_backward_instr;
+#ifdef Py_GIL_DISABLED
+    int32_t tlbc_index;
+#endif
 } _PyJitTracerInitialState;
 
 #define MAX_RECORDED_VALUES 3
@@ -144,6 +147,9 @@ typedef struct _PyJitTracerPreviousState {
     struct _PyInterpreterFrame *instr_frame;
     PyObject *recorded_values[MAX_RECORDED_VALUES]; // Strong, may be NULL
     int recorded_count;
+#ifdef Py_GIL_DISABLED
+    int32_t tlbc_index;
+#endif
 } _PyJitTracerPreviousState;
 
 typedef struct _PyJitTracerTranslatorState {
@@ -211,6 +217,10 @@ PyAPI_FUNC(_PyExecutorObject*) _Py_GetExecutor(PyCodeObject *code, int offset);
 int _Py_ExecutorInit(_PyExecutorObject *, const _PyBloomFilter *);
 PyAPI_FUNC(void) _Py_ExecutorDetach(_PyExecutorObject *);
 PyAPI_FUNC(void) _Py_Executor_DependsOn(_PyExecutorObject *executor, void *obj);
+#if defined(Py_GIL_DISABLED) && defined(_Py_TIER2)
+PyAPI_FUNC(void) _PyOptimizer_InvalidateExecutorsForTLBC(
+    PyCodeObject *code, int32_t tlbc_index);
+#endif
 
 /* We use a bloomfilter with k = 6, m = 256
  * The choice of k and the following constants

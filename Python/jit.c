@@ -104,13 +104,13 @@ _PyJIT_AddressInJitCode(PyInterpreterState *interp, uintptr_t addr)
     if (interp == NULL) {
         return 0;
     }
-    if (address_in_executor_array(interp->executor_ptrs, interp->executor_count, addr)) {
-        return 1;
-    }
-    if (address_in_executor_list(interp->executor_deletion_list_head, addr)) {
-        return 1;
-    }
-    return 0;
+    PyMutex_Lock(&interp->executor_mutex);
+    int found =
+        address_in_executor_array(
+            interp->executor_ptrs, interp->executor_count, addr) ||
+        address_in_executor_list(interp->executor_deletion_list_head, addr);
+    PyMutex_Unlock(&interp->executor_mutex);
+    return found;
 }
 
 static unsigned char *

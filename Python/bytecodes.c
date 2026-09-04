@@ -3590,8 +3590,30 @@ dummy_func(
         tier1 inst(ENTER_EXECUTOR, (--)) {
             #ifdef _Py_TIER2
             PyCodeObject *code = _PyFrame_GetCode(frame);
-            _PyExecutorObject *executor = code->co_executors->executors[oparg & 255];
+            _PyExecutorObject *executor;
+            Py_BEGIN_CRITICAL_SECTION(code);
+            executor = code->co_executors->executors[oparg & 255];
+            Py_XINCREF(executor);
+            Py_END_CRITICAL_SECTION();
+            if (executor == NULL) {
+                /* The executor was detached after this thread fetched the
+                 * ENTER_EXECUTOR opcode. Re-dispatch the restored opcode. */
+                opcode = this_instr->op.code;
+                oparg = (oparg & ~255) | this_instr->op.arg;
+                next_instr = this_instr;
+                DISPATCH_GOTO();
+            }
+#ifdef Py_GIL_DISABLED
+            bool wrong_executor = executor->vm_data.tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index;
+#else
+            bool wrong_executor = false;
+#endif
             if (IS_JIT_TRACING()) {
+                if (wrong_executor) {
+                    _Py_ExecutorDetach(executor);
+                    Py_DECREF(executor);
+                    goto stop_tracing;
+                }
                 int og_opcode = executor->vm_data.opcode;
                 int og_oparg = (oparg & ~255) | executor->vm_data.oparg;
                 next_instr = this_instr;
@@ -3601,24 +3623,33 @@ dummy_func(
                     }
                     opcode = og_opcode;
                     oparg = og_oparg;
+                    Py_DECREF(executor);
                     DISPATCH_GOTO_NON_TRACING();
                 }
+                Py_DECREF(executor);
                 goto stop_tracing;
             }
-            assert(executor->vm_data.index == INSTR_OFFSET() - 1);
-            assert(executor->vm_data.code == code);
-            assert(executor->vm_data.valid);
+            if (wrong_executor) {
+                _Py_ExecutorDetach(executor);
+                Py_DECREF(executor);
+                opcode = this_instr->op.code;
+                oparg = (oparg & ~255) | this_instr->op.arg;
+                next_instr = this_instr;
+                DISPATCH_GOTO();
+            }
             assert(tstate->current_executor == NULL);
             /* If the eval breaker is set, or instrumentation is needed, then stay in tier 1.
              * This avoids any potentially infinite loops involving _RESUME_CHECK */
             uintptr_t iversion = FT_ATOMIC_LOAD_UINTPTR_ACQUIRE(code->_co_instrumentation_version);
-            if (_Py_atomic_load_uintptr_relaxed(&tstate->eval_breaker) != iversion) {
+            if (!executor->vm_data.valid ||
+                _Py_atomic_load_uintptr_relaxed(&tstate->eval_breaker) != iversion) {
                 opcode = executor->vm_data.opcode;
                 oparg = (oparg & ~255) | executor->vm_data.oparg;
                 next_instr = this_instr;
                 if (_PyOpcode_Caches[_PyOpcode_Deopt[opcode]]) {
                     PAUSE_ADAPTIVE_COUNTER(this_instr[1].counter);
                 }
+                Py_DECREF(executor);
                 DISPATCH_GOTO();
             }
             assert(executor != tstate->interp->cold_executor);
@@ -6122,6 +6153,9 @@ dummy_func(
         }
 
         tier2 op(_SET_IP, (instr_ptr/4 --)) {
+#ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+#endif
             frame->instr_ptr = (_Py_CODEUNIT *)instr_ptr;
         }
 
@@ -6202,6 +6236,9 @@ dummy_func(
             assert(current_executor == (_PyExecutorObject*)executor);
 #endif
             assert(tstate->jit_exit == NULL || tstate->jit_exit->executor == current_executor);
+#ifdef Py_GIL_DISABLED
+            assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
+#endif
             tstate->current_executor = (PyObject *)current_executor;
             if (!current_executor->vm_data.valid) {
                 assert(tstate->jit_exit->executor == current_executor);
@@ -6266,12 +6303,27 @@ dummy_func(
             _PyExecutorObject *executor;
             if (target->op.code == ENTER_EXECUTOR) {
                 PyCodeObject *code = _PyFrame_GetCode(frame);
+                Py_BEGIN_CRITICAL_SECTION(code);
                 executor = code->co_executors->executors[target->op.arg];
-                if (executor == _PyExecutor_FromExit(exit)) {
-                    _Py_ExecutorDetach(executor);
+                Py_XINCREF(executor);
+                Py_END_CRITICAL_SECTION();
+                if (executor == NULL) {
+                    SYNC_SP();
                     GOTO_TIER_ONE(target);
                 }
-                Py_INCREF(executor);
+#ifdef Py_GIL_DISABLED
+                if (executor->vm_data.tlbc_index != frame->tlbc_index ||
+                    executor->vm_data.tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index) {
+                    Py_DECREF(executor);
+                    SYNC_SP();
+                    GOTO_TIER_ONE(target);
+                }
+#endif
+                if (executor == _PyExecutor_FromExit(exit)) {
+                    _Py_ExecutorDetach(executor);
+                    Py_DECREF(executor);
+                    GOTO_TIER_ONE(target);
+                }
                 assert(tstate->jit_exit == exit);
                 exit->executor = executor;
                 TIER2_TO_TIER2(exit->executor);
@@ -6648,6 +6700,9 @@ dummy_func(
             }
 
             tracer->prev_state.instr_frame = frame;
+#ifdef Py_GIL_DISABLED
+            tracer->prev_state.tlbc_index = frame->tlbc_index;
+#endif
             tracer->prev_state.instr_oparg = oparg;
             tracer->prev_state.instr_stacklevel = PyStackRef_IsNone(frame->f_executable) ? 2 : STACK_LEVEL();
             if (_PyOpcode_Caches[_PyOpcode_Deopt[opcode]]

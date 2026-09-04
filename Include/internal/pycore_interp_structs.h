@@ -1004,6 +1004,7 @@ struct _is {
 
     // Optimization configuration (thresholds and flags for JIT and interpreter)
     _PyOptimizationConfig opt_config;
+    PyMutex executor_mutex;
     _PyBloomFilter *executor_blooms;             // Contiguous bloom filter array
     struct _PyExecutorObject **executor_ptrs;    // Corresponding executor pointer array
     size_t executor_count;                       // Number of valid executors

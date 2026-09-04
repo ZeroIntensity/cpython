@@ -3540,6 +3540,9 @@ free_unused_bytecode(PyCodeObject *co, struct flag_set *indices_in_use)
     // in the code object.
     for (Py_ssize_t i = 1; i < tlbc->size; i++) {
         if (is_bytecode_unused(tlbc, i, indices_in_use)) {
+#ifdef _Py_TIER2
+            _PyOptimizer_InvalidateExecutorsForTLBC(co, (int32_t)i);
+#endif
             PyMem_Free(tlbc->entries[i]);
             tlbc->entries[i] = NULL;
         }

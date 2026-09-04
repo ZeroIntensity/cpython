@@ -6154,8 +6154,43 @@
             opcode = ENTER_EXECUTOR;
             #ifdef _Py_TIER2
             PyCodeObject *code = _PyFrame_GetCode(frame);
-            _PyExecutorObject *executor = code->co_executors->executors[oparg & 255];
+            _PyExecutorObject *executor;
+            _PyFrame_SetStackPointer(frame, stack_pointer);
+            _PyFrame_StackPointerValidate(frame);
+            Py_BEGIN_CRITICAL_SECTION(code);
+            _PyFrame_StackPointerInvalidate(frame);
+            executor = code->co_executors->executors[oparg & 255];
+            assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+            _PyFrame_StackPointerValidate(frame);
+            Py_XINCREF(executor);
+            _PyFrame_StackPointerInvalidate(frame);
+            assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+            _PyFrame_StackPointerValidate(frame);
+            Py_END_CRITICAL_SECTION();
+            _PyFrame_StackPointerInvalidate(frame);
+            if (executor == NULL) {
+                opcode = this_instr->op.code;
+                oparg = (oparg & ~255) | this_instr->op.arg;
+                next_instr = this_instr;
+                DISPATCH_GOTO();
+            }
+            #ifdef Py_GIL_DISABLED
+            bool wrong_executor = executor->vm_data.tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index;
+            #else
+            bool wrong_executor = false;
+            #endif
             if (IS_JIT_TRACING()) {
+                if (wrong_executor) {
+                    assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                    _PyFrame_StackPointerValidate(frame);
+                    _Py_ExecutorDetach(executor);
+                    _PyFrame_StackPointerInvalidate(frame);
+                    assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                    _PyFrame_StackPointerValidate(frame);
+                    Py_DECREF(executor);
+                    _PyFrame_StackPointerInvalidate(frame);
+                    JUMP_TO_LABEL(stop_tracing);
+                }
                 int og_opcode = executor->vm_data.opcode;
                 int og_oparg = (oparg & ~255) | executor->vm_data.oparg;
                 next_instr = this_instr;
@@ -6165,22 +6200,46 @@
                     }
                     opcode = og_opcode;
                     oparg = og_oparg;
+                    assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                    _PyFrame_StackPointerValidate(frame);
+                    Py_DECREF(executor);
+                    _PyFrame_StackPointerInvalidate(frame);
                     DISPATCH_GOTO_NON_TRACING();
                 }
+                assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                _PyFrame_StackPointerValidate(frame);
+                Py_DECREF(executor);
+                _PyFrame_StackPointerInvalidate(frame);
                 JUMP_TO_LABEL(stop_tracing);
             }
-            assert(executor->vm_data.index == INSTR_OFFSET() - 1);
-            assert(executor->vm_data.code == code);
-            assert(executor->vm_data.valid);
+            if (wrong_executor) {
+                assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                _PyFrame_StackPointerValidate(frame);
+                _Py_ExecutorDetach(executor);
+                _PyFrame_StackPointerInvalidate(frame);
+                assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                _PyFrame_StackPointerValidate(frame);
+                Py_DECREF(executor);
+                _PyFrame_StackPointerInvalidate(frame);
+                opcode = this_instr->op.code;
+                oparg = (oparg & ~255) | this_instr->op.arg;
+                next_instr = this_instr;
+                DISPATCH_GOTO();
+            }
             assert(tstate->current_executor == NULL);
             uintptr_t iversion = FT_ATOMIC_LOAD_UINTPTR_ACQUIRE(code->_co_instrumentation_version);
-            if (_Py_atomic_load_uintptr_relaxed(&tstate->eval_breaker) != iversion) {
+            if (!executor->vm_data.valid ||
+                _Py_atomic_load_uintptr_relaxed(&tstate->eval_breaker) != iversion) {
                 opcode = executor->vm_data.opcode;
                 oparg = (oparg & ~255) | executor->vm_data.oparg;
                 next_instr = this_instr;
                 if (_PyOpcode_Caches[_PyOpcode_Deopt[opcode]]) {
                     PAUSE_ADAPTIVE_COUNTER(this_instr[1].counter);
                 }
+                assert(stack_pointer == _PyFrame_GetStackPointer(frame));
+                _PyFrame_StackPointerValidate(frame);
+                Py_DECREF(executor);
+                _PyFrame_StackPointerInvalidate(frame);
                 DISPATCH_GOTO();
             }
             assert(executor != tstate->interp->cold_executor);
@@ -13215,6 +13274,9 @@
                 _PyFrame_StackPointerInvalidate(frame);
             }
             tracer->prev_state.instr_frame = frame;
+            #ifdef Py_GIL_DISABLED
+            tracer->prev_state.tlbc_index = frame->tlbc_index;
+            #endif
             tracer->prev_state.instr_oparg = oparg;
             tracer->prev_state.instr_stacklevel = PyStackRef_IsNone(frame->f_executable) ? 2 : STACK_LEVEL();
             if (_PyOpcode_Caches[_PyOpcode_Deopt[opcode]]
