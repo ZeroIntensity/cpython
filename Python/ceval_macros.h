@@ -359,17 +359,19 @@ static void dtrace_function_return(_PyInterpreterFrame *);
  * so there is no need to update them. */
 #define ADVANCE_ADAPTIVE_COUNTER(COUNTER) \
     do { \
-        _Py_BackoffCounter cnt = (COUNTER); \
+        _Py_BackoffCounter *counter = &(COUNTER); \
+        _Py_BackoffCounter cnt = load_backoff_counter(counter); \
         if (!backoff_counter_is_unreachable(cnt)) { \
-            (COUNTER) = advance_backoff_counter(cnt); \
+            store_backoff_counter(counter, advance_backoff_counter(cnt)); \
         } \
     } while (0);
 
 #define PAUSE_ADAPTIVE_COUNTER(COUNTER) \
     do { \
-        _Py_BackoffCounter cnt = (COUNTER); \
+        _Py_BackoffCounter *counter = &(COUNTER); \
+        _Py_BackoffCounter cnt = load_backoff_counter(counter); \
         if (!backoff_counter_is_unreachable(cnt)) { \
-            (COUNTER) = pause_backoff_counter(cnt); \
+            store_backoff_counter(counter, pause_backoff_counter(cnt)); \
         } \
     } while (0);
 #else

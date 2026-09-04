@@ -346,7 +346,8 @@ executor_clear_exits(_PyExecutorObject *executor)
     _PyExecutorObject *cold_dynamic = _PyExecutor_GetColdDynamicExecutor();
     for (uint32_t i = 0; i < executor->exit_count; i++) {
         _PyExitData *exit = &executor->exits[i];
-        exit->temperature = initial_unreachable_backoff_counter();
+        store_backoff_counter(
+            &exit->temperature, initial_unreachable_backoff_counter());
         _PyExecutorObject *old = executor->exits[i].executor;
         exit->executor = exit->is_dynamic ? cold_dynamic : cold;
         Py_DECREF(old);
@@ -850,7 +851,7 @@ _PyJit_translate_single_bytecode_to_trace(
     }
 
     if (_PyOpcode_Caches[_PyOpcode_Deopt[opcode]] > 0) {
-        uint16_t backoff = (this_instr + 1)->counter.value_and_backoff;
+        uint16_t backoff = load_backoff_counter(&(this_instr + 1)->counter).value_and_backoff;
         // adaptive_counter_cooldown is a fresh specialization.
         // trigger_backoff_counter is what we set during tracing.
         // All tracing backoffs should be freshly specialized or untouched.
@@ -1360,15 +1361,18 @@ _PyJit_FinalizeTracing(PyThreadState *tstate, int err)
     if (exit == NULL) {
         // We hold a strong reference to the code object, so the instruction won't be freed.
         if (err <= 0) {
-            _Py_BackoffCounter counter = tracer->initial_state.jump_backward_instr[1].counter;
-            tracer->initial_state.jump_backward_instr[1].counter = restart_backoff_counter(counter);
+            _Py_BackoffCounter *counter =
+                &tracer->initial_state.jump_backward_instr[1].counter;
+            store_backoff_counter(counter, restart_backoff_counter(load_backoff_counter(counter)));
         }
         else {
             if (tracer->initial_state.jump_backward_instr[0].op.code == JUMP_BACKWARD_JIT) {
-                tracer->initial_state.jump_backward_instr[1].counter = initial_jump_backoff_counter(&tstate->interp->opt_config);
+                store_backoff_counter(&tracer->initial_state.jump_backward_instr[1].counter,
+                                      initial_jump_backoff_counter(&tstate->interp->opt_config));
             }
             else {
-                tracer->initial_state.jump_backward_instr[1].counter = initial_resume_backoff_counter(&tstate->interp->opt_config);
+                store_backoff_counter(&tracer->initial_state.jump_backward_instr[1].counter,
+                                      initial_resume_backoff_counter(&tstate->interp->opt_config));
             }
         }
     }
@@ -1376,10 +1380,12 @@ _PyJit_FinalizeTracing(PyThreadState *tstate, int err)
         // Likewise, we hold a strong reference to the executor containing this exit, so the exit is guaranteed
         // to be valid to access.
         if (err <= 0) {
-            exit->temperature = restart_backoff_counter(exit->temperature);
+            store_backoff_counter(&exit->temperature,
+                                  restart_backoff_counter(load_backoff_counter(&exit->temperature)));
         }
         else {
-            exit->temperature = initial_temperature_backoff_counter(&tstate->interp->opt_config);
+            store_backoff_counter(&exit->temperature,
+                                  initial_temperature_backoff_counter(&tstate->interp->opt_config));
         }
     }
     // Clear all recorded values
@@ -1670,7 +1676,8 @@ make_executor_from_uops(_PyThreadStateImpl *tstate, _PyUOpInstruction *buffer, i
     PyInterpreterState *interp = tstate->base.interp;
     for (int i = 0; i < exit_count; i++) {
         executor->exits[i].index = i;
-        executor->exits[i].temperature = initial_temperature_backoff_counter(&interp->opt_config);
+        store_backoff_counter(&executor->exits[i].temperature,
+                              initial_temperature_backoff_counter(&interp->opt_config));
     }
     int next_exit = exit_count-1;
     _PyUOpInstruction *dest = (_PyUOpInstruction *)&executor->trace[length];

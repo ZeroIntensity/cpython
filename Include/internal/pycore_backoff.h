@@ -11,6 +11,7 @@ extern "C" {
 
 #include <assert.h>
 #include <stdbool.h>
+#include "pycore_pyatomic_ft_wrappers.h" // FT_ATOMIC_*
 #include "pycore_structs.h"       // _Py_BackoffCounter
 #include "pycore_interp_structs.h" // _PyOptimizationConfig
 
@@ -73,6 +74,21 @@ forge_backoff_counter(uint16_t counter)
     _Py_BackoffCounter result;
     result.value_and_backoff = counter;
     return result;
+}
+
+/* Backoff counters are optimization hints, so concurrent updates may overwrite
+ * each other. Relaxed atomics prevent data races and tearing without imposing
+ * synchronization between threads. */
+static inline _Py_BackoffCounter
+load_backoff_counter(const _Py_BackoffCounter *counter)
+{
+    return forge_backoff_counter(FT_ATOMIC_LOAD_UINT16_RELAXED(counter->value_and_backoff));
+}
+
+static inline void
+store_backoff_counter(_Py_BackoffCounter *counter, _Py_BackoffCounter value)
+{
+    FT_ATOMIC_STORE_UINT16_RELAXED(counter->value_and_backoff, value.value_and_backoff);
 }
 
 static inline _Py_BackoffCounter

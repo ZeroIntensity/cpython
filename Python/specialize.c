@@ -90,10 +90,10 @@ _PyCode_Quicken(_Py_CODEUNIT *instructions, Py_ssize_t size, int enable_counters
             // The initial value depends on the opcode
             switch (opcode) {
                 case JUMP_BACKWARD:
-                    instructions[i + 1].counter = jump_counter;
+                    store_backoff_counter(&instructions[i + 1].counter, jump_counter);
                     break;
                 case RESUME:
-                    instructions[i + 1].counter = resume_counter;
+                    store_backoff_counter(&instructions[i + 1].counter, resume_counter);
                     break;
                 case POP_JUMP_IF_FALSE:
                 case POP_JUMP_IF_TRUE:
@@ -102,7 +102,7 @@ _PyCode_Quicken(_Py_CODEUNIT *instructions, Py_ssize_t size, int enable_counters
                     instructions[i + 1].cache = 0x5555;  // Alternating 0, 1 bits
                     break;
                 default:
-                    instructions[i + 1].counter = adaptive_counter;
+                    store_backoff_counter(&instructions[i + 1].counter, adaptive_counter);
                     break;
             }
             i += caches;
@@ -344,22 +344,6 @@ set_opcode(_Py_CODEUNIT *instr, uint8_t opcode)
 }
 
 static inline void
-set_counter(_Py_BackoffCounter *counter, _Py_BackoffCounter value)
-{
-    FT_ATOMIC_STORE_UINT16_RELAXED(counter->value_and_backoff,
-                                   value.value_and_backoff);
-}
-
-static inline _Py_BackoffCounter
-load_counter(_Py_BackoffCounter *counter)
-{
-    _Py_BackoffCounter result = {
-        .value_and_backoff =
-            FT_ATOMIC_LOAD_UINT16_RELAXED(counter->value_and_backoff)};
-    return result;
-}
-
-static inline void
 specialize(_Py_CODEUNIT *instr, uint8_t specialized_opcode)
 {
     assert(!PyErr_Occurred());
@@ -370,7 +354,7 @@ specialize(_Py_CODEUNIT *instr, uint8_t specialized_opcode)
         return;
     }
     STAT_INC(_PyOpcode_Deopt[specialized_opcode], success);
-    set_counter((_Py_BackoffCounter *)instr + 1, adaptive_counter_cooldown());
+    store_backoff_counter((_Py_BackoffCounter *)instr + 1, adaptive_counter_cooldown());
 }
 
 static inline void
@@ -385,8 +369,8 @@ unspecialize(_Py_CODEUNIT *instr)
         return;
     }
     _Py_BackoffCounter *counter = (_Py_BackoffCounter *)instr + 1;
-    _Py_BackoffCounter cur = load_counter(counter);
-    set_counter(counter, adaptive_counter_backoff(cur));
+    _Py_BackoffCounter cur = load_backoff_counter(counter);
+    store_backoff_counter(counter, adaptive_counter_backoff(cur));
 }
 
 static int function_kind(PyCodeObject *code);
@@ -963,7 +947,7 @@ do_specialize_instance_load_attr(PyObject* owner, _Py_CODEUNIT* instr, PyObject*
             if (shadow) {
                 goto try_instance;
             }
-            set_counter((_Py_BackoffCounter*)instr + 1, adaptive_counter_cooldown());
+            store_backoff_counter((_Py_BackoffCounter*)instr + 1, adaptive_counter_cooldown());
             return 0;
     }
     Py_UNREACHABLE();
@@ -2961,7 +2945,7 @@ _Py_Specialize_Resume(_Py_CODEUNIT *instr, PyThreadState *tstate, _PyInterpreter
                 PyCode_Check(co) &&
                 (co->co_flags & (CO_GENERATOR | CO_COROUTINE | CO_ASYNC_GENERATOR)) == 0) {
                 specialize(instr, RESUME_CHECK_JIT);
-                set_counter((_Py_BackoffCounter *)instr + 1, initial_resume_backoff_counter(&tstate->interp->opt_config));
+                store_backoff_counter((_Py_BackoffCounter *)instr + 1, initial_resume_backoff_counter(&tstate->interp->opt_config));
                 return;
             }
         }

@@ -362,7 +362,7 @@ write_ptr(uint16_t *p, void *val)
 static inline uint16_t
 read_u16(uint16_t *p)
 {
-    return *p;
+    return FT_ATOMIC_LOAD_UINT16_RELAXED(*p);
 }
 
 static inline uint32_t

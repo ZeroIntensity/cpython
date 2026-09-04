@@ -8545,7 +8545,7 @@
             {
                 #ifdef _Py_TIER2
                 bool is_resume = this_instr->op.code == RESUME_CHECK_JIT;
-                _Py_BackoffCounter counter = this_instr[1].counter;
+                _Py_BackoffCounter counter = load_backoff_counter(&this_instr[1].counter);
                 if ((backoff_counter_triggers(counter) &&
                         !IS_JIT_TRACING() &&
                         (this_instr->op.code == JUMP_BACKWARD_JIT || is_resume)) &&
@@ -8560,7 +8560,7 @@
                         ENTER_TRACING();
                     }
                     else {
-                        this_instr[1].counter = restart_backoff_counter(counter);
+                        store_backoff_counter(&this_instr[1].counter, restart_backoff_counter(counter));
                     }
                 }
                 else {
@@ -11513,7 +11513,7 @@
             {
                 #ifdef _Py_TIER2
                 bool is_resume = this_instr->op.code == RESUME_CHECK_JIT;
-                _Py_BackoffCounter counter = this_instr[1].counter;
+                _Py_BackoffCounter counter = load_backoff_counter(&this_instr[1].counter);
                 if ((backoff_counter_triggers(counter) &&
                         !IS_JIT_TRACING() &&
                         (this_instr->op.code == JUMP_BACKWARD_JIT || is_resume)) &&
@@ -11528,7 +11528,7 @@
                         ENTER_TRACING();
                     }
                     else {
-                        this_instr[1].counter = restart_backoff_counter(counter);
+                        store_backoff_counter(&this_instr[1].counter, restart_backoff_counter(counter));
                     }
                 }
                 else {
@@ -13267,7 +13267,7 @@
                 // Branch opcodes use the cache for branch history, not
                 // specialization counters.  Don't reset it.
                 && !IS_CONDITIONAL_JUMP_OPCODE(opcode)) {
-                (&next_instr[1])->counter = trigger_backoff_counter();
+                store_backoff_counter(&next_instr[1].counter, trigger_backoff_counter());
             }
             const _PyOpcodeRecordEntry *record_entry = &_PyOpcode_RecordEntries[opcode];
             for (int i = 0; i < record_entry->count; i++) {

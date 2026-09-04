@@ -22796,7 +22796,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s, is_control_flow %d]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code], exit->is_control_flow);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -22833,7 +22834,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s, is_control_flow %d]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code], exit->is_control_flow);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -22876,7 +22878,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s, is_control_flow %d]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code], exit->is_control_flow);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -22922,7 +22925,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s, is_control_flow %d]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code], exit->is_control_flow);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -22959,7 +22963,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code]);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -22993,7 +22998,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code]);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -23033,7 +23039,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code]);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -23076,7 +23083,8 @@
                 assert(stack_pointer == _PyFrame_GetStackPointer(frame));
                 _PyFrame_StackPointerValidate(frame);
                 printf(", exit %tu, temp %d, target %d -> %s]\n",
-                       exit - current_executor->exits, exit->temperature.value_and_backoff,
+                       exit - current_executor->exits,
+                       load_backoff_counter(&exit->temperature).value_and_backoff,
                        (int)(target - _PyFrame_GetBytecode(frame)),
                        _PyOpcode_OpName[target->op.code]);
                 _PyFrame_StackPointerInvalidate(frame);
@@ -23884,7 +23892,7 @@
             assert(exit != NULL);
             assert(frame->owner < FRAME_OWNED_BY_INTERPRETER);
             _Py_CODEUNIT *target = _PyFrame_GetBytecode(frame) + exit->target;
-            _Py_BackoffCounter temperature = exit->temperature;
+            _Py_BackoffCounter temperature = load_backoff_counter(&exit->temperature);
             _PyExecutorObject *executor;
             if (target->op.code == ENTER_EXECUTOR) {
                 PyCodeObject *code = _PyFrame_GetCode(frame);
@@ -23935,7 +23943,7 @@
             }
             else {
                 if (!backoff_counter_triggers(temperature)) {
-                    exit->temperature = advance_backoff_counter(temperature);
+                    store_backoff_counter(&exit->temperature, advance_backoff_counter(temperature));
                     SET_CURRENT_CACHED_VALUES(0);
                     GOTO_TIER_ONE(target);
                 }
@@ -23943,7 +23951,8 @@
                 assert(tstate->current_executor == (PyObject *)previous_executor);
                 int chain_depth = previous_executor->vm_data.chain_depth + !exit->is_control_flow;
                 int succ = _PyJit_TryInitializeTracing(tstate, frame, target, target, target, stack_pointer, chain_depth, exit, target->op.arg, previous_executor);
-                exit->temperature = restart_backoff_counter(exit->temperature);
+                store_backoff_counter(&exit->temperature,
+                                      restart_backoff_counter(load_backoff_counter(&exit->temperature)));
                 if (succ) {
                     GOTO_TIER_ONE_CONTINUE_TRACING(target);
                 }

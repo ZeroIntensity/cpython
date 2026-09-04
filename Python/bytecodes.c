@@ -3526,7 +3526,7 @@ dummy_func(
         tier1 op(_JIT, (--)) {
         #ifdef _Py_TIER2
             bool is_resume = this_instr->op.code == RESUME_CHECK_JIT;
-            _Py_BackoffCounter counter = this_instr[1].counter;
+            _Py_BackoffCounter counter = load_backoff_counter(&this_instr[1].counter);
             if ((backoff_counter_triggers(counter) &&
                 !IS_JIT_TRACING() &&
                 (this_instr->op.code == JUMP_BACKWARD_JIT || is_resume)) &&
@@ -3543,7 +3543,7 @@ dummy_func(
                     ENTER_TRACING();
                 }
                 else {
-                    this_instr[1].counter = restart_backoff_counter(counter);
+                    store_backoff_counter(&this_instr[1].counter, restart_backoff_counter(counter));
                 }
             }
             else {
@@ -6184,7 +6184,8 @@ dummy_func(
                 printf("SIDE EXIT: [UOp ");
                 _PyUOpPrint(&next_uop[-1]);
                 printf(", exit %tu, temp %d, target %d -> %s, is_control_flow %d]\n",
-                    exit - current_executor->exits, exit->temperature.value_and_backoff,
+                    exit - current_executor->exits,
+                    load_backoff_counter(&exit->temperature).value_and_backoff,
                     (int)(target - _PyFrame_GetBytecode(frame)),
                     _PyOpcode_OpName[target->op.code], exit->is_control_flow);
             }
@@ -6202,7 +6203,8 @@ dummy_func(
                 printf("DYNAMIC EXIT: [UOp ");
                 _PyUOpPrint(&next_uop[-1]);
                 printf(", exit %tu, temp %d, target %d -> %s]\n",
-                    exit - current_executor->exits, exit->temperature.value_and_backoff,
+                    exit - current_executor->exits,
+                    load_backoff_counter(&exit->temperature).value_and_backoff,
                     (int)(target - _PyFrame_GetBytecode(frame)),
                     _PyOpcode_OpName[target->op.code]);
             }
@@ -6299,7 +6301,7 @@ dummy_func(
             assert(exit != NULL);
             assert(frame->owner < FRAME_OWNED_BY_INTERPRETER);
             _Py_CODEUNIT *target = _PyFrame_GetBytecode(frame) + exit->target;
-            _Py_BackoffCounter temperature = exit->temperature;
+            _Py_BackoffCounter temperature = load_backoff_counter(&exit->temperature);
             _PyExecutorObject *executor;
             if (target->op.code == ENTER_EXECUTOR) {
                 PyCodeObject *code = _PyFrame_GetCode(frame);
@@ -6331,7 +6333,7 @@ dummy_func(
             else {
                 SYNC_SP();
                 if (!backoff_counter_triggers(temperature)) {
-                    exit->temperature = advance_backoff_counter(temperature);
+                    store_backoff_counter(&exit->temperature, advance_backoff_counter(temperature));
                     GOTO_TIER_ONE(target);
                 }
                 _PyExecutorObject *previous_executor = _PyExecutor_FromExit(exit);
@@ -6343,7 +6345,8 @@ dummy_func(
                 // The invariant in the optimizer is the deopt target always points back to the first EXTENDED_ARG.
                 // So setting it to anything else is wrong.
                 int succ = _PyJit_TryInitializeTracing(tstate, frame, target, target, target, stack_pointer, chain_depth, exit, target->op.arg, previous_executor);
-                exit->temperature = restart_backoff_counter(exit->temperature);
+                store_backoff_counter(&exit->temperature,
+                                      restart_backoff_counter(load_backoff_counter(&exit->temperature)));
                 if (succ) {
                     GOTO_TIER_ONE_CONTINUE_TRACING(target);
                 }
@@ -6696,7 +6699,7 @@ dummy_func(
                 // Branch opcodes use the cache for branch history, not
                 // specialization counters.  Don't reset it.
                 && !IS_CONDITIONAL_JUMP_OPCODE(opcode)) {
-                (&next_instr[1])->counter = trigger_backoff_counter();
+                store_backoff_counter(&next_instr[1].counter, trigger_backoff_counter());
             }
 
             const _PyOpcodeRecordEntry *record_entry = &_PyOpcode_RecordEntries[opcode];
