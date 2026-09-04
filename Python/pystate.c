@@ -594,7 +594,9 @@ init_interpreter(PyInterpreterState *interp,
     interp->executor_ptrs = NULL;
     interp->executor_count = 0;
     interp->executor_capacity = 0;
+#ifndef Py_GIL_DISABLED
     interp->executor_deletion_list_head = NULL;
+#endif
     interp->executor_creation_counter = JIT_CLEANUP_THRESHOLD;
 
     // Initialize optimization configuration from environment variables
@@ -899,7 +901,7 @@ interpreter_clear(PyInterpreterState *interp, PyThreadState *tstate)
 
 
 #ifdef _Py_TIER2
-    _Py_ClearExecutorDeletionList(interp);
+    _Py_ClearExecutorDeletionList(tstate);
 #endif
     _PyAST_Fini(interp);
     _PyAtExit_Fini(interp);
@@ -1632,6 +1634,9 @@ init_threadstate(_PyThreadStateImpl *_tstate,
 
 #ifdef _Py_TIER2
     _tstate->jit_tracer_state = NULL;
+#ifdef Py_GIL_DISABLED
+    _tstate->executor_deletion_list_head = NULL;
+#endif
 #endif
     tstate->delete_later = NULL;
 
@@ -1873,6 +1878,9 @@ PyThreadState_Clear(PyThreadState *tstate)
     Py_CLEAR(tstate->context);
 
 #ifdef Py_GIL_DISABLED
+#ifdef _Py_TIER2
+    _Py_ClearExecutorDeletionList(tstate);
+#endif
     // Each thread should clear own freelists in free-threading builds.
     struct _Py_freelists *freelists = _Py_freelists_GET();
     _PyObject_ClearFreeLists(freelists, 1);

@@ -1803,8 +1803,7 @@ invalidate_executors(PyObject *self, PyObject *obj)
 static PyObject *
 clear_executor_deletion_list(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
-    PyInterpreterState *interp = PyInterpreterState_Get();
-    _Py_ClearExecutorDeletionList(interp);
+    _Py_ClearExecutorDeletionList(_PyThreadState_GET());
     Py_RETURN_NONE;
 }
 

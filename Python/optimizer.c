@@ -354,14 +354,26 @@ executor_clear_exits(_PyExecutorObject *executor)
     }
 }
 
+#ifndef Py_GIL_DISABLED
+#define DELETION_LIST_HEAD(tstate) ((interp)->executor_deletion_list_head)
+#else
+#define DELETION_LIST_HEAD(tstate) (((_PyThreadStateImpl *)(tstate)->interp)->executor_deletion_list_head)
+#endif
+
+#ifndef Py_GIL_DISABLED
+#define DELETION_LIST_APPEND(tstate, value) do { ((interp)->executor_deletion_list_head) = value; } while (0)
+#else
+#define DELETION_LIST_APPEND(tstate, value) do { ((_PyThreadStateImpl *)(tstate)->interp)->executor_deletion_list_head = value; } while (0)
+
+#endif
+
 
 void
-_Py_ClearExecutorDeletionList(PyInterpreterState *interp)
+_Py_ClearExecutorDeletionList(PyThreadState *tstate)
 {
-    PyMutex_Lock(&interp->executor_mutex);
-    _PyExecutorObject *deletion_list = interp->executor_deletion_list_head;
-    interp->executor_deletion_list_head = NULL;
-    PyMutex_Unlock(&interp->executor_mutex);
+    PyInterpreterState *interp = tstate->interp;
+    _PyExecutorObject *deletion_list = DELETION_LIST_HEAD(tstate);
+    DELETION_LIST_APPEND(tstate, NULL);
     if (deletion_list == NULL) {
         return;
     }
@@ -385,14 +397,12 @@ _Py_ClearExecutorDeletionList(PyInterpreterState *interp)
             keep_list = exec;
         }
     } while (deletion_list != NULL);
-    PyMutex_Lock(&interp->executor_mutex);
     while (keep_list != NULL) {
         _PyExecutorObject *exec = keep_list;
         keep_list = exec->vm_data.links.next;
-        exec->vm_data.links.next = interp->executor_deletion_list_head;
-        interp->executor_deletion_list_head = exec;
+        exec->vm_data.links.next = DELETION_LIST_HEAD(tstate);
+        DELETION_LIST_APPEND(tstate, exec);
     }
-    PyMutex_Unlock(&interp->executor_mutex);
     HEAD_LOCK(runtime);
     ts = PyInterpreterState_ThreadHead(interp);
     while (ts) {
@@ -408,19 +418,15 @@ _Py_ClearExecutorDeletionList(PyInterpreterState *interp)
 static void
 add_to_pending_deletion_list(_PyExecutorObject *self)
 {
-    // TODO: This should probably be thread local
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    assert(interp != NULL);
-    PyMutex_Lock(&interp->executor_mutex);
+    PyThreadState *tstate = _PyThreadState_GET();
+    assert(tstate != NULL);
     if (self->vm_data.pending_deletion) {
-        PyMutex_Unlock(&interp->executor_mutex);
         return;
     }
     self->vm_data.pending_deletion = 1;
     self->vm_data.links.previous = NULL;
-    self->vm_data.links.next = interp->executor_deletion_list_head;
-    interp->executor_deletion_list_head = self;
-    PyMutex_Unlock(&interp->executor_mutex);
+    self->vm_data.links.next = DELETION_LIST_HEAD(tstate);
+    DELETION_LIST_APPEND(tstate, self);
 }
 
 static void

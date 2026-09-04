@@ -1009,7 +1009,9 @@ struct _is {
     struct _PyExecutorObject **executor_ptrs;    // Corresponding executor pointer array
     size_t executor_count;                       // Number of valid executors
     size_t executor_capacity;                    // Array capacity
+#ifndef Py_GIL_DISABLED
     struct _PyExecutorObject *executor_deletion_list_head;
+#endif
     struct _PyExecutorObject *cold_executor;
     struct _PyExecutorObject *cold_dynamic_executor;
     size_t executor_creation_counter;

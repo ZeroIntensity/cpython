@@ -1398,7 +1398,7 @@ _Py_HandlePending(PyThreadState *tstate)
         _Py_unset_eval_breaker_bit(tstate, _PY_GC_SCHEDULED_BIT);
         _Py_RunGC(tstate);
 #ifdef _Py_TIER2
-        _Py_ClearExecutorDeletionList(tstate->interp);
+        _Py_ClearExecutorDeletionList(tstate);
 #endif
     }
 
@@ -1409,7 +1409,7 @@ _Py_HandlePending(PyThreadState *tstate)
         PyMutex_Lock(&tstate->interp->executor_mutex);
         tstate->interp->executor_creation_counter = JIT_CLEANUP_THRESHOLD;
         PyMutex_Unlock(&tstate->interp->executor_mutex);
-        _Py_ClearExecutorDeletionList(tstate->interp);
+        _Py_ClearExecutorDeletionList(tstate);
     }
 #endif
 

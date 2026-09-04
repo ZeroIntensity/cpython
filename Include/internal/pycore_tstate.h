@@ -105,6 +105,9 @@ typedef struct _PyThreadStateImpl {
 
 #ifdef _Py_TIER2
     int compiling; // Is the JIT compiling code?
+#ifdef Py_GIL_DISABLED
+    struct _PyExecutorObject *executor_deletion_list_head;
+#endif
 #endif
 
 #ifdef Py_GIL_DISABLED

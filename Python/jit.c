@@ -28,6 +28,7 @@
 #include "pycore_setobject.h"
 #include "pycore_sliceobject.h"
 #include "pycore_template.h"
+#include "pycore_tstate.h"
 #include "pycore_tuple.h"
 #include "pycore_unicodeobject.h"
 
@@ -104,13 +105,21 @@ _PyJIT_AddressInJitCode(PyInterpreterState *interp, uintptr_t addr)
     if (interp == NULL) {
         return 0;
     }
-    PyMutex_Lock(&interp->executor_mutex);
-    int found =
-        address_in_executor_array(
-            interp->executor_ptrs, interp->executor_count, addr) ||
-        address_in_executor_list(interp->executor_deletion_list_head, addr);
-    PyMutex_Unlock(&interp->executor_mutex);
-    return found;
+#ifdef Py_GIL_DISABLED
+    PyThreadState *tstate = _PyThreadState_GET();
+    _PyExecutorObject *deletion_list = ((_PyThreadStateImpl *)tstate)->executor_deletion_list_head;
+#else
+    _PyExecutorObject *deletion_list = interp->executor_deletion_list_head;
+#endif
+
+    if (address_in_executor_array(interp->executor_ptrs, interp->executor_count, addr)) {
+        return 1;
+    }
+    if (address_in_executor_list(deletion_list, addr)) {
+        return 1;
+    }
+
+    return 0;
 }
 
 static unsigned char *
