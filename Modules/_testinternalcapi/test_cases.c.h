@@ -13218,22 +13218,6 @@
             assert(IS_JIT_TRACING());
             next_instr = this_instr;
             frame->instr_ptr = prev_instr;
-            #ifdef Py_GIL_DISABLED
-            if (frame->owner != FRAME_OWNED_BY_INTERPRETER &&
-                frame->tlbc_index != ((_PyThreadStateImpl *)tstate)->tlbc_index) {
-                _PyFrame_SetStackPointer(frame, stack_pointer);
-                _PyFrame_StackPointerValidate(frame);
-                _Py_CODEUNIT *bytecode = _PyEval_GetExecutableCode(tstate, _PyFrame_GetCode(frame));
-                _PyFrame_StackPointerInvalidate(frame);
-                if (bytecode == NULL) {
-                    JUMP_TO_LABEL(error);
-                }
-                _Py_CODEUNIT *old_base = _PyFrame_GetBytecode(frame);
-                frame->instr_ptr = bytecode + (frame->instr_ptr - old_base);
-                next_instr = bytecode + (next_instr - old_base);
-                frame->tlbc_index = ((_PyThreadStateImpl *)tstate)->tlbc_index;
-            }
-            #endif
             opcode = next_instr->op.code;
             bool stop_tracing = (
                                  opcode == WITH_EXCEPT_START ||
