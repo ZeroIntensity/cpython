@@ -85,7 +85,6 @@ def count_ops(ex, name):
 
 
 @requires_specialization
-@unittest.skipIf(Py_GIL_DISABLED, "optimizer not yet supported in free-threaded builds")
 @requires_jit_enabled
 class TestExecutorInvalidation(unittest.TestCase):
 
@@ -141,6 +140,7 @@ class TestExecutorInvalidation(unittest.TestCase):
         self.assertFalse(exe.is_valid())
 
     def test_sys__clear_internal_caches(self):
+        @reset_code
         def f():
             for _ in range(TIER2_THRESHOLD):
                 pass

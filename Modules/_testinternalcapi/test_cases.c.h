@@ -6228,7 +6228,7 @@
             }
             assert(tstate->current_executor == NULL);
             uintptr_t iversion = FT_ATOMIC_LOAD_UINTPTR_ACQUIRE(code->_co_instrumentation_version);
-            if (!executor->vm_data.valid ||
+            if (!FT_ATOMIC_LOAD_UINT8(executor->vm_data.valid) ||
                 _Py_atomic_load_uintptr_relaxed(&tstate->eval_breaker) != iversion) {
                 opcode = executor->vm_data.opcode;
                 oparg = (oparg & ~255) | executor->vm_data.oparg;

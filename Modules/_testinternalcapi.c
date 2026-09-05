@@ -340,13 +340,26 @@ get_jit_code_ranges(PyObject *self, PyObject *Py_UNUSED(args))
     if (interp == NULL) {
         return ranges;
     }
+#ifdef Py_GIL_DISABLED
+    _PyExecutorIterator iter;
+    _PyExecutorIter_Init(&iter, interp);
+    _PyExecutorObject *exec;
+    while ((exec = _PyExecutorIter_Next(&iter)) != NULL) {
+#else
     for (size_t i = 0; i < interp->executor_count; i++) {
         _PyExecutorObject *exec = interp->executor_ptrs[i];
+#endif
         if (exec->jit_code == NULL || exec->jit_size == 0) {
+#ifdef Py_GIL_DISABLED
+            Py_DECREF(exec);
+#endif
             continue;
         }
         uintptr_t start = (uintptr_t)exec->jit_code;
         uintptr_t end = start + exec->jit_size;
+#ifdef Py_GIL_DISABLED
+        Py_DECREF(exec);
+#endif
         PyObject *start_obj = PyLong_FromUnsignedLongLong(start);
         PyObject *end_obj = PyLong_FromUnsignedLongLong(end);
         if (start_obj == NULL || end_obj == NULL) {

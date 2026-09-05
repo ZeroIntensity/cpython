@@ -15,6 +15,7 @@
 #include "pycore_opcode_utils.h"  // MAX_REAL_OPCODE
 #include "pycore_optimizer.h"     // _Py_uop_analyze_and_optimize()
 #include "pycore_pystate.h"       // _PyInterpreterState_GET()
+#include "pycore_pyatomic_ft_wrappers.h"
 #include "pycore_tuple.h"         // _PyTuple_FromArraySteal
 #include "pycore_unicodeobject.h" // _PyUnicode_FromASCII
 #include "pycore_uop_ids.h"
@@ -42,25 +43,21 @@
 #define _PyExecutorObject_CAST(op)  ((_PyExecutorObject *)(op))
 
 static void executor_detach_lock_held(_PyExecutorObject *executor);
+static void executor_invalidate(PyObject *op);
+#ifdef Py_GIL_DISABLED
+static int link_executor(_PyExecutorObject *executor);
+#endif
 
 static inline PyCodeObject *
 executor_get_code(_PyExecutorObject *executor)
 {
-#ifdef Py_GIL_DISABLED
-    return (PyCodeObject *)_Py_atomic_load_ptr_acquire(&executor->vm_data.code);
-#else
-    return executor->vm_data.code;
-#endif
+    return (PyCodeObject *)FT_ATOMIC_LOAD_PTR(executor->vm_data.code);
 }
 
 static inline void
 executor_set_code(_PyExecutorObject *executor, PyCodeObject *code)
 {
-#ifdef Py_GIL_DISABLED
-    _Py_atomic_store_ptr_release(&executor->vm_data.code, code);
-#else
-    executor->vm_data.code = code;
-#endif
+    FT_ATOMIC_STORE_PTR(executor->vm_data.code, code);
 }
 
 static bool
@@ -140,10 +137,20 @@ executor_code(_PyExecutorObject *executor)
 #endif
 }
 
-static void
+static int
 insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorObject *executor)
 {
     _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
+#ifdef Py_GIL_DISABLED
+    // Publish the backlink before checking validity. An invalidator either
+    // sees it and waits for this critical section, or has already claimed
+    // invalidation and we must abandon the attachment.
+    executor_set_code(executor, code);
+    if (!FT_ATOMIC_LOAD_UINT8(executor->vm_data.valid)) {
+        executor_set_code(executor, NULL);
+        return -1;
+    }
+#endif
     Py_INCREF(executor);
     if (instr->op.code == ENTER_EXECUTOR) {
         assert(index == instr->op.arg);
@@ -158,7 +165,9 @@ insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorO
     }
     executor->vm_data.opcode = instr->op.code;
     executor->vm_data.oparg = instr->op.arg;
+#ifndef Py_GIL_DISABLED
     executor_set_code(executor, code);
+#endif
     _Py_CODEUNIT *bytecode = executor_code(executor);
     assert(bytecode != NULL);
     executor->vm_data.index = (int)(instr - bytecode);
@@ -168,6 +177,7 @@ insert_executor(PyCodeObject *code, _Py_CODEUNIT *instr, int index, _PyExecutorO
     assert(index < MAX_EXECUTORS_SIZE);
     instr->op.code = ENTER_EXECUTOR;
     instr->op.arg = index;
+    return 0;
 }
 
 static _PyExecutorObject *
@@ -209,6 +219,13 @@ optimize_code(_PyInterpreterFrame *frame, PyThreadState *tstate, PyCodeObject *c
     assert(executor != NULL);
 #ifdef Py_GIL_DISABLED
     executor->vm_data.tlbc_index = _tstate->jit_tracer_state->initial_state.tlbc_index;
+    executor->vm_data.chain_depth = chain_depth;
+    // Publish only after compilation and execution metadata are complete.
+    if (link_executor(executor) < 0) {
+        Py_DECREF(executor);
+        _tstate->compiling = false;
+        return 0;
+    }
 #endif
     if (progress_needed) {
         int index;
@@ -219,7 +236,9 @@ optimize_code(_PyInterpreterFrame *frame, PyThreadState *tstate, PyCodeObject *c
         else {
             index = get_index_for_executor(code, start);
             if (index >= 0) {
-                insert_executor(code, start, index, executor);
+                if (insert_executor(code, start, index, executor) < 0) {
+                    index = -2;
+                }
             }
         }
         Py_END_CRITICAL_SECTION();
@@ -235,15 +254,15 @@ optimize_code(_PyInterpreterFrame *frame, PyThreadState *tstate, PyCodeObject *c
             return 0;
         }
     }
+#ifndef Py_GIL_DISABLED
     executor->vm_data.chain_depth = chain_depth;
     assert(executor->vm_data.valid);
+#endif
     _PyExitData *exit = _tstate->jit_tracer_state->initial_state.exit;
     if (exit != NULL && !progress_needed) {
         exit->executor = executor;
     }
     else {
-        // An executor inserted into the code object now has a strong reference
-        // to it from the code object. Thus, we don't need this reference anymore.
         Py_DECREF(executor);
     }
     _tstate->compiling = false;
@@ -268,7 +287,7 @@ _PyOptimizer_Optimize(
         return 0;
     }
     _PyExecutorObject *prev_executor = _tstate->jit_tracer_state->initial_state.executor;
-    if (prev_executor != NULL && !prev_executor->vm_data.valid) {
+    if (prev_executor != NULL && !FT_ATOMIC_LOAD_UINT8(prev_executor->vm_data.valid)) {
         // gh-143604: If we are a side exit executor and the original executor is no
         // longer valid, don't compile to prevent a reference leak.
         return 0;
@@ -282,7 +301,11 @@ get_executor_lock_held(PyCodeObject *code, int offset)
 {
     _Py_CRITICAL_SECTION_ASSERT_OBJECT_LOCKED(code);
     int code_len = (int)Py_SIZE(code);
+#ifdef Py_GIL_DISABLED
     _Py_CODEUNIT *bytecode = _PyCode_GetTLBC(code);
+#else
+    _Py_CODEUNIT *bytecode = _PyCode_CODE(code);
+#endif
     for (int i = 0 ; i < code_len;) {
         if (bytecode[i].op.code == ENTER_EXECUTOR && i*2 == offset) {
             int oparg = bytecode[i].op.arg;
@@ -309,7 +332,8 @@ _Py_GetExecutor(PyCodeObject *code, int offset)
 static PyObject *
 is_valid(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
-    return PyBool_FromLong(((_PyExecutorObject *)self)->vm_data.valid);
+    return PyBool_FromLong(FT_ATOMIC_LOAD_UINT8(
+        ((_PyExecutorObject *)self)->vm_data.valid));
 }
 
 static PyObject *
@@ -337,8 +361,6 @@ _PyExecutor_Free(_PyExecutorObject *self)
     PyObject_GC_Del(self);
 }
 
-static void executor_invalidate(PyObject *op);
-
 static void
 executor_clear_exits(_PyExecutorObject *executor)
 {
@@ -355,17 +377,13 @@ executor_clear_exits(_PyExecutorObject *executor)
 }
 
 #ifndef Py_GIL_DISABLED
-#define DELETION_LIST_HEAD(tstate) ((interp)->executor_deletion_list_head)
+#define DELETION_LIST_HEAD(tstate) ((tstate)->interp->executor_deletion_list_head)
 #else
-#define DELETION_LIST_HEAD(tstate) (((_PyThreadStateImpl *)(tstate)->interp)->executor_deletion_list_head)
+#define DELETION_LIST_HEAD(tstate) (((_PyThreadStateImpl *)(tstate))->executor_deletion_list_head)
 #endif
 
-#ifndef Py_GIL_DISABLED
-#define DELETION_LIST_APPEND(tstate, value) do { ((interp)->executor_deletion_list_head) = value; } while (0)
-#else
-#define DELETION_LIST_APPEND(tstate, value) do { ((_PyThreadStateImpl *)(tstate)->interp)->executor_deletion_list_head = value; } while (0)
-
-#endif
+#define DELETION_LIST_APPEND(tstate, value) \
+    do { DELETION_LIST_HEAD(tstate) = (value); } while (0)
 
 
 void
@@ -1382,7 +1400,7 @@ _PyJit_FinalizeTracing(PyThreadState *tstate, int err)
             }
         }
     }
-    else if (tracer->initial_state.executor->vm_data.valid) {
+    else if (FT_ATOMIC_LOAD_UINT8(tracer->initial_state.executor->vm_data.valid)) {
         // Likewise, we hold a strong reference to the executor containing this exit, so the exit is guaranteed
         // to be valid to access.
         if (err <= 0) {
@@ -1675,10 +1693,11 @@ make_executor_from_uops(_PyThreadStateImpl *tstate, _PyUOpInstruction *buffer, i
     }
 
     /* Initialize exits */
-    int chain_depth = tstate->jit_tracer_state->initial_state.chain_depth;
     _PyExecutorObject *cold = _PyExecutor_GetColdExecutor();
     _PyExecutorObject *cold_dynamic = _PyExecutor_GetColdDynamicExecutor();
-    cold->vm_data.chain_depth = chain_depth;
+#ifndef Py_GIL_DISABLED
+    cold->vm_data.chain_depth = tstate->jit_tracer_state->initial_state.chain_depth;
+#endif
     PyInterpreterState *interp = tstate->base.interp;
     for (int i = 0; i < exit_count; i++) {
         executor->exits[i].index = i;
@@ -1880,18 +1899,26 @@ uop_optimize(
     }
     assert(length <= UOP_MAX_TRACE_LENGTH);
 
-    // Check executor coldness. Multiple threads can finish compiling at once.
-    bool invalidate_cold = false;
-    PyMutex_Lock(&tstate->interp->executor_mutex);
-    if (tstate->interp->executor_creation_counter > 0 &&
-        --tstate->interp->executor_creation_counter == 0) {
-        invalidate_cold = true;
-    }
-    PyMutex_Unlock(&tstate->interp->executor_mutex);
-    if (invalidate_cold) {
-        _Py_set_eval_breaker_bit(tstate, _PY_EVAL_JIT_INVALIDATE_COLD_BIT);
+    // Check executor coldness.
+#ifdef Py_GIL_DISABLED
+    // Multiple threads can finish compiling at once.
+    Py_ssize_t *counter = &tstate->interp->executor_creation_counter;
+    Py_ssize_t remaining = _Py_atomic_load_ssize_relaxed(counter);
+    while (remaining > 0) {
+        if (_Py_atomic_compare_exchange_ssize(counter, &remaining, remaining - 1)) {
+            if (remaining == 1) {
+                _Py_set_eval_breaker_bit(tstate, _PY_EVAL_JIT_INVALIDATE_COLD_BIT);
+            }
+            break;
+        }
     }
 
+#else
+    if (tstate->interp->executor_creation_counter > 0 &&
+        --tstate->interp->executor_creation_counter == 0) {
+        _Py_set_eval_breaker_bit(tstate, _PY_EVAL_JIT_INVALIDATE_COLD_BIT);
+    }
+#endif
     *exec_ptr = executor;
     return 1;
 }
@@ -1901,17 +1928,108 @@ uop_optimize(
  *        Executor management
  ****************************************/
 
+#ifdef Py_GIL_DISABLED
+void
+_PyExecutorIter_Init(_PyExecutorIterator *iter, PyInterpreterState *interp)
+{
+    iter->chunk = _Py_atomic_load_ptr_acquire(&interp->executors);
+    iter->index = 0;
+}
+
+_PyExecutorObject *
+_PyExecutorIter_Next(_PyExecutorIterator *iter)
+{
+    while (iter->chunk != NULL) {
+        if (iter->index == _Py_EXECUTOR_REGISTRY_CHUNK_SIZE) {
+            iter->chunk = _Py_atomic_load_ptr_acquire(&iter->chunk->next);
+            iter->index = 0;
+            continue;
+        }
+        _PyExecutorObject **slot = &iter->chunk->slots[iter->index++];
+        _PyExecutorObject *executor = (_PyExecutorObject *)_Py_TryXGetRef((PyObject **)slot);
+        if (executor != NULL) {
+            if (FT_ATOMIC_LOAD_UINT8(executor->vm_data.valid)) {
+                return executor;
+            }
+            Py_DECREF(executor);
+        }
+    }
+    return NULL;
+}
+
+void
+_PyExecutorRegistry_Fini(PyInterpreterState *interp)
+{
+    _PyExecutorRegistry *chunk = interp->executors;
+    interp->executors = NULL;
+    while (chunk != NULL) {
+        _PyExecutorRegistry *next = chunk->next;
+        for (int i = 0; i < _Py_EXECUTOR_REGISTRY_CHUNK_SIZE; i++) {
+            assert(chunk->slots[i] == NULL);
+        }
+        PyMem_Free(chunk);
+        chunk = next;
+    }
+}
+
+static int
+link_executor(_PyExecutorObject *executor)
+{
+    PyInterpreterState *interp = _PyInterpreterState_GET();
+    _PyObject_SetMaybeWeakref((PyObject *)executor);
+    _PyExecutorRegistry **link = &interp->executors;
+    for (;;) {
+        _PyExecutorRegistry *chunk = _Py_atomic_load_ptr_acquire(link);
+        if (chunk == NULL) {
+            _PyExecutorRegistry *new = PyMem_Calloc(1, sizeof(*new));
+            if (new == NULL) {
+                executor->vm_data.registry_slot = NULL;
+                return -1;
+            }
+            if (_Py_atomic_compare_exchange_ptr(link, &chunk, new)) {
+                chunk = new;
+            }
+            else {
+                PyMem_Free(new);
+            }
+        }
+        for (Py_ssize_t i = 0; i < _Py_EXECUTOR_REGISTRY_CHUNK_SIZE; ++i) {
+            _PyExecutorObject **slot = &chunk->slots[i];
+            _PyExecutorObject *expected = NULL;
+            executor->vm_data.registry_slot = slot;
+            if (_Py_atomic_compare_exchange_ptr(slot, &expected, executor)) {
+                return 0;
+            }
+        }
+        link = &chunk->next;
+    }
+}
+
+static bool
+executor_claim_invalidation(_PyExecutorObject *executor)
+{
+    if (!_Py_atomic_exchange_uint8(&executor->vm_data.valid, 0)) {
+        return false;
+    }
+    _PyExecutorObject **slot = executor->vm_data.registry_slot;
+    if (slot != NULL) {
+        assert(_Py_atomic_load_ptr(slot) == executor);
+        _Py_atomic_store_ptr(slot, NULL);
+    }
+    return true;
+}
+
+#else
+
 static int
 link_executor(_PyExecutorObject *executor, const _PyBloomFilter *bloom)
 {
     PyInterpreterState *interp = _PyInterpreterState_GET();
-    PyMutex_Lock(&interp->executor_mutex);
     if (interp->executor_count == interp->executor_capacity) {
         size_t new_cap = interp->executor_capacity ? interp->executor_capacity * 2 : 64;
         _PyBloomFilter *new_blooms = PyMem_Realloc(
             interp->executor_blooms, new_cap * sizeof(_PyBloomFilter));
         if (new_blooms == NULL) {
-            PyMutex_Unlock(&interp->executor_mutex);
             return -1;
         }
         _PyExecutorObject **new_ptrs = PyMem_Realloc(
@@ -1920,7 +2038,6 @@ link_executor(_PyExecutorObject *executor, const _PyBloomFilter *bloom)
             /* Revert blooms realloc — the old pointer may have been freed by
              * a successful realloc, but new_blooms is the valid pointer. */
             interp->executor_blooms = new_blooms;
-            PyMutex_Unlock(&interp->executor_mutex);
             return -1;
         }
         interp->executor_blooms = new_blooms;
@@ -1931,12 +2048,11 @@ link_executor(_PyExecutorObject *executor, const _PyBloomFilter *bloom)
     interp->executor_blooms[idx] = *bloom;
     interp->executor_ptrs[idx] = executor;
     executor->vm_data.bloom_array_idx = (int32_t)idx;
-    PyMutex_Unlock(&interp->executor_mutex);
     return 0;
 }
 
 static void
-unlink_executor_lock_held(
+unlink_executor(
     PyInterpreterState *interp, _PyExecutorObject *executor)
 {
     int32_t idx = executor->vm_data.bloom_array_idx;
@@ -1951,17 +2067,23 @@ unlink_executor_lock_held(
     executor->vm_data.bloom_array_idx = -1;
 }
 
+#endif
+
 /* This must be called by optimizers before using the executor */
 int
 _Py_ExecutorInit(_PyExecutorObject *executor, const _PyBloomFilter *dependency_set)
 {
     executor->vm_data.valid = true;
+    executor->vm_data.cold = false;
     executor->vm_data.pending_deletion = 0;
     executor_set_code(executor, NULL);
-    if (link_executor(executor, dependency_set) < 0) {
-        return -1;
-    }
+#ifdef Py_GIL_DISABLED
+    executor->vm_data.registry_slot = NULL;
+    memcpy(executor->bloom, dependency_set, sizeof(executor->bloom));
     return 0;
+#else
+    return link_executor(executor, dependency_set);
+#endif
 }
 
 static _PyExecutorObject *
@@ -1975,6 +2097,9 @@ make_cold_executor(uint16_t opcode)
     // Cold executors bypass _Py_ExecutorInit().
     cold->vm_data.valid = true;
     cold->vm_data.pending_deletion = 0;
+#ifdef Py_GIL_DISABLED
+    cold->vm_data.registry_slot = NULL;
+#endif
     executor_set_code(cold, NULL);
 
     // This is initialized to false so we can prevent the executor
@@ -1992,30 +2117,39 @@ make_cold_executor(uint16_t opcode)
     return cold;
 }
 
+static _PyExecutorObject *
+get_cold_executor(_PyExecutorObject **slot, uint16_t opcode)
+{
+    _PyExecutorObject *executor = FT_ATOMIC_LOAD_PTR_ACQUIRE(*slot);
+    if (executor == NULL) {
+        _PyExecutorObject *new = make_cold_executor(opcode);
+#ifdef Py_GIL_DISABLED
+        if (_Py_atomic_compare_exchange_ptr(slot, &executor, new)) {
+            executor = new;
+        }
+        else {
+            // The losing candidate was never published and has no users.
+            _PyExecutor_Free(new);
+        }
+#else
+        *slot = executor = new;
+#endif
+    }
+    return executor;
+}
+
 _PyExecutorObject *
 _PyExecutor_GetColdExecutor(void)
 {
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    PyMutex_Lock(&interp->executor_mutex);
-    if (interp->cold_executor == NULL) {
-        interp->cold_executor = make_cold_executor(_COLD_EXIT_r00);
-    }
-    _PyExecutorObject *executor = interp->cold_executor;
-    PyMutex_Unlock(&interp->executor_mutex);
-    return executor;
+    return get_cold_executor(&_PyInterpreterState_GET()->cold_executor,
+                             _COLD_EXIT_r00);
 }
 
 _PyExecutorObject *
 _PyExecutor_GetColdDynamicExecutor(void)
 {
-    PyInterpreterState *interp = _PyInterpreterState_GET();
-    PyMutex_Lock(&interp->executor_mutex);
-    if (interp->cold_dynamic_executor == NULL) {
-        interp->cold_dynamic_executor = make_cold_executor(_COLD_DYNAMIC_EXIT_r00);
-    }
-    _PyExecutorObject *executor = interp->cold_dynamic_executor;
-    PyMutex_Unlock(&interp->executor_mutex);
-    return executor;
+    return get_cold_executor(&_PyInterpreterState_GET()->cold_dynamic_executor,
+                             _COLD_DYNAMIC_EXIT_r00);
 }
 
 void
@@ -2094,15 +2228,17 @@ static void
 executor_invalidate(PyObject *op)
 {
     _PyExecutorObject *executor = _PyExecutorObject_CAST(op);
-    PyInterpreterState *interp = PyInterpreterState_Get();
-    PyMutex_Lock(&interp->executor_mutex);
-    if (!executor->vm_data.valid) {
-        PyMutex_Unlock(&interp->executor_mutex);
+#ifdef Py_GIL_DISABLED
+    if (!executor_claim_invalidation(executor)) {
         return;
     }
-    executor->vm_data.valid = 0;
-    unlink_executor_lock_held(interp, executor);
-    PyMutex_Unlock(&interp->executor_mutex);
+#else
+    if (!executor->vm_data.valid) {
+        return;
+    }
+    executor->vm_data.valid = false;
+    unlink_executor(_PyInterpreterState_GET(), executor);
+#endif
     executor_clear_exits(executor);
     _Py_ExecutorDetach(executor);
     _PyObject_GC_UNTRACK(op);
@@ -2121,20 +2257,9 @@ _PyOptimizer_InvalidateExecutorsForTLBC(
         if (executor == NULL || executor->vm_data.tlbc_index != tlbc_index) {
             continue;
         }
-        if (executor->vm_data.valid) {
-            PyInterpreterState *interp = PyInterpreterState_Get();
-            bool invalidate = false;
-            PyMutex_Lock(&interp->executor_mutex);
-            if (executor->vm_data.valid) {
-                executor->vm_data.valid = 0;
-                unlink_executor_lock_held(interp, executor);
-                invalidate = true;
-            }
-            PyMutex_Unlock(&interp->executor_mutex);
-            if (invalidate) {
-                executor_clear_exits(executor);
-                _PyObject_GC_UNTRACK((PyObject *)executor);
-            }
+        if (executor_claim_invalidation(executor)) {
+            executor_clear_exits(executor);
+            _PyObject_GC_UNTRACK((PyObject *)executor);
         }
         /* The caller is about to free this TLBC copy, so detach the executor
          * without restoring its ENTER_EXECUTOR instruction. */
@@ -2153,19 +2278,98 @@ executor_clear(PyObject *op)
     return 0;
 }
 
+#ifdef Py_GIL_DISABLED
+void
+_Py_Executor_DependsOn(_PyExecutorObject *executor, void *obj)
+{
+    _PyBloomFilter filter;
+    _Py_BloomFilter_Init(&filter);
+    _Py_BloomFilter_Add(&filter, obj);
+    uint64_t bits[4];
+    memcpy(bits, &filter, sizeof(bits));
+    for (Py_ssize_t i = 0; i < 4; ++i) {
+        _Py_atomic_or_uint64(&executor->bloom[i], bits[i]);
+    }
+}
+
+void
+_Py_Executors_InvalidateDependency(PyInterpreterState *interp, void *obj, int is_invalidation)
+{
+    _PyBloomFilter obj_filter;
+    _Py_BloomFilter_Init(&obj_filter);
+    _Py_BloomFilter_Add(&obj_filter, obj);
+    uint64_t bits[4];
+    memcpy(bits, &obj_filter, sizeof(bits));
+    _PyExecutorIterator iter;
+    _PyExecutorIter_Init(&iter, interp);
+    _PyExecutorObject *executor;
+    while ((executor = _PyExecutorIter_Next(&iter)) != NULL) {
+        bool matches = true;
+        for (int i = 0; i < 4; i++) {
+            uint64_t word = _Py_atomic_load_uint64(&executor->bloom[i]);
+            if ((word & bits[i]) != bits[i]) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) {
+            executor_invalidate((PyObject *)executor);
+            if (is_invalidation) {
+                OPT_STAT_INC(executors_invalidated);
+            }
+        }
+        Py_DECREF(executor);
+    }
+}
+
+void
+_Py_Executors_InvalidateAll(PyInterpreterState *interp, int is_invalidation)
+{
+    _PyExecutorIterator iter;
+    _PyExecutorIter_Init(&iter, interp);
+    _PyExecutorObject *executor;
+    while ((executor = _PyExecutorIter_Next(&iter)) != NULL) {
+        PyCodeObject *code = executor_get_code(executor);
+        if (code != NULL) {
+            Py_BEGIN_CRITICAL_SECTION(code);
+            _PyCode_Clear_Executors(code);
+            Py_END_CRITICAL_SECTION();
+        }
+
+        executor_invalidate((PyObject *)executor);
+        Py_DECREF(executor);
+        if (is_invalidation) {
+            OPT_STAT_INC(executors_invalidated);
+        }
+    }
+}
+
+void
+_Py_Executors_InvalidateCold(PyInterpreterState *interp)
+{
+    _PyExecutorIterator iter;
+    _PyExecutorIter_Init(&iter, interp);
+    _PyExecutorObject *executor;
+    while ((executor = _PyExecutorIter_Next(&iter)) != NULL) {
+        if (_Py_atomic_exchange_uint8(&executor->vm_data.cold, true)) {
+            executor_invalidate((PyObject *)executor);
+        }
+        Py_DECREF(executor);
+    }
+}
+
+#else
+
 void
 _Py_Executor_DependsOn(_PyExecutorObject *executor, void *obj)
 {
     PyInterpreterState *interp = _PyInterpreterState_GET();
-    PyMutex_Lock(&interp->executor_mutex);
     if (!executor->vm_data.valid) {
-        PyMutex_Unlock(&interp->executor_mutex);
         return;
     }
     int32_t idx = executor->vm_data.bloom_array_idx;
     assert(idx >= 0 && (size_t)idx < interp->executor_count);
     _Py_BloomFilter_Add(&interp->executor_blooms[idx], obj);
-    PyMutex_Unlock(&interp->executor_mutex);
 }
 
 /* Invalidate all executors that depend on `obj`
@@ -2185,17 +2389,14 @@ _Py_Executors_InvalidateDependency(PyInterpreterState *interp, void *obj, int is
     }
     /* Clearing an executor can clear others, so we need to make a list of
      * executors to invalidate first */
-    PyMutex_Lock(&interp->executor_mutex);
     for (size_t i = 0; i < interp->executor_count; i++) {
         assert(interp->executor_ptrs[i]->vm_data.valid);
         if (bloom_filter_may_contain(&interp->executor_blooms[i], &obj_filter) &&
             PyList_Append(invalidate, (PyObject *)interp->executor_ptrs[i]))
         {
-            PyMutex_Unlock(&interp->executor_mutex);
             goto error;
         }
     }
-    PyMutex_Unlock(&interp->executor_mutex);
     for (Py_ssize_t i = 0; i < PyList_GET_SIZE(invalidate); i++) {
         PyObject *exec = PyList_GET_ITEM(invalidate, i);
         executor_invalidate(exec);
@@ -2217,15 +2418,12 @@ void
 _Py_Executors_InvalidateAll(PyInterpreterState *interp, int is_invalidation)
 {
     while (true) {
-        PyMutex_Lock(&interp->executor_mutex);
         if (interp->executor_count == 0) {
-            PyMutex_Unlock(&interp->executor_mutex);
             break;
         }
         /* Invalidate from the end to avoid repeated swap-remove shifts */
         _PyExecutorObject *executor = interp->executor_ptrs[interp->executor_count - 1];
         Py_INCREF(executor);
-        PyMutex_Unlock(&interp->executor_mutex);
         PyCodeObject *code = executor_get_code(executor);
         if (code != NULL) {
             // Clear the entire code object so its co_executors array be freed:
@@ -2252,20 +2450,17 @@ _Py_Executors_InvalidateCold(PyInterpreterState *interp)
 
     /* Clearing an executor can deallocate others, so we need to make a list of
      * executors to invalidate first */
-    PyMutex_Lock(&interp->executor_mutex);
     for (size_t i = 0; i < interp->executor_count; i++) {
         _PyExecutorObject *exec = interp->executor_ptrs[i];
         assert(exec->vm_data.valid);
 
         if (exec->vm_data.cold && PyList_Append(invalidate, (PyObject *)exec) < 0) {
-            PyMutex_Unlock(&interp->executor_mutex);
             goto error;
         }
         else {
             exec->vm_data.cold = true;
         }
     }
-    PyMutex_Unlock(&interp->executor_mutex);
     for (Py_ssize_t i = 0; i < PyList_GET_SIZE(invalidate); i++) {
         PyObject *exec = PyList_GET_ITEM(invalidate, i);
         executor_invalidate(exec);
@@ -2278,6 +2473,8 @@ error:
     // If we're truly out of memory, wiping out everything is a fine fallback
     _Py_Executors_InvalidateAll(interp, 0);
 }
+
+#endif
 
 #include "record_functions.c.h"
 
@@ -2509,11 +2706,19 @@ _PyDumpExecutors(FILE *out)
     PyInterpreterState *interp = PyInterpreterState_Get();
     _PyExecutorObject *cold = _PyExecutor_GetColdExecutor();
     _PyExecutorObject *cold_dynamic = _PyExecutor_GetColdDynamicExecutor();
-    PyMutex_Lock(&interp->executor_mutex);
+#ifdef Py_GIL_DISABLED
+    _PyExecutorIterator iter;
+    _PyExecutorIter_Init(&iter, interp);
+    _PyExecutorObject *executor;
+    while ((executor = _PyExecutorIter_Next(&iter)) != NULL) {
+        executor_to_gv(executor, out, cold, cold_dynamic);
+        Py_DECREF(executor);
+    }
+#else
     for (size_t i = 0; i < interp->executor_count; i++) {
         executor_to_gv(interp->executor_ptrs[i], out, cold, cold_dynamic);
     }
-    PyMutex_Unlock(&interp->executor_mutex);
+#endif
     fprintf(out, "}\n\n");
     return 0;
 }

@@ -63,6 +63,29 @@ jit_error(const char *message)
     PyErr_Format(PyExc_RuntimeWarning, "JIT %s (%d)", message, hint);
 }
 
+#ifdef Py_GIL_DISABLED
+static int
+address_in_executor_registry(PyInterpreterState *interp, uintptr_t addr)
+{
+    _PyExecutorIterator iter;
+    _PyExecutorIter_Init(&iter, interp);
+    _PyExecutorObject *exec;
+    while ((exec = _PyExecutorIter_Next(&iter)) != NULL) {
+        if (exec->jit_code == NULL || exec->jit_size == 0) {
+            Py_DECREF(exec);
+            continue;
+        }
+        uintptr_t start = (uintptr_t)exec->jit_code;
+        uintptr_t end = start + exec->jit_size;
+        Py_DECREF(exec);
+        if (addr >= start && addr < end) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+#else
 static int
 address_in_executor_array(_PyExecutorObject **ptrs, size_t count, uintptr_t addr)
 {
@@ -79,6 +102,8 @@ address_in_executor_array(_PyExecutorObject **ptrs, size_t count, uintptr_t addr
     }
     return 0;
 }
+
+#endif
 
 static int
 address_in_executor_list(_PyExecutorObject *head, uintptr_t addr)
@@ -112,7 +137,11 @@ _PyJIT_AddressInJitCode(PyInterpreterState *interp, uintptr_t addr)
     _PyExecutorObject *deletion_list = interp->executor_deletion_list_head;
 #endif
 
+#ifdef Py_GIL_DISABLED
+    if (address_in_executor_registry(interp, addr)) {
+#else
     if (address_in_executor_array(interp->executor_ptrs, interp->executor_count, addr)) {
+#endif
         return 1;
     }
     if (address_in_executor_list(deletion_list, addr)) {

@@ -1004,17 +1004,18 @@ struct _is {
 
     // Optimization configuration (thresholds and flags for JIT and interpreter)
     _PyOptimizationConfig opt_config;
-    PyMutex executor_mutex;
-    _PyBloomFilter *executor_blooms;             // Contiguous bloom filter array
-    struct _PyExecutorObject **executor_ptrs;    // Corresponding executor pointer array
-    size_t executor_count;                       // Number of valid executors
-    size_t executor_capacity;                    // Array capacity
-#ifndef Py_GIL_DISABLED
+#ifdef Py_GIL_DISABLED
+    struct _PyExecutorRegistry *executors;
+#else
+    _PyBloomFilter *executor_blooms;
+    struct _PyExecutorObject **executor_ptrs;
+    size_t executor_count;
+    size_t executor_capacity;
     struct _PyExecutorObject *executor_deletion_list_head;
 #endif
     struct _PyExecutorObject *cold_executor;
     struct _PyExecutorObject *cold_dynamic_executor;
-    size_t executor_creation_counter;
+    Py_ssize_t executor_creation_counter;
     _rare_events rare_events;
     PyDict_WatchCallback builtins_dict_watcher;
 

@@ -1906,12 +1906,16 @@ finalize_modules(PyThreadState *tstate)
     ((_PyThreadStateImpl *)tstate)->compiling = false;
 #ifdef _Py_TIER2
     _Py_Executors_InvalidateAll(interp, 0);
+#ifdef Py_GIL_DISABLED
+    _PyExecutorRegistry_Fini(interp);
+#else
     PyMem_Free(interp->executor_blooms);
     PyMem_Free(interp->executor_ptrs);
     interp->executor_blooms = NULL;
     interp->executor_ptrs = NULL;
     interp->executor_count = 0;
     interp->executor_capacity = 0;
+#endif
 #endif
 
     // Stop watching __builtin__ modifications

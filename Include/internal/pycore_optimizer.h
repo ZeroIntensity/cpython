@@ -178,10 +178,14 @@ typedef struct {
     uint8_t oparg;
     uint8_t valid;
     uint8_t chain_depth;  // Must be big enough for MAX_CHAIN_DEPTH - 1.
-    bool cold;
+    uint8_t cold;
     uint8_t pending_deletion;
     int32_t index;           // Index of ENTER_EXECUTOR (if code isn't NULL, below).
-    int32_t bloom_array_idx;        // Index in interp->executor_blooms/executor_ptrs.
+#ifdef Py_GIL_DISABLED
+    struct _PyExecutorObject **registry_slot;
+#else
+    int32_t bloom_array_idx;  // Index in interp->executor_blooms/executor_ptrs.
+#endif
     _PyExecutorLinkListNode links;  // Used by deletion list.
     PyCodeObject *code;  // Weak (NULL if no corresponding ENTER_EXECUTOR).
 #ifdef Py_GIL_DISABLED
@@ -208,8 +212,32 @@ typedef struct _PyExecutorObject {
     size_t jit_size;
     void *jit_code;
     _PyJitCodeRegistration *jit_registration;
+#ifdef Py_GIL_DISABLED
+    // 64-bit words allow atomic updates even when _PyBloomFilter uses uint128.
+    uint64_t bloom[4];
+#endif
     _PyExitData exits[1];
 } _PyExecutorObject;
+
+#ifdef Py_GIL_DISABLED
+// Chunks and their next pointers remain stable until interpreter teardown.
+// Slots hold weak references and may be reused after invalidation.
+#define _Py_EXECUTOR_REGISTRY_CHUNK_SIZE 64
+typedef struct _PyExecutorRegistry {
+    struct _PyExecutorRegistry *next;
+    _PyExecutorObject *slots[_Py_EXECUTOR_REGISTRY_CHUNK_SIZE];
+} _PyExecutorRegistry;
+
+typedef struct {
+    _PyExecutorRegistry *chunk;
+    Py_ssize_t index;
+} _PyExecutorIterator;
+
+PyAPI_FUNC(void) _PyExecutorIter_Init(_PyExecutorIterator *, PyInterpreterState *);
+// Returns a new reference, or NULL at the end. Does not set an exception.
+PyAPI_FUNC(_PyExecutorObject *) _PyExecutorIter_Next(_PyExecutorIterator *);
+void _PyExecutorRegistry_Fini(PyInterpreterState *);
+#endif
 
 // Export for '_opcode' shared extension (JIT compiler).
 PyAPI_FUNC(_PyExecutorObject*) _Py_GetExecutor(PyCodeObject *code, int offset);

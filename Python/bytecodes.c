@@ -3641,7 +3641,7 @@ dummy_func(
             /* If the eval breaker is set, or instrumentation is needed, then stay in tier 1.
              * This avoids any potentially infinite loops involving _RESUME_CHECK */
             uintptr_t iversion = FT_ATOMIC_LOAD_UINTPTR_ACQUIRE(code->_co_instrumentation_version);
-            if (!executor->vm_data.valid ||
+            if (!FT_ATOMIC_LOAD_UINT8(executor->vm_data.valid) ||
                 _Py_atomic_load_uintptr_relaxed(&tstate->eval_breaker) != iversion) {
                 opcode = executor->vm_data.opcode;
                 oparg = (oparg & ~255) | executor->vm_data.oparg;
@@ -6215,7 +6215,7 @@ dummy_func(
         }
 
         tier2 op(_CHECK_VALIDITY, (--)) {
-            DEOPT_IF(!current_executor->vm_data.valid);
+            DEOPT_IF(!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid));
         }
 
         tier2 pure op(_LOAD_CONST_INLINE, (ptr/4 -- value)) {
@@ -6242,7 +6242,7 @@ dummy_func(
             assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
 #endif
             tstate->current_executor = (PyObject *)current_executor;
-            if (!current_executor->vm_data.valid) {
+            if (!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid)) {
                 assert(tstate->jit_exit->executor == current_executor);
                 assert(tstate->current_executor == executor);
                 _PyExecutor_ClearExit(tstate->jit_exit);
@@ -6251,7 +6251,7 @@ dummy_func(
         }
 
         tier2 op(_MAKE_WARM, (--)) {
-            current_executor->vm_data.cold = false;
+            FT_ATOMIC_STORE_UINT8_RELAXED(current_executor->vm_data.cold, false);
         }
 
         tier2 op(_FATAL_ERROR, (--)) {

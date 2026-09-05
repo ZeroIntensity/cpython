@@ -590,11 +590,13 @@ init_interpreter(PyInterpreterState *interp,
     }
     interp->_code_object_generation = 0;
     interp->jit = false;
+#ifdef Py_GIL_DISABLED
+    interp->executors = NULL;
+#else
     interp->executor_blooms = NULL;
     interp->executor_ptrs = NULL;
     interp->executor_count = 0;
     interp->executor_capacity = 0;
-#ifndef Py_GIL_DISABLED
     interp->executor_deletion_list_head = NULL;
 #endif
     interp->executor_creation_counter = JIT_CLEANUP_THRESHOLD;

@@ -23103,7 +23103,7 @@
         case _CHECK_VALIDITY_r00: {
             CHECK_CURRENT_CACHED_VALUES(0);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
-            if (!current_executor->vm_data.valid) {
+            if (!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid)) {
                 UOP_STAT_INC(uopcode, miss);
                 SET_CURRENT_CACHED_VALUES(0);
                 JUMP_TO_JUMP_TARGET();
@@ -23117,7 +23117,7 @@
             CHECK_CURRENT_CACHED_VALUES(1);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             _PyStackRef _stack_item_0 = _tos_cache0;
-            if (!current_executor->vm_data.valid) {
+            if (!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid)) {
                 UOP_STAT_INC(uopcode, miss);
                 _tos_cache0 = _stack_item_0;
                 SET_CURRENT_CACHED_VALUES(1);
@@ -23134,7 +23134,7 @@
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             _PyStackRef _stack_item_0 = _tos_cache0;
             _PyStackRef _stack_item_1 = _tos_cache1;
-            if (!current_executor->vm_data.valid) {
+            if (!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid)) {
                 UOP_STAT_INC(uopcode, miss);
                 _tos_cache1 = _stack_item_1;
                 _tos_cache0 = _stack_item_0;
@@ -23154,7 +23154,7 @@
             _PyStackRef _stack_item_0 = _tos_cache0;
             _PyStackRef _stack_item_1 = _tos_cache1;
             _PyStackRef _stack_item_2 = _tos_cache2;
-            if (!current_executor->vm_data.valid) {
+            if (!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid)) {
                 UOP_STAT_INC(uopcode, miss);
                 _tos_cache2 = _stack_item_2;
                 _tos_cache1 = _stack_item_1;
@@ -23362,7 +23362,7 @@
             assert(current_executor->vm_data.tlbc_index == frame->tlbc_index);
             #endif
             tstate->current_executor = (PyObject *)current_executor;
-            if (!current_executor->vm_data.valid) {
+            if (!FT_ATOMIC_LOAD_UINT8(current_executor->vm_data.valid)) {
                 assert(tstate->jit_exit->executor == current_executor);
                 assert(tstate->current_executor == executor);
                 _PyFrame_SetStackPointer(frame, stack_pointer);
@@ -23383,7 +23383,7 @@
         case _MAKE_WARM_r00: {
             CHECK_CURRENT_CACHED_VALUES(0);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
-            current_executor->vm_data.cold = false;
+            FT_ATOMIC_STORE_UINT8_RELAXED(current_executor->vm_data.cold, false);
             SET_CURRENT_CACHED_VALUES(0);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             break;
@@ -23393,7 +23393,7 @@
             CHECK_CURRENT_CACHED_VALUES(1);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             _PyStackRef _stack_item_0 = _tos_cache0;
-            current_executor->vm_data.cold = false;
+            FT_ATOMIC_STORE_UINT8_RELAXED(current_executor->vm_data.cold, false);
             _tos_cache0 = _stack_item_0;
             SET_CURRENT_CACHED_VALUES(1);
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
@@ -23405,7 +23405,7 @@
             ASSERT_WITHIN_STACK_BOUNDS_IGNORING_CACHE(__FILE__, __LINE__);
             _PyStackRef _stack_item_0 = _tos_cache0;
             _PyStackRef _stack_item_1 = _tos_cache1;
-            current_executor->vm_data.cold = false;
+            FT_ATOMIC_STORE_UINT8_RELAXED(current_executor->vm_data.cold, false);
             _tos_cache1 = _stack_item_1;
             _tos_cache0 = _stack_item_0;
             SET_CURRENT_CACHED_VALUES(2);
@@ -23419,7 +23419,7 @@
             _PyStackRef _stack_item_0 = _tos_cache0;
             _PyStackRef _stack_item_1 = _tos_cache1;
             _PyStackRef _stack_item_2 = _tos_cache2;
-            current_executor->vm_data.cold = false;
+            FT_ATOMIC_STORE_UINT8_RELAXED(current_executor->vm_data.cold, false);
             _tos_cache2 = _stack_item_2;
             _tos_cache1 = _stack_item_1;
             _tos_cache0 = _stack_item_0;
