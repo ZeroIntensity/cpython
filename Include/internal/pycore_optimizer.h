@@ -220,7 +220,6 @@ typedef struct _PyExecutorObject {
 } _PyExecutorObject;
 
 #ifdef Py_GIL_DISABLED
-// Chunks and their next pointers remain stable until interpreter teardown.
 // Slots hold weak references and may be reused after invalidation.
 #define _Py_EXECUTOR_REGISTRY_CHUNK_SIZE 64
 typedef struct _PyExecutorRegistry {
@@ -234,7 +233,6 @@ typedef struct {
 } _PyExecutorIterator;
 
 PyAPI_FUNC(void) _PyExecutorIter_Init(_PyExecutorIterator *, PyInterpreterState *);
-// Returns a new reference, or NULL at the end. Does not set an exception.
 PyAPI_FUNC(_PyExecutorObject *) _PyExecutorIter_Next(_PyExecutorIterator *);
 void _PyExecutorRegistry_Fini(PyInterpreterState *);
 #endif

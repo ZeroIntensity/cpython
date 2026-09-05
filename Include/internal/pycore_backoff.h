@@ -76,9 +76,6 @@ forge_backoff_counter(uint16_t counter)
     return result;
 }
 
-/* Backoff counters are optimization hints, so concurrent updates may overwrite
- * each other. Relaxed atomics prevent data races and tearing without imposing
- * synchronization between threads. */
 static inline _Py_BackoffCounter
 load_backoff_counter(const _Py_BackoffCounter *counter)
 {
