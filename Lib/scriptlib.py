@@ -282,7 +282,7 @@ def main():
     )
     parser.add_argument('-v', '--verbose', action='store_true', help="Enable verbosity.")
     args = parser.parse_args()
-    run_script(args.path)
+    run_script(args.path, verbose=args.verbose)
 
 
 if __name__ == "__main__":
