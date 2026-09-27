@@ -252,7 +252,6 @@ def run_script(path: str | Path, *, verbose: bool = False) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         venv_dir = Path(temp_dir) / "venv"
         venv.create(venv_dir, with_pip=True)
-        script_file = path.copy_into(temp_dir)
         python = venv_dir / "bin" / "python"
         deps = metadata.get("dependencies")
         if deps is not None:
@@ -262,7 +261,7 @@ def run_script(path: str | Path, *, verbose: bool = False) -> None:
                 capture_output=not verbose,
             )
 
-        subprocess.run([python, str(script_file.absolute())])
+        subprocess.run([python, str(path.absolute())])
 
 
 def _file_path(path_str: str) -> Path:
