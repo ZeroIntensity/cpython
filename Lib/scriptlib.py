@@ -254,9 +254,10 @@ def run_script(path: str | Path, *, verbose: bool = False) -> None:
         venv.create(venv_dir, with_pip=True)
         script_file = path.copy_into(temp_dir)
         python = venv_dir / "bin" / "python"
-        for dependency in metadata.get("dependencies") or []:
+        deps = metadata.get("dependencies")
+        if deps is not None:
             subprocess.run(
-                [python, "-m", "pip", "install", dependency],
+                [python, "-m", "pip", "install", *deps],
                 check=True,
                 capture_output=not verbose,
             )
