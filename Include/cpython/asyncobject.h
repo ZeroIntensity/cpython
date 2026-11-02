@@ -13,27 +13,31 @@ PyAPI_DATA(PyTypeObject) PyAsync_Type;
 
 #define PyAsync_CheckExact(op) Py_IS_TYPE((op), &PyAsync_Type)
 
-typedef int (*PyAsync_Callback)(PyObject *, PyObject *);
-typedef int (*PyAsync_Error)(PyObject *, PyObject *);
-typedef int (*PyAsync_Defer)(PyObject *);
+typedef int (*PyAsync_Callback)(PyObject *asyncobj, PyObject *result);
+typedef int (*PyAsync_Error)(PyObject *asyncobj, PyObject *exception);
+typedef int (*PyAsync_Defer)(PyObject *asyncobj);
 
 PyAPI_FUNC(PyObject *) PyAsync_New(void);
-PyAPI_FUNC(int) PyAsync_SetResult(PyObject *, PyObject *);
+PyAPI_FUNC(int) PyAsync_SetResult(PyObject *asyncobj, PyObject *result);
 PyAPI_FUNC(int) PyAsync_AddAwait(
-    PyObject *, PyObject *, PyAsync_Callback, PyAsync_Error);
+    PyObject *asyncobj, PyObject *coroutine,
+    PyAsync_Callback result_callback, PyAsync_Error error_callback);
 PyAPI_FUNC(int) PyAsync_AddExpr(
-    PyObject *, PyObject *, PyAsync_Callback, PyAsync_Error);
-PyAPI_FUNC(int) PyAsync_DeferAwait(PyObject *, PyAsync_Defer);
-PyAPI_FUNC(void) PyAsync_Cancel(PyObject *);
+    PyObject *asyncobj, PyObject *expr,
+    PyAsync_Callback result_callback, PyAsync_Error error_callback);
+PyAPI_FUNC(int) PyAsync_DeferAwait(
+    PyObject *asyncobj, PyAsync_Defer callback);
+PyAPI_FUNC(void) PyAsync_Cancel(PyObject *asyncobj);
 PyAPI_FUNC(int) PyAsync_AsyncWith(
-    PyObject *, PyObject *, PyAsync_Callback, PyAsync_Error);
+    PyObject *asyncobj, PyObject *context_manager,
+    PyAsync_Callback result_callback, PyAsync_Error error_callback);
 
 /* The object slot holds a strong reference; GetValue returns a new one.
    Either slot can be cleared by setting it to NULL. */
-PyAPI_FUNC(int) PyAsync_SetValue(PyObject *, PyObject *);
-PyAPI_FUNC(PyObject *) PyAsync_GetValue(PyObject *);
-PyAPI_FUNC(int) PyAsync_SetArbValue(PyObject *, void *);
-PyAPI_FUNC(void *) PyAsync_GetArbValue(PyObject *);
+PyAPI_FUNC(int) PyAsync_SetValue(PyObject *asyncobj, PyObject *value);
+PyAPI_FUNC(PyObject *) PyAsync_GetValue(PyObject *asyncobj);
+PyAPI_FUNC(int) PyAsync_SetArbValue(PyObject *asyncobj, void *value);
+PyAPI_FUNC(void *) PyAsync_GetArbValue(PyObject *asyncobj);
 
 #ifdef __cplusplus
 }
