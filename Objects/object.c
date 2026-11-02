@@ -2533,6 +2533,7 @@ _PyObject_FiniState(PyInterpreterState *interp)
 }
 
 
+extern PyTypeObject _PyAsyncGenWrapper_Type;
 extern PyTypeObject _PyLegacyEventHandler_Type;
 extern PyTypeObject _PyLineIterator;
 extern PyTypeObject _PyMemoryIter_Type;
@@ -2552,6 +2553,7 @@ static PyTypeObject* static_types[_Py_NUM_MANAGED_PREINITIALIZED_TYPES] = {
 
     // Static types with base=&PyBaseObject_Type
     &PyAsyncGen_Type,
+    &PyAsync_Type,
     &PyByteArrayIter_Type,
     &PyByteArray_Type,
     &PyBytesIter_Type,
@@ -2628,6 +2630,7 @@ static PyTypeObject* static_types[_Py_NUM_MANAGED_PREINITIALIZED_TYPES] = {
     &_PyAsyncGenASend_Type,
     &_PyAsyncGenAThrow_Type,
     &_PyAsyncGenWrappedValue_Type,
+    &_PyAsyncGenWrapper_Type,
     &_PyBufferWrapper_Type,
     &_PyContextTokenMissing_Type,
     &_PyCoroWrapper_Type,

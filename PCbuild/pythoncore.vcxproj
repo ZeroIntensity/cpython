@@ -147,6 +147,7 @@
     <ClInclude Include="..\Include\complexobject.h" />
     <ClInclude Include="..\Include\critical_section.h" />
     <ClInclude Include="..\Include\cpython\abstract.h" />
+    <ClInclude Include="..\Include\cpython\asyncobject.h" />
     <ClInclude Include="..\Include\cpython\audit.h" />
     <ClInclude Include="..\Include\cpython\bytearrayobject.h" />
     <ClInclude Include="..\Include\cpython\bytesobject.h" />
@@ -539,6 +540,7 @@
     <ClCompile Include="..\Modules\cjkcodecs\multibytecodec.c" />
     <ClCompile Include="..\Modules\_winapi.c" />
     <ClCompile Include="..\Objects\abstract.c" />
+    <ClCompile Include="..\Objects\asyncobject.c" />
     <ClCompile Include="..\Objects\boolobject.c" />
     <ClCompile Include="..\Objects\bytearrayobject.c" />
     <ClCompile Include="..\Objects\bytes_methods.c" />
