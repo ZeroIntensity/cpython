@@ -706,23 +706,14 @@ genwrapper_close(PyObject *self, PyObject *ignored)
     return res;
 }
 
-static void
-async_with_callback_free(PyObject *capsule)
-{
-    void *callback = PyCapsule_GetPointer(capsule, "PyAsync.AsyncWith");
-    assert(callback != NULL);
-    PyMem_Free(callback);
-}
-
 static int
 async_with_get_state(PyObject *self, PyObject **state)
 {
     PyObject *value = PyAsync_GetValue(self);
     if (value == NULL || !PyTuple_CheckExact(value) ||
-        PyTuple_GET_SIZE(value) != 3 ||
-        !PyCapsule_IsValid(PyTuple_GET_ITEM(value, 1), "PyAsync.AsyncWith") ||
-        (PyTuple_GET_ITEM(value, 2) != Py_None &&
-         !PyExceptionInstance_Check(PyTuple_GET_ITEM(value, 2)))) {
+        PyTuple_GET_SIZE(value) != 2 ||
+        (PyTuple_GET_ITEM(value, 1) != Py_None &&
+         !PyExceptionInstance_Check(PyTuple_GET_ITEM(value, 1)))) {
         Py_XDECREF(value);
         PyErr_SetString(PyExc_RuntimeError, "PyAsync async with state was replaced");
         return -1;
@@ -738,7 +729,7 @@ async_with_exit(PyObject *self, PyObject *result)
     if (async_with_get_state(self, &state) < 0) {
         return -1;
     }
-    PyObject *error = PyTuple_GET_ITEM(state, 2);
+    PyObject *error = PyTuple_GET_ITEM(state, 1);
     if (error != Py_None) {
         int suppress = PyObject_IsTrue(result);
         if (suppress < 0) {
@@ -763,11 +754,8 @@ async_with_inner(PyObject *self, PyObject *result)
         return 0;
     }
     PyObject *exit = PyTuple_GET_ITEM(state, 0);
-    PyObject *capsule = PyTuple_GET_ITEM(state, 1);
-    PyAsync_Callback *callback = PyCapsule_GetPointer(
-        capsule, "PyAsync.AsyncWith");
-    assert(callback != NULL);
-    int res = *callback != NULL ? (*callback)(self, result) : 1;
+    PyAsync_Callback callback = (PyAsync_Callback)PyAsync_GetArbValue(self);
+    int res = callback != NULL ? callback(self, result) : 1;
     PyObject *error = NULL;
     PyObject *args[3] = {Py_None, Py_None, Py_None};
     if (res <= 0) {
@@ -784,7 +772,7 @@ async_with_inner(PyObject *self, PyObject *result)
         if (args[2] == NULL) {
             args[2] = Py_NewRef(Py_None);
         }
-        PyObject *new_state = PyTuple_Pack(3, exit, capsule, error);
+        PyObject *new_state = PyTuple_Pack(2, exit, error);
         if (new_state == NULL) {
             Py_DECREF(args[2]);
             Py_DECREF(error);
@@ -819,25 +807,8 @@ PyAsync_AsyncWith(PyObject *self, PyObject *ctx, PyAsync_Callback callback,
         Py_DECREF(enter);
         return -1;
     }
-    PyAsync_Callback *saved_callback = PyMem_Malloc(sizeof(*saved_callback));
-    if (saved_callback == NULL) {
-        Py_DECREF(enter);
-        Py_DECREF(exit);
-        PyErr_NoMemory();
-        return -1;
-    }
-    *saved_callback = callback;
-    PyObject *capsule = PyCapsule_New(
-        saved_callback, "PyAsync.AsyncWith", async_with_callback_free);
-    if (capsule == NULL) {
-        PyMem_Free(saved_callback);
-        Py_DECREF(enter);
-        Py_DECREF(exit);
-        return -1;
-    }
-    PyObject *state = PyTuple_Pack(3, exit, capsule, Py_None);
+    PyObject *state = PyTuple_Pack(2, exit, Py_None);
     Py_DECREF(exit);
-    Py_DECREF(capsule);
     if (state == NULL) {
         Py_DECREF(enter);
         return -1;
@@ -849,6 +820,7 @@ PyAsync_AsyncWith(PyObject *self, PyObject *ctx, PyAsync_Callback callback,
         return -1;
     }
     PyAsync_SetValue(inner, state);
+    PyAsync_SetArbValue(inner, (void *)callback);
     Py_DECREF(state);
     PyObject *coro = PyObject_CallNoArgs(enter);
     Py_DECREF(enter);
