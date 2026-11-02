@@ -213,7 +213,7 @@ PyAsync_GetValue(PyObject *self)
 {
     PyObject *value;
     Py_BEGIN_CRITICAL_SECTION(self);
-    value = async_cast(self)->aw_object_value;
+    value = Py_XNewRef(async_cast(self)->aw_object_value);
     Py_END_CRITICAL_SECTION();
     return value;
 }
@@ -750,10 +750,11 @@ async_with_get_state(PyObject *self, PyObject **state)
         !PyCapsule_IsValid(PyTuple_GET_ITEM(value, 1), "PyAsync.AsyncWith") ||
         (PyTuple_GET_ITEM(value, 2) != Py_None &&
          !PyExceptionInstance_Check(PyTuple_GET_ITEM(value, 2)))) {
+        Py_XDECREF(value);
         PyErr_SetString(PyExc_RuntimeError, "PyAsync async with state was replaced");
         return -1;
     }
-    *state = Py_NewRef(value);
+    *state = value;
     return 0;
 }
 

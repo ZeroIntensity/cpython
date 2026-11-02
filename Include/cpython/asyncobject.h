@@ -28,7 +28,7 @@ PyAPI_FUNC(void) PyAsync_Cancel(PyObject *);
 PyAPI_FUNC(int) PyAsync_AsyncWith(
     PyObject *, PyObject *, PyAsync_Callback, PyAsync_Error);
 
-/* The object slot holds a strong reference; GetValue returns a borrowed one.
+/* The object slot holds a strong reference; GetValue returns a new one.
    Either slot can be cleared by setting it to NULL. */
 PyAPI_FUNC(int) PyAsync_SetValue(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyAsync_GetValue(PyObject *);
