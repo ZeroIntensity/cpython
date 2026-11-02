@@ -379,13 +379,13 @@ async_fire_error(PyAsync *aw, PyAsync_Error callback)
     }
     PyObject *error = PyErr_GetRaisedException();
     int res = callback((PyObject *)aw, error);
-    if (res == -1) {
+    if (res == 0) {
         PyErr_SetRaisedException(error);
     }
     else {
         Py_DECREF(error);
     }
-    if (res < 0 && !PyErr_Occurred()) {
+    if (res <= 0 && !PyErr_Occurred()) {
         PyErr_SetString(PyExc_SystemError,
                          "PyAsync error callback failed without an exception");
     }
@@ -464,7 +464,7 @@ genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
             err_callback = cb->err_callback;
             if (cb->defer != NULL) {
                 int res = cb->defer((PyObject *)aw);
-                if (res < 0 || PyErr_Occurred()) {
+                if (res <= 0 || PyErr_Occurred()) {
                     if (!PyErr_Occurred()) {
                         PyErr_SetString(PyExc_SystemError,
                             "PyAsync deferred callback failed without an exception");
@@ -525,15 +525,15 @@ genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
             }
             continue;
         }
-        int res = callback != NULL ? callback((PyObject *)aw, result) : 0;
+        int res = callback != NULL ? callback((PyObject *)aw, result) : 1;
         Py_CLEAR(result);
-        if (res < 0 || PyErr_Occurred()) {
+        if (res <= 0 || PyErr_Occurred()) {
             if (!PyErr_Occurred()) {
                 PyErr_SetString(PyExc_SystemError,
                                 "PyAsync callback failed without an exception");
                 goto done;
             }
-            if (res < -1 || async_fire_error(aw, err_callback) < 0) {
+            if (res < 0 || async_fire_error(aw, err_callback) < 0) {
                 goto done;
             }
         }
@@ -762,23 +762,23 @@ async_with_exit(PyObject *self, PyObject *result)
 {
     PyObject *state;
     if (async_with_get_state(self, &state) < 0) {
-        return -2;
+        return -1;
     }
     PyObject *error = PyTuple_GET_ITEM(state, 2);
     if (error != Py_None) {
         int suppress = PyObject_IsTrue(result);
         if (suppress < 0) {
             Py_DECREF(state);
-            return -2;
+            return -1;
         }
         if (!suppress) {
             PyErr_SetRaisedException(Py_NewRef(error));
             Py_DECREF(state);
-            return -2;
+            return -1;
         }
     }
     Py_DECREF(state);
-    return 0;
+    return 1;
 }
 
 static int
@@ -786,23 +786,23 @@ async_with_inner(PyObject *self, PyObject *result)
 {
     PyObject *state;
     if (async_with_get_state(self, &state) < 0) {
-        return -1;
+        return 0;
     }
     PyObject *exit = PyTuple_GET_ITEM(state, 0);
     PyObject *capsule = PyTuple_GET_ITEM(state, 1);
     PyAsync_Callback *callback = PyCapsule_GetPointer(
         capsule, "PyAsync.AsyncWith");
     assert(callback != NULL);
-    int res = *callback != NULL ? (*callback)(self, result) : 0;
+    int res = *callback != NULL ? (*callback)(self, result) : 1;
     PyObject *error = NULL;
     PyObject *args[3] = {Py_None, Py_None, Py_None};
-    if (res < 0) {
+    if (res <= 0) {
         error = PyErr_GetRaisedException();
         if (error == NULL) {
             Py_DECREF(state);
             PyErr_SetString(PyExc_SystemError,
                 "PyAsync async with callback failed without an exception");
-            return -1;
+            return 0;
         }
         args[0] = (PyObject *)Py_TYPE(error);
         args[1] = error;
@@ -815,7 +815,7 @@ async_with_inner(PyObject *self, PyObject *result)
             Py_DECREF(args[2]);
             Py_DECREF(error);
             Py_DECREF(state);
-            return -1;
+            return 0;
         }
         PyAsync_SetValue(self, new_state);
         Py_DECREF(new_state);
@@ -829,7 +829,7 @@ async_with_inner(PyObject *self, PyObject *result)
         Py_DECREF(error);
     }
     Py_DECREF(state);
-    return PyAsync_AddExpr(self, coro, async_with_exit, NULL);
+    return PyAsync_AddExpr(self, coro, async_with_exit, NULL) == 0;
 }
 
 int
