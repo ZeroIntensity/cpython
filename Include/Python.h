@@ -116,7 +116,7 @@ __pragma(warning(disable: 4201))
 #include "cpython/initconfig.h"
 #include "pystate.h"
 #include "cpython/genobject.h"
-#include "cpython/asyncobject.h"
+#include "asyncobject.h"
 #include "descrobject.h"
 #include "genericaliasobject.h"
 #include "cpython/sentinelobject.h"

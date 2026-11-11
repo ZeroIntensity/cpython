@@ -147,7 +147,7 @@
     <ClInclude Include="..\Include\complexobject.h" />
     <ClInclude Include="..\Include\critical_section.h" />
     <ClInclude Include="..\Include\cpython\abstract.h" />
-    <ClInclude Include="..\Include\cpython\asyncobject.h" />
+    <ClInclude Include="..\Include\asyncobject.h" />
     <ClInclude Include="..\Include\cpython\audit.h" />
     <ClInclude Include="..\Include\cpython\bytearrayobject.h" />
     <ClInclude Include="..\Include\cpython\bytesobject.h" />

@@ -528,8 +528,8 @@
     <ClInclude Include="..\Include\cpython\genobject.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="..\Include\cpython\asyncobject.h">
-      <Filter>Include\cpython</Filter>
+    <ClInclude Include="..\Include\asyncobject.h">
+      <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="..\Include\cpython\pythonrun.h">
       <Filter>Include\cpython</Filter>

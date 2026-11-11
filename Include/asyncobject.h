@@ -1,17 +1,19 @@
-/* C API for composing asynchronous operations. */
+/* C API for defining asynchronous functions (PEP 852). */
 
-#ifndef Py_LIMITED_API
 #ifndef Py_ASYNCOBJECT_H
 #define Py_ASYNCOBJECT_H
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if !defined(Py_LIMITED_API) || Py_LIMITED_API+0 >= 0x03100000
+
+/* An opaque object implementing the coroutine protocol. */
 typedef struct _PyAsync PyAsync;
 
 PyAPI_DATA(PyTypeObject) PyAsync_Type;
 
-#define PyAsync_CheckExact(op) Py_IS_TYPE((op), &PyAsync_Type)
+PyAPI_FUNC(int) PyAsync_CheckExact(PyObject *op);
 
 typedef int (*PyAsync_Callback)(PyObject *asyncobj, PyObject *result);
 typedef int (*PyAsync_Error)(PyObject *asyncobj, PyObject *exception);
@@ -39,8 +41,9 @@ PyAPI_FUNC(PyObject *) PyAsync_GetValue(PyObject *asyncobj);
 PyAPI_FUNC(int) PyAsync_SetArbValue(PyObject *asyncobj, void *value);
 PyAPI_FUNC(void *) PyAsync_GetArbValue(PyObject *asyncobj);
 
+#endif /* !Py_LIMITED_API || Py_LIMITED_API >= 3.16 */
+
 #ifdef __cplusplus
 }
 #endif
 #endif /* !Py_ASYNCOBJECT_H */
-#endif /* !Py_LIMITED_API */

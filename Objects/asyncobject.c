@@ -1,8 +1,13 @@
+/* PyAsync: a coroutine object driven by C callbacks (PEP 852). */
+
 #include "Python.h"
 #include "pycore_genobject.h"     // _PyCoro_GetAwaitableIter()
+#include "pycore_pyerrors.h"      // _PyErr_FormatFromCause()
 
 #include <stdbool.h>
 
+/* One queued operation: either an awaitable with its callbacks, or a
+   deferred (synchronous) callback. */
 typedef struct {
     PyObject *coro;
     PyAsync_Callback callback;
@@ -24,6 +29,15 @@ struct _PyAsync {
     PyObject *aw_gen;
     PyObject *aw_object_value;
     void *aw_arbitrary_value;
+
+    /* Set on the internal object created by PyAsync_AsyncWith(). Result and
+       value storage are delegated to the root of the parent chain, so a
+       callback running inside the block sees the enclosing object's state. */
+    PyAsync *aw_parent;
+    PyObject *aw_with_exit;         // bound __aexit__, or NULL
+    PyObject *aw_with_error;        // exception being passed to __aexit__
+    PyAsync_Callback aw_with_callback;
+    bool aw_with_entered;           // __aenter__ completed; __aexit__ is owed
 };
 
 typedef struct {
@@ -34,11 +48,27 @@ typedef struct {
 
 extern PyTypeObject _PyAsyncGenWrapper_Type;
 
+int
+PyAsync_CheckExact(PyObject *op)
+{
+    return Py_IS_TYPE(op, &PyAsync_Type);
+}
+
 static PyAsync *
 async_cast(PyObject *op)
 {
     assert(PyAsync_CheckExact(op));
     return (PyAsync *)op;
+}
+
+/* The object whose result and value slots this object uses. */
+static PyAsync *
+async_root(PyAsync *aw)
+{
+    while (aw->aw_parent != NULL) {
+        aw = aw->aw_parent;
+    }
+    return aw;
 }
 
 static void
@@ -104,6 +134,9 @@ async_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(aw->aw_object_value);
     Py_VISIT(aw->aw_gen);
     Py_VISIT(aw->aw_result);
+    Py_VISIT(aw->aw_parent);
+    Py_VISIT(aw->aw_with_exit);
+    Py_VISIT(aw->aw_with_error);
     return 0;
 }
 
@@ -116,7 +149,11 @@ async_clear(PyObject *self)
     Py_CLEAR(aw->aw_object_value);
     Py_CLEAR(aw->aw_gen);
     Py_CLEAR(aw->aw_result);
+    Py_CLEAR(aw->aw_parent);
+    Py_CLEAR(aw->aw_with_exit);
+    Py_CLEAR(aw->aw_with_error);
     aw->aw_arbitrary_value = NULL;
+    aw->aw_with_callback = NULL;
     return 0;
 }
 
@@ -127,7 +164,8 @@ async_dealloc(PyObject *self)
     PyObject_GC_UnTrack(self);
     PyObject *error = PyErr_GetRaisedException();
     if (!aw->aw_awaited) {
-        if (PyErr_WarnEx(PyExc_ResourceWarning,
+        /* Match native coroutines, which emit a RuntimeWarning. */
+        if (PyErr_WarnEx(PyExc_RuntimeWarning,
                          "PyAsync object was never awaited", 1) < 0) {
             PyErr_WriteUnraisable(self);
         }
@@ -156,6 +194,11 @@ PyAsync_New(void)
     aw->aw_gen = NULL;
     aw->aw_object_value = NULL;
     aw->aw_arbitrary_value = NULL;
+    aw->aw_parent = NULL;
+    aw->aw_with_exit = NULL;
+    aw->aw_with_error = NULL;
+    aw->aw_with_callback = NULL;
+    aw->aw_with_entered = false;
     PyObject_GC_Track(aw);
     return (PyObject *)aw;
 }
@@ -164,8 +207,8 @@ int
 PyAsync_SetResult(PyObject *self, PyObject *result)
 {
     assert(result != NULL);
-    PyAsync *aw = async_cast(self);
-    Py_BEGIN_CRITICAL_SECTION(self);
+    PyAsync *aw = async_root(async_cast(self));
+    Py_BEGIN_CRITICAL_SECTION(aw);
     Py_XSETREF(aw->aw_result, Py_NewRef(result));
     Py_END_CRITICAL_SECTION();
     return 0;
@@ -174,8 +217,8 @@ PyAsync_SetResult(PyObject *self, PyObject *result)
 int
 PyAsync_SetValue(PyObject *self, PyObject *value)
 {
-    PyAsync *aw = async_cast(self);
-    Py_BEGIN_CRITICAL_SECTION(self);
+    PyAsync *aw = async_root(async_cast(self));
+    Py_BEGIN_CRITICAL_SECTION(aw);
     Py_XSETREF(aw->aw_object_value, Py_XNewRef(value));
     Py_END_CRITICAL_SECTION();
     return 0;
@@ -184,9 +227,10 @@ PyAsync_SetValue(PyObject *self, PyObject *value)
 PyObject *
 PyAsync_GetValue(PyObject *self)
 {
+    PyAsync *aw = async_root(async_cast(self));
     PyObject *value;
-    Py_BEGIN_CRITICAL_SECTION(self);
-    value = Py_XNewRef(async_cast(self)->aw_object_value);
+    Py_BEGIN_CRITICAL_SECTION(aw);
+    value = Py_XNewRef(aw->aw_object_value);
     Py_END_CRITICAL_SECTION();
     return value;
 }
@@ -194,8 +238,8 @@ PyAsync_GetValue(PyObject *self)
 int
 PyAsync_SetArbValue(PyObject *self, void *value)
 {
-    PyAsync *aw = async_cast(self);
-    Py_BEGIN_CRITICAL_SECTION(self);
+    PyAsync *aw = async_root(async_cast(self));
+    Py_BEGIN_CRITICAL_SECTION(aw);
     aw->aw_arbitrary_value = value;
     Py_END_CRITICAL_SECTION();
     return 0;
@@ -204,23 +248,23 @@ PyAsync_SetArbValue(PyObject *self, void *value)
 void *
 PyAsync_GetArbValue(PyObject *self)
 {
+    PyAsync *aw = async_root(async_cast(self));
     void *value;
-    Py_BEGIN_CRITICAL_SECTION(self);
-    value = async_cast(self)->aw_arbitrary_value;
+    Py_BEGIN_CRITICAL_SECTION(aw);
+    value = aw->aw_arbitrary_value;
     Py_END_CRITICAL_SECTION();
     return value;
 }
 
-int
-PyAsync_AddAwait(PyObject *self, PyObject *coro, PyAsync_Callback callback,
-                 PyAsync_Error err_callback)
+static int
+async_add_await_locked(PyAsync *aw, PyObject *coro, PyAsync_Callback callback,
+                       PyAsync_Error err_callback)
 {
-    PyAsync *aw = async_cast(self);
     if (coro == NULL) {
         PyErr_SetString(PyExc_ValueError, "NULL passed to PyAsync_AddAwait()");
         return -1;
     }
-    if (coro == self) {
+    if (coro == (PyObject *)aw) {
         PyErr_SetString(PyExc_ValueError, "a PyAsync cannot await itself");
         return -1;
     }
@@ -237,9 +281,17 @@ PyAsync_AddAwait(PyObject *self, PyObject *coro, PyAsync_Callback callback,
                      Py_TYPE(coro)->tp_name);
         return -1;
     }
+    return async_append_callback(aw, coro, callback, err_callback, NULL);
+}
+
+int
+PyAsync_AddAwait(PyObject *self, PyObject *coro, PyAsync_Callback callback,
+                 PyAsync_Error err_callback)
+{
+    PyAsync *aw = async_cast(self);
     int res;
     Py_BEGIN_CRITICAL_SECTION(self);
-    res = async_append_callback(aw, coro, callback, err_callback, NULL);
+    res = async_add_await_locked(aw, coro, callback, err_callback);
     Py_END_CRITICAL_SECTION();
     return res;
 }
@@ -268,11 +320,9 @@ PyAsync_DeferAwait(PyObject *self, PyAsync_Defer callback)
     return res;
 }
 
-void
-PyAsync_Cancel(PyObject *self)
+static void
+async_cancel_locked(PyAsync *aw)
 {
-    PyAsync *aw = async_cast(self);
-    Py_BEGIN_CRITICAL_SECTION(self);
     aw->aw_recently_cancelled = true;
     aw->aw_awaited = true;
     if (aw->aw_gen != NULL) {
@@ -280,6 +330,14 @@ PyAsync_Cancel(PyObject *self)
         Py_CLEAR(g->gw_current_await);
     }
     async_clear_callbacks(aw);
+}
+
+void
+PyAsync_Cancel(PyObject *self)
+{
+    PyAsync *aw = async_cast(self);
+    Py_BEGIN_CRITICAL_SECTION(self);
+    async_cancel_locked(aw);
     Py_END_CRITICAL_SECTION();
 }
 
@@ -343,6 +401,31 @@ async_await(PyObject *self)
     return res;
 }
 
+/* Validate the return value of a callback against the exception state.
+   Callbacks must set an exception if and only if they report failure.
+   Return 1 for success, 0 for "failed, run the error callback", and -1 for
+   "failed, propagate", always with an exception set for the latter two. */
+static int
+async_check_callback_result(int res, const char *what)
+{
+    if (res > 0) {
+        if (PyErr_Occurred()) {
+            _PyErr_FormatFromCause(PyExc_SystemError,
+                "PyAsync %s returned success with an exception set", what);
+            return -1;
+        }
+        return 1;
+    }
+    if (!PyErr_Occurred()) {
+        PyErr_Format(PyExc_SystemError,
+            "PyAsync %s returned %d without setting an exception", what, res);
+        return -1;
+    }
+    return res == 0 ? 0 : -1;
+}
+
+/* Run the error callback for the current exception. Return 0 if the error
+   was handled and execution should continue, or -1 with an exception set. */
 static int
 async_fire_error(PyAsync *aw, PyAsync_Error callback)
 {
@@ -352,17 +435,32 @@ async_fire_error(PyAsync *aw, PyAsync_Error callback)
     }
     PyObject *error = PyErr_GetRaisedException();
     int res = callback((PyObject *)aw, error);
-    if (res == 0) {
-        PyErr_SetRaisedException(error);
-    }
-    else {
+    if (res > 0) {
         Py_DECREF(error);
+        if (PyErr_Occurred()) {
+            _PyErr_FormatFromCause(PyExc_SystemError,
+                "PyAsync error callback returned success "
+                "with an exception set");
+            return -1;
+        }
+        return 0;
     }
-    if (res <= 0 && !PyErr_Occurred()) {
+    if (res == 0) {
+        if (PyErr_Occurred()) {
+            Py_DECREF(error);
+            _PyErr_FormatFromCause(PyExc_SystemError,
+                "PyAsync error callback returned 0 with an exception set");
+            return -1;
+        }
+        PyErr_SetRaisedException(error);
+        return -1;
+    }
+    Py_DECREF(error);
+    if (!PyErr_Occurred()) {
         PyErr_SetString(PyExc_SystemError,
-                         "PyAsync error callback failed without an exception");
+            "PyAsync error callback returned -1 without setting an exception");
     }
-    return PyErr_Occurred() ? -1 : 0;
+    return -1;
 }
 
 static void
@@ -401,6 +499,106 @@ genwrapper_throw_current(PyObject *current, PyObject *error, PyObject **result)
     return PYGEN_ERROR;
 }
 
+/* Result callback for the awaited __aexit__(). */
+static int
+async_with_exit(PyObject *self, PyObject *result)
+{
+    PyAsync *aw = async_cast(self);
+    if (aw->aw_with_error == NULL) {
+        return 1;
+    }
+    int suppress = PyObject_IsTrue(result);
+    if (suppress < 0) {
+        return -1;
+    }
+    PyObject *error = aw->aw_with_error;
+    aw->aw_with_error = NULL;
+    if (suppress) {
+        Py_DECREF(error);
+        return 1;
+    }
+    PyErr_SetRaisedException(error);
+    return -1;
+}
+
+/* Queue the __aexit__() call. *error* is a borrowed reference to the
+   exception raised by the block, or NULL for a normal exit. Any operations
+   remaining in the queue are discarded. */
+static int
+async_with_schedule_exit(PyAsync *aw, PyObject *error)
+{
+    assert(aw->aw_with_entered && aw->aw_with_exit != NULL);
+    PyObject *exit = aw->aw_with_exit;
+    aw->aw_with_exit = NULL;
+    aw->aw_with_entered = false;
+    async_clear_callbacks(aw);
+    Py_XSETREF(aw->aw_with_error, Py_XNewRef(error));
+
+    PyObject *args[3] = {Py_None, Py_None, Py_None};
+    PyObject *tb = NULL;
+    if (error != NULL) {
+        tb = PyException_GetTraceback(error);
+        args[0] = (PyObject *)Py_TYPE(error);
+        args[1] = error;
+        args[2] = tb != NULL ? tb : Py_None;
+    }
+    PyObject *coro = PyObject_Vectorcall(exit, args, 3, NULL);
+    Py_XDECREF(tb);
+    Py_DECREF(exit);
+    if (coro == NULL) {
+        return -1;
+    }
+    int res = async_add_await_locked(aw, coro, async_with_exit, NULL);
+    Py_DECREF(coro);
+    return res;
+}
+
+/* Result callback for the awaited __aenter__(). From here on, __aexit__()
+   is owed, whatever happens in the block. */
+static int
+async_with_enter_done(PyObject *self, PyObject *result)
+{
+    PyAsync *aw = async_cast(self);
+    aw->aw_with_entered = true;
+    if (aw->aw_with_callback == NULL) {
+        return 1;
+    }
+    return aw->aw_with_callback(self, result);
+}
+
+/* An exception is set and would end execution of *aw*. Return 0 if it was
+   routed to a pending __aexit__() and execution should continue, or -1 if
+   it should propagate (still set). */
+static int
+async_on_failure(PyAsync *aw)
+{
+    assert(PyErr_Occurred());
+    if (aw->aw_with_entered && aw->aw_with_exit != NULL) {
+        PyObject *error = PyErr_GetRaisedException();
+        int res = async_with_schedule_exit(aw, error);
+        Py_DECREF(error);
+        if (res == 0) {
+            return 0;
+        }
+        /* Calling __aexit__ itself failed; fall through and chain. */
+    }
+    if (aw->aw_with_error != NULL) {
+        /* Failure during __aexit__(): keep the block's exception as context,
+           as the interpreter does for exceptions raised in a handler. */
+        PyObject *error = PyErr_GetRaisedException();
+        PyObject *context = aw->aw_with_error;
+        aw->aw_with_error = NULL;
+        if (error != context && PyException_GetContext(error) == NULL) {
+            PyException_SetContext(error, context);
+        }
+        else {
+            Py_DECREF(context);
+        }
+        PyErr_SetRaisedException(error);
+    }
+    return -1;
+}
+
 static PyObject *
 genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
                          PyObject *error)
@@ -416,12 +614,24 @@ genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
     aw->aw_running = true;
     PyObject *result = NULL;
 
-    while (!aw->aw_done) {
+    for (;;) {
         if (g->gw_current_await == NULL && error != NULL) {
+            /* Thrown in while nothing is being awaited. */
             PyErr_SetRaisedException(Py_NewRef(error));
-            goto done;
+            error = NULL;
+            if (async_on_failure(aw) < 0) {
+                goto done;
+            }
+            continue;
         }
         if (g->gw_current_await == NULL && aw->aw_state == aw->aw_size) {
+            if (aw->aw_with_entered && aw->aw_with_exit != NULL) {
+                if (async_with_schedule_exit(aw, NULL) < 0 &&
+                    async_on_failure(aw) < 0) {
+                    goto done;
+                }
+                continue;
+            }
             _PyGen_SetStopIterationValue(
                 aw->aw_result != NULL ? aw->aw_result : Py_None);
             goto done;
@@ -436,12 +646,9 @@ genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
             callback = cb->callback;
             err_callback = cb->err_callback;
             if (cb->defer != NULL) {
-                int res = cb->defer((PyObject *)aw);
-                if (res <= 0 || PyErr_Occurred()) {
-                    if (!PyErr_Occurred()) {
-                        PyErr_SetString(PyExc_SystemError,
-                            "PyAsync deferred callback failed without an exception");
-                    }
+                int res = async_check_callback_result(
+                    cb->defer((PyObject *)aw), "deferred callback");
+                if (res <= 0 && async_on_failure(aw) < 0) {
                     goto done;
                 }
                 continue;
@@ -451,14 +658,15 @@ genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
             Py_DECREF(coro);
             if (aw->aw_recently_cancelled) {
                 Py_XDECREF(iter);
-                if (PyErr_Occurred()) {
+                if (PyErr_Occurred() && async_on_failure(aw) < 0) {
                     goto done;
                 }
                 continue;
             }
             if (iter == NULL) {
                 genwrapper_callback_done(g, cb);
-                if (async_fire_error(aw, err_callback) < 0) {
+                if (async_fire_error(aw, err_callback) < 0 &&
+                    async_on_failure(aw) < 0) {
                     goto done;
                 }
                 continue;
@@ -488,30 +696,30 @@ genwrapper_resume_locked(asyncgenwrapper *g, PyAsync *aw, PyObject *value,
         if (!aw->aw_recently_cancelled) {
             genwrapper_callback_done(g, cb);
         }
-        if (aw->aw_recently_cancelled) {
+        else {
             callback = NULL;
             err_callback = NULL;
         }
         if (status == PYGEN_ERROR) {
-            if (async_fire_error(aw, err_callback) < 0) {
+            if (async_fire_error(aw, err_callback) < 0 &&
+                async_on_failure(aw) < 0) {
                 goto done;
             }
             continue;
         }
-        int res = callback != NULL ? callback((PyObject *)aw, result) : 1;
+        int res = 1;
+        if (callback != NULL) {
+            res = async_check_callback_result(
+                callback((PyObject *)aw, result), "result callback");
+        }
         Py_CLEAR(result);
-        if (res <= 0 || PyErr_Occurred()) {
-            if (!PyErr_Occurred()) {
-                PyErr_SetString(PyExc_SystemError,
-                                "PyAsync callback failed without an exception");
-                goto done;
-            }
-            if (res < 0 || async_fire_error(aw, err_callback) < 0) {
+        if (res <= 0) {
+            if ((res < 0 || async_fire_error(aw, err_callback) < 0) &&
+                async_on_failure(aw) < 0) {
                 goto done;
             }
         }
     }
-    _PyGen_SetStopIterationValue(Py_None);
 
 done:
     aw->aw_done = true;
@@ -606,6 +814,31 @@ async_am_send(PyObject *self, PyObject *value, PyObject **result)
     return PYGEN_ERROR;
 }
 
+/* Throw *error* (a strong reference, consumed) into the object. */
+static PyObject *
+async_throw_locked(PyAsync *aw, PyObject *error)
+{
+    PyObject *res = NULL;
+    if (aw->aw_gen != NULL) {
+        PyObject *gen = Py_NewRef(aw->aw_gen);
+        res = genwrapper_resume_locked(
+            (asyncgenwrapper *)gen, aw, Py_None, error);
+        Py_DECREF(gen);
+    }
+    else if (aw->aw_done) {
+        PyErr_SetString(PyExc_RuntimeError, "cannot reuse a completed PyAsync");
+    }
+    else {
+        /* Like a coroutine that was never started: raise at the first line. */
+        aw->aw_done = true;
+        aw->aw_awaited = true;
+        async_clear_callbacks(aw);
+        PyErr_SetRaisedException(Py_NewRef(error));
+    }
+    Py_DECREF(error);
+    return res;
+}
+
 static PyObject *
 async_throw(PyObject *self, PyObject *args)
 {
@@ -622,61 +855,51 @@ async_throw(PyObject *self, PyObject *args)
     if (error == NULL) {
         return NULL;
     }
-    PyAsync *aw = async_cast(self);
-    PyObject *res = NULL;
+    PyObject *res;
     Py_BEGIN_CRITICAL_SECTION(self);
-    if (aw->aw_gen != NULL) {
-        PyObject *gen = Py_NewRef(aw->aw_gen);
-        res = genwrapper_resume_locked(
-            (asyncgenwrapper *)gen, aw, Py_None, error);
-        Py_DECREF(gen);
-    }
-    else {
-        aw->aw_done = true;
-        aw->aw_awaited = true;
-        PyErr_SetRaisedException(Py_NewRef(error));
-    }
+    res = async_throw_locked(async_cast(self), error);
     Py_END_CRITICAL_SECTION();
-    Py_DECREF(error);
     return res;
 }
 
+/* close(): throw GeneratorExit, like a native coroutine. Error callbacks and
+   any pending __aexit__() observe it; the object may not suspend again. */
 static PyObject *
 async_close(PyObject *self, PyObject *Py_UNUSED(ignored))
 {
     PyAsync *aw = async_cast(self);
-    int res = 0;
+    PyObject *res = NULL;
+    bool finished = false;
     Py_BEGIN_CRITICAL_SECTION(self);
-    if (aw->aw_running) {
-        PyErr_SetString(PyExc_ValueError, "PyAsync is already executing");
-        res = -1;
+    if (aw->aw_done) {
+        finished = true;
+    }
+    else if (aw->aw_gen == NULL) {
+        /* Never started: nothing to unwind. */
+        aw->aw_done = true;
+        async_cancel_locked(aw);
+        finished = true;
     }
     else {
-        aw->aw_running = true;
-        aw->aw_done = true;
-        if (aw->aw_gen != NULL) {
-            asyncgenwrapper *g = (asyncgenwrapper *)aw->aw_gen;
-            if (g->gw_current_await != NULL) {
-                PyObject *close;
-                res = PyObject_GetOptionalAttrString(
-                    g->gw_current_await, "close", &close);
-                if (res > 0) {
-                    PyObject *result = PyObject_CallNoArgs(close);
-                    Py_DECREF(close);
-                    res = result == NULL ? -1 : 0;
-                    Py_XDECREF(result);
-                }
-            }
-        }
-        PyAsync_Cancel(self);
-        Py_CLEAR(aw->aw_gen);
-        aw->aw_running = false;
+        PyErr_SetNone(PyExc_GeneratorExit);
+        PyObject *error = PyErr_GetRaisedException();
+        res = async_throw_locked(aw, error);
     }
     Py_END_CRITICAL_SECTION();
-    if (res < 0) {
+    if (finished) {
+        Py_RETURN_NONE;
+    }
+    if (res != NULL) {
+        Py_DECREF(res);
+        PyErr_SetString(PyExc_RuntimeError, "PyAsync ignored GeneratorExit");
         return NULL;
     }
-    Py_RETURN_NONE;
+    if (PyErr_ExceptionMatches(PyExc_GeneratorExit) ||
+        PyErr_ExceptionMatches(PyExc_StopIteration)) {
+        PyErr_Clear();
+        Py_RETURN_NONE;
+    }
+    return NULL;
 }
 
 static PyObject *
@@ -706,94 +929,6 @@ genwrapper_close(PyObject *self, PyObject *ignored)
     return res;
 }
 
-static int
-async_with_get_state(PyObject *self, PyObject **state)
-{
-    PyObject *value = PyAsync_GetValue(self);
-    if (value == NULL || !PyTuple_CheckExact(value) ||
-        PyTuple_GET_SIZE(value) != 2 ||
-        (PyTuple_GET_ITEM(value, 1) != Py_None &&
-         !PyExceptionInstance_Check(PyTuple_GET_ITEM(value, 1)))) {
-        Py_XDECREF(value);
-        PyErr_SetString(PyExc_RuntimeError, "PyAsync async with state was replaced");
-        return -1;
-    }
-    *state = value;
-    return 0;
-}
-
-static int
-async_with_exit(PyObject *self, PyObject *result)
-{
-    PyObject *state;
-    if (async_with_get_state(self, &state) < 0) {
-        return -1;
-    }
-    PyObject *error = PyTuple_GET_ITEM(state, 1);
-    if (error != Py_None) {
-        int suppress = PyObject_IsTrue(result);
-        if (suppress < 0) {
-            Py_DECREF(state);
-            return -1;
-        }
-        if (!suppress) {
-            PyErr_SetRaisedException(Py_NewRef(error));
-            Py_DECREF(state);
-            return -1;
-        }
-    }
-    Py_DECREF(state);
-    return 1;
-}
-
-static int
-async_with_inner(PyObject *self, PyObject *result)
-{
-    PyObject *state;
-    if (async_with_get_state(self, &state) < 0) {
-        return 0;
-    }
-    PyObject *exit = PyTuple_GET_ITEM(state, 0);
-    PyAsync_Callback callback = (PyAsync_Callback)PyAsync_GetArbValue(self);
-    int res = callback != NULL ? callback(self, result) : 1;
-    PyObject *error = NULL;
-    PyObject *args[3] = {Py_None, Py_None, Py_None};
-    if (res <= 0) {
-        error = PyErr_GetRaisedException();
-        if (error == NULL) {
-            Py_DECREF(state);
-            PyErr_SetString(PyExc_SystemError,
-                "PyAsync async with callback failed without an exception");
-            return 0;
-        }
-        args[0] = (PyObject *)Py_TYPE(error);
-        args[1] = error;
-        args[2] = PyException_GetTraceback(error);
-        if (args[2] == NULL) {
-            args[2] = Py_NewRef(Py_None);
-        }
-        PyObject *new_state = PyTuple_Pack(2, exit, error);
-        if (new_state == NULL) {
-            Py_DECREF(args[2]);
-            Py_DECREF(error);
-            Py_DECREF(state);
-            return 0;
-        }
-        PyAsync_SetValue(self, new_state);
-        Py_DECREF(new_state);
-    }
-    else {
-        PyAsync_SetValue(self, state);
-    }
-    PyObject *coro = PyObject_Vectorcall(exit, args, 3, NULL);
-    if (error != NULL) {
-        Py_DECREF(args[2]);
-        Py_DECREF(error);
-    }
-    Py_DECREF(state);
-    return PyAsync_AddExpr(self, coro, async_with_exit, NULL) == 0;
-}
-
 int
 PyAsync_AsyncWith(PyObject *self, PyObject *ctx, PyAsync_Callback callback,
                   PyAsync_Error err_callback)
@@ -807,29 +942,25 @@ PyAsync_AsyncWith(PyObject *self, PyObject *ctx, PyAsync_Callback callback,
         Py_DECREF(enter);
         return -1;
     }
-    PyObject *state = PyTuple_Pack(2, exit, Py_None);
-    Py_DECREF(exit);
-    if (state == NULL) {
-        Py_DECREF(enter);
-        return -1;
-    }
-    PyObject *inner = PyAsync_New();
+    PyAsync *inner = (PyAsync *)PyAsync_New();
     if (inner == NULL) {
         Py_DECREF(enter);
-        Py_DECREF(state);
+        Py_DECREF(exit);
         return -1;
     }
-    PyAsync_SetValue(inner, state);
-    PyAsync_SetArbValue(inner, (void *)callback);
-    Py_DECREF(state);
+    /* The block shares result and value storage with the enclosing object,
+       and is driven by it, so it never warns on its own. */
+    inner->aw_parent = (PyAsync *)Py_NewRef(self);
+    inner->aw_awaited = true;
+    inner->aw_with_exit = exit;
+    inner->aw_with_callback = callback;
+
     PyObject *coro = PyObject_CallNoArgs(enter);
     Py_DECREF(enter);
-    int res = PyAsync_AddExpr(inner, coro, async_with_inner, NULL);
+    int res = PyAsync_AddExpr((PyObject *)inner, coro,
+                              async_with_enter_done, NULL);
     if (res == 0) {
-        res = PyAsync_AddAwait(self, inner, NULL, err_callback);
-    }
-    if (res < 0) {
-        PyAsync_Cancel(inner);
+        res = PyAsync_AddAwait(self, (PyObject *)inner, NULL, err_callback);
     }
     Py_DECREF(inner);
     return res;

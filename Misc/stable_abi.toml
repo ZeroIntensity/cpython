@@ -2915,3 +2915,37 @@
     added = '3.16'
 [macro.Py_XSETREF]
     added = '3.16'
+[data.PyAsync_Type]
+    added = '3.16'
+[typedef.PyAsync]
+    added = '3.16'
+[typedef.PyAsync_Callback]
+    added = '3.16'
+[typedef.PyAsync_Error]
+    added = '3.16'
+[typedef.PyAsync_Defer]
+    added = '3.16'
+[function.PyAsync_CheckExact]
+    added = '3.16'
+[function.PyAsync_New]
+    added = '3.16'
+[function.PyAsync_SetResult]
+    added = '3.16'
+[function.PyAsync_AddAwait]
+    added = '3.16'
+[function.PyAsync_AddExpr]
+    added = '3.16'
+[function.PyAsync_DeferAwait]
+    added = '3.16'
+[function.PyAsync_Cancel]
+    added = '3.16'
+[function.PyAsync_AsyncWith]
+    added = '3.16'
+[function.PyAsync_SetValue]
+    added = '3.16'
+[function.PyAsync_GetValue]
+    added = '3.16'
+[function.PyAsync_SetArbValue]
+    added = '3.16'
+[function.PyAsync_GetArbValue]
+    added = '3.16'
